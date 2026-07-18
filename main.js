@@ -14,6 +14,28 @@
   var progressBar = document.getElementById("progressBar");
   var heroVideo = document.querySelector(".hero__video");
 
+  /* Pick the right video for the device: phones get a lighter 720p encode,
+     laptops/desktops the full-quality file. */
+  if (heroVideo) {
+    var smallScreen =
+      Math.min(window.screen.width, window.screen.height) <= 820 ||
+      window.innerWidth <= 820;
+    heroVideo.src = heroVideo.getAttribute(
+      smallScreen ? "data-src-mobile" : "data-src-desktop"
+    );
+    heroVideo.play().catch(function () {});
+    // iOS blocks autoplay in Low Power Mode — start on the first touch instead.
+    var kickVideo = function () {
+      window.removeEventListener("touchstart", kickVideo);
+      window.removeEventListener("pointerdown", kickVideo);
+      if (activeIndex <= 0 && heroVideo.paused) {
+        heroVideo.play().catch(function () {});
+      }
+    };
+    window.addEventListener("touchstart", kickVideo, { passive: true });
+    window.addEventListener("pointerdown", kickVideo, { passive: true });
+  }
+
   var N = panels.length;
   var DEPTH = 1100;          // z-distance between panels (px)
   var FADE_BEHIND = 260;     // how far past the camera before a panel is gone
