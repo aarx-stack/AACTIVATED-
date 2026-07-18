@@ -1,0 +1,344 @@
+/* ============================================================
+   RED DOOR STUDIO — 3D fly-through scroll site
+   ============================================================ */
+
+:root {
+  --red: #b3161c;
+  --red-bright: #e02128;
+  --red-deep: #4d0507;
+  --black: #0a0505;
+  --ink: #120808;
+  --bone: #e9dfd2;
+  --bone-dim: #b3a595;
+  --serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --sans: "Futura", "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--black);
+  color: var(--bone);
+  font-family: var(--sans);
+  overflow-x: hidden;
+  /* Scroll length is set from JS via --pages */
+  height: calc(var(--pages, 6) * 100vh);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #1c0808 0%, var(--black) 60%),
+    var(--black);
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+
+/* ---------- overlays ---------- */
+
+.vignette {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 45%, rgba(0,0,0,.55) 85%, rgba(0,0,0,.85) 100%);
+}
+
+.grain {
+  position: fixed; inset: -50%; z-index: 41; pointer-events: none;
+  opacity: .07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 900ms steps(4) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(-2%,3%); }
+  50% { transform: translate(3%,-2%); }
+  75% { transform: translate(-3%,-3%); }
+  100% { transform: translate(2%,2%); }
+}
+
+#dust { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+
+/* ---------- progress + dots ---------- */
+
+.progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  z-index: 50; background: rgba(255,255,255,.06);
+}
+.progress__bar {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--red-deep), var(--red-bright));
+  box-shadow: 0 0 12px rgba(224,33,40,.8);
+}
+
+.dots {
+  position: fixed; right: 22px; top: 50%; z-index: 50;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1px solid var(--bone-dim);
+  background: transparent; cursor: pointer;
+  transition: background .3s, transform .3s, border-color .3s, box-shadow .3s;
+}
+.dot:hover { border-color: var(--bone); transform: scale(1.25); }
+.dot.is-active {
+  background: var(--red-bright); border-color: var(--red-bright);
+  box-shadow: 0 0 10px rgba(224,33,40,.9);
+  transform: scale(1.25);
+}
+
+/* ---------- 3D scene ---------- */
+
+.scene {
+  position: fixed; inset: 0; z-index: 10;
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
+  overflow: hidden;
+}
+
+.panel {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  padding: 6vmin;
+  will-change: transform, opacity, filter;
+  opacity: 0;
+  pointer-events: none;
+}
+.panel.is-live { pointer-events: auto; }
+
+/* ---------- hero ---------- */
+
+.hero { text-align: center; }
+
+.hero__frame {
+  position: relative;
+  width: min(58vh, 82vw);
+  margin: 0 auto;
+  border-radius: 6px;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 40px 90px rgba(0,0,0,.85),
+    0 0 80px rgba(179,22,28,.25),
+    inset 0 0 0 1px rgba(233,223,210,.08);
+  transition: box-shadow .4s;
+  will-change: transform;
+}
+.hero__img {
+  display: block; width: 100%; height: auto;
+  border-radius: 6px;
+  transform: translateZ(30px);
+}
+.hero__sheen {
+  position: absolute; inset: 0; border-radius: 6px;
+  background: linear-gradient(115deg,
+    transparent 40%, rgba(255,255,255,.12) 50%, transparent 60%);
+  background-size: 250% 250%;
+  background-position: var(--shx, 50%) 0;
+  transform: translateZ(31px);
+  pointer-events: none;
+}
+
+.hero__kicker {
+  margin-top: 3.2vh;
+  font-size: clamp(.6rem, 1.4vw, .8rem);
+  letter-spacing: .45em;
+  color: var(--bone-dim);
+}
+.hero__tag {
+  margin-top: 1vh;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.1rem, 2.6vw, 1.7rem);
+  color: var(--bone);
+  text-shadow: 0 0 24px rgba(224,33,40,.5);
+}
+
+.hero__scrollhint {
+  margin-top: 3.5vh;
+  display: inline-flex; flex-direction: column; align-items: center; gap: 10px;
+  font-size: .65rem; letter-spacing: .35em; color: var(--bone-dim);
+  animation: floaty 2.6s ease-in-out infinite;
+}
+.hero__mouse {
+  width: 22px; height: 36px; border-radius: 12px;
+  border: 1.5px solid var(--bone-dim);
+  position: relative;
+}
+.hero__mouse::after {
+  content: ""; position: absolute; left: 50%; top: 7px;
+  width: 3px; height: 7px; border-radius: 2px;
+  background: var(--red-bright);
+  transform: translateX(-50%);
+  animation: wheel 1.6s ease-in-out infinite;
+}
+@keyframes wheel {
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  70% { opacity: 0; transform: translate(-50%, 12px); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(7px); }
+}
+
+/* ---------- content panels ---------- */
+
+.content { max-width: 700px; width: 100%; }
+.content--wide { max-width: 1050px; }
+.content--center { text-align: center; }
+
+.eyebrow {
+  font-size: .7rem; letter-spacing: .5em;
+  color: var(--red-bright);
+  text-transform: uppercase;
+  margin-bottom: 2.2vh;
+}
+
+h2 {
+  font-family: var(--serif);
+  font-weight: 800;
+  font-size: clamp(1.9rem, 5vw, 3.6rem);
+  line-height: 1.12;
+  letter-spacing: .01em;
+  margin-bottom: 3vh;
+  text-shadow: 0 4px 30px rgba(0,0,0,.9);
+}
+.red {
+  color: var(--red-bright);
+  text-shadow: 0 0 30px rgba(224,33,40,.55);
+}
+
+.lede {
+  font-size: clamp(.95rem, 1.6vw, 1.15rem);
+  line-height: 1.75;
+  color: var(--bone-dim);
+  max-width: 58ch;
+}
+.content--center .lede { margin: 0 auto 4vh; }
+
+/* stats */
+.stats { display: flex; gap: 6vmin; margin-top: 5vh; flex-wrap: wrap; }
+.stat strong {
+  font-family: var(--serif);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  color: var(--bone);
+}
+.stat strong span { color: var(--red-bright); font-size: .6em; }
+.stat em {
+  display: block; font-style: normal;
+  font-size: .7rem; letter-spacing: .3em; text-transform: uppercase;
+  color: var(--bone-dim); margin-top: .5vh;
+}
+
+/* cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 18px;
+}
+.card {
+  position: relative;
+  padding: 26px 22px;
+  border: 1px solid rgba(233,223,210,.12);
+  border-radius: 6px;
+  background: linear-gradient(160deg, rgba(30,10,10,.85), rgba(10,5,5,.9));
+  backdrop-filter: blur(4px);
+  transition: transform .35s cubic-bezier(.2,.7,.3,1), border-color .35s, box-shadow .35s;
+  transform-style: preserve-3d;
+}
+.card:hover {
+  transform: translateY(-6px) rotateX(4deg);
+  border-color: rgba(224,33,40,.6);
+  box-shadow: 0 24px 50px rgba(0,0,0,.7), 0 0 30px rgba(179,22,28,.25);
+}
+.card__num {
+  position: absolute; top: 14px; right: 16px;
+  font-family: var(--serif); font-size: 1.6rem;
+  color: rgba(224,33,40,.35);
+}
+.card h3 {
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+  color: var(--bone);
+}
+.card p { font-size: .86rem; line-height: 1.65; color: var(--bone-dim); }
+
+.card--featured {
+  border-color: rgba(224,33,40,.55);
+  box-shadow: 0 0 40px rgba(179,22,28,.2);
+}
+.price {
+  font-family: var(--serif);
+  font-size: 2rem !important;
+  color: var(--bone) !important;
+  margin-bottom: 10px;
+}
+.price span { font-size: .45em; color: var(--bone-dim); letter-spacing: .1em; }
+
+/* gear list */
+.gear { list-style: none; margin-top: 1vh; }
+.gear li {
+  padding: 2.2vh 0;
+  border-bottom: 1px solid rgba(233,223,210,.12);
+  font-size: clamp(.9rem, 1.5vw, 1.05rem);
+  color: var(--bone-dim);
+  line-height: 1.6;
+}
+.gear li span {
+  display: block;
+  font-size: .68rem; letter-spacing: .4em; text-transform: uppercase;
+  color: var(--red-bright);
+  margin-bottom: .6vh;
+}
+
+/* button */
+.btn {
+  display: inline-block;
+  padding: 16px 42px;
+  border: 1px solid var(--red-bright);
+  border-radius: 3px;
+  color: var(--bone);
+  text-decoration: none;
+  font-size: .85rem; letter-spacing: .25em; text-transform: uppercase;
+  background: linear-gradient(160deg, rgba(179,22,28,.25), rgba(77,5,7,.4));
+  box-shadow: 0 0 30px rgba(179,22,28,.25);
+  transition: background .3s, box-shadow .3s, transform .3s;
+}
+.btn:hover {
+  background: linear-gradient(160deg, rgba(224,33,40,.5), rgba(77,5,7,.6));
+  box-shadow: 0 0 50px rgba(224,33,40,.5);
+  transform: translateY(-2px);
+}
+
+.fineprint {
+  margin-top: 6vh;
+  font-size: .65rem; letter-spacing: .3em;
+  color: rgba(179,165,149,.5);
+  text-transform: uppercase;
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 640px) {
+  .dots { right: 10px; gap: 11px; }
+  .hero__frame { width: min(52vh, 86vw); }
+  .stats { gap: 8vmin 10vmin; }
+}
+
+/* ---------- reduced motion: flat stacked layout ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  body { height: auto; }
+  .scene { position: static; perspective: none; overflow: visible; }
+  .panel {
+    position: relative; opacity: 1 !important;
+    transform: none !important; filter: none !important;
+    pointer-events: auto;
+    min-height: 100vh;
+  }
+  .grain, #dust { display: none; }
+  .hero__scrollhint, .hero__sheen { animation: none; }
+}
