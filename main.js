@@ -12,8 +12,7 @@
   var panels = Array.prototype.slice.call(document.querySelectorAll("[data-panel]"));
   var dots = Array.prototype.slice.call(document.querySelectorAll(".dot"));
   var progressBar = document.getElementById("progressBar");
-  var heroCard = document.getElementById("heroCard");
-  var sheen = document.querySelector(".hero__sheen");
+  var heroVideo = document.querySelector(".hero__video");
 
   var N = panels.length;
   var DEPTH = 1100;          // z-distance between panels (px)
@@ -42,6 +41,14 @@
     panels.forEach(function (p, k) {
       p.classList.toggle("is-live", k === i);
     });
+    // Only run the hero video while it's on screen
+    if (heroVideo) {
+      if (i === 0) {
+        if (heroVideo.paused) heroVideo.play().catch(function () {});
+      } else if (!heroVideo.paused) {
+        heroVideo.pause();
+      }
+    }
   }
 
   function render() {
@@ -86,30 +93,7 @@
     smoothY += (scrollY - smoothY) * 0.09;
     if (Math.abs(scrollY - smoothY) < 0.05) smoothY = scrollY;
     render();
-    tiltStep();
     requestAnimationFrame(tick);
-  }
-
-  /* ---------------- hero mouse tilt ---------------- */
-
-  var targetRX = 0, targetRY = 0, curRX = 0, curRY = 0;
-
-  function onPointerMove(e) {
-    var cx = window.innerWidth / 2;
-    var cy = window.innerHeight / 2;
-    targetRY = ((e.clientX - cx) / cx) * 9;    // deg
-    targetRX = -((e.clientY - cy) / cy) * 7;
-    if (sheen) {
-      sheen.style.setProperty("--shx", ((e.clientX / window.innerWidth) * 100) + "%");
-    }
-  }
-
-  function tiltStep() {
-    if (!heroCard) return;
-    curRX += (targetRX - curRX) * 0.08;
-    curRY += (targetRY - curRY) * 0.08;
-    heroCard.style.transform =
-      "rotateX(" + curRX.toFixed(2) + "deg) rotateY(" + curRY.toFixed(2) + "deg)";
   }
 
   /* ---------------- dust particles ---------------- */
@@ -187,8 +171,6 @@
     resizeCanvas();
     initMotes();
   });
-  window.addEventListener("pointermove", onPointerMove, { passive: true });
-
   resizeCanvas();
   initMotes();
   drawMotes();

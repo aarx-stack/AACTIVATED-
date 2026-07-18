@@ -6,7 +6,6 @@
   <title>Red Door Studio — Step Through. Press Record.</title>
   <meta name="description" content="Red Door Studio — an analog-soul recording studio. Tracking, mixing, mastering and production behind the red door." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%230a0505'/%3E%3Crect x='9' y='6' width='14' height='22' rx='2' fill='%23b3161c'/%3E%3Ccircle cx='19.5' cy='17' r='1.6' fill='%23e9dfd2'/%3E%3C/svg%3E" />
-  <link rel="preload" as="image" href="assets/red-door-studio.png" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -36,17 +35,14 @@
 
     <!-- 0 · HERO -->
     <section class="panel panel--hero" data-panel>
-      <div class="hero" id="hero">
-        <div class="hero__frame" id="heroCard">
-          <img class="hero__img" src="assets/red-door-studio.png" alt="Red Door Studio — a Warm Audio microphone in front of a dripping red door" />
-          <div class="hero__sheen" aria-hidden="true"></div>
-        </div>
-        <p class="hero__kicker">EST. MMXXVI &nbsp;·&nbsp; ANALOG SOUL, DIGITAL PRECISION</p>
+      <div class="hero">
+        <video class="hero__video" src="assets/hero-video.mp4" autoplay muted loop playsinline preload="auto"></video>
         <h1 class="visually-hidden">Red Door Studio</h1>
-        <p class="hero__tag">Step through. Press record.</p>
-        <div class="hero__scrollhint" aria-hidden="true">
-          <span class="hero__mouse"></span>
-          <span>Scroll to enter</span>
+        <div class="hero__overlay">
+          <div class="hero__scrollhint" aria-hidden="true">
+            <span class="hero__mouse"></span>
+            <span>Scroll to enter</span>
+          </div>
         </div>
       </div>
     </section>
