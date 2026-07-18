@@ -123,6 +123,11 @@ body {
   object-position: center;
   background: var(--black);
 }
+/* Portrait phones: show the full frame (the title never survives a
+   phone-width crop) instead of cropping edge-to-edge. */
+@media (max-width: 820px) and (orientation: portrait) {
+  .hero__video { object-fit: contain; }
+}
 .hero__overlay {
   position: absolute; inset: 0;
   display: flex; align-items: flex-end; justify-content: center;

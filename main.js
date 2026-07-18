@@ -14,15 +14,15 @@
   var progressBar = document.getElementById("progressBar");
   var heroVideo = document.querySelector(".hero__video");
 
-  /* Pick the right video for the device: phones get a lighter 720p encode,
-     laptops/desktops the full-quality file. */
+  /* Pick the right video for the device: phones get a tall-framed lighter
+     encode, laptops/desktops the full-quality widescreen file. */
   if (heroVideo) {
     var smallScreen =
       Math.min(window.screen.width, window.screen.height) <= 820 ||
       window.innerWidth <= 820;
-    heroVideo.src = heroVideo.getAttribute(
-      smallScreen ? "data-src-mobile" : "data-src-desktop"
-    );
+    var variant = smallScreen ? "mobile" : "desktop";
+    heroVideo.poster = heroVideo.getAttribute("data-poster-" + variant);
+    heroVideo.src = heroVideo.getAttribute("data-src-" + variant);
     heroVideo.play().catch(function () {});
     // iOS blocks autoplay in Low Power Mode — start on the first touch instead.
     var kickVideo = function () {
