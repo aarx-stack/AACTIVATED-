@@ -21,14 +21,13 @@ html {
   scroll-snap-type: y proximity;
 }
 
+/* Flat background: must match the hero logo video's baked backdrop
+   (#0a0505) exactly so alpha-blind browsers show no seam. */
 body {
   color: var(--bone);
   font-family: var(--sans);
   overflow-x: hidden;
-  background:
-    radial-gradient(120% 90% at 50% 0%, #1c0808 0%, var(--black) 60%),
-    var(--black);
-  background-attachment: fixed;
+  background: var(--black);
 }
 
 .visually-hidden {
@@ -127,12 +126,24 @@ body {
   overflow: hidden;
   display: grid; place-items: center;
 }
+/* Circular red glow washed over the whole hero (above the video), so it
+   renders continuously whether or not the browser supports video alpha. */
+.hero::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: min(100vmin, 120vw); aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle,
+    rgba(179,22,28,.20) 0%, rgba(179,22,28,.08) 45%, transparent 68%);
+  pointer-events: none;
+  z-index: 1;
+}
 .hero__logo {
   width: min(76vmin, 92vw);
   height: auto;
   aspect-ratio: 1;
   object-fit: contain;
-  filter: drop-shadow(0 0 60px rgba(179,22,28,.35));
 }
 .hero__overlay {
   position: absolute; inset: 0;
