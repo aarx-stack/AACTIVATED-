@@ -16,18 +16,19 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
+}
 
 body {
-  background: var(--black);
   color: var(--bone);
   font-family: var(--sans);
   overflow-x: hidden;
-  /* Scroll length is set from JS via --pages */
-  height: calc(var(--pages, 6) * 100vh);
   background:
     radial-gradient(120% 90% at 50% 0%, #1c0808 0%, var(--black) 60%),
     var(--black);
+  background-attachment: fixed;
 }
 
 .visually-hidden {
@@ -89,24 +90,33 @@ body {
   transform: scale(1.25);
 }
 
-/* ---------- 3D scene ---------- */
+/* ---------- stacked sections ---------- */
 
 .scene {
-  position: fixed; inset: 0; z-index: 10;
-  perspective: 1200px;
-  perspective-origin: 50% 50%;
-  overflow: hidden;
+  position: relative; z-index: 10;
 }
 
 .panel {
-  position: absolute; inset: 0;
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: grid; place-items: center;
   padding: 6vmin;
-  will-change: transform, opacity, filter;
-  opacity: 0;
-  pointer-events: none;
+  scroll-snap-align: start;
 }
-.panel.is-live { pointer-events: auto; }
+
+/* reveal on scroll */
+.panel.will-reveal .content,
+.panel.will-reveal .hero__logo {
+  opacity: 0;
+  transform: translateY(34px);
+  transition: opacity .9s ease, transform .9s cubic-bezier(.2,.7,.3,1);
+}
+.panel.is-in .content,
+.panel.is-in .hero__logo {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 /* ---------- hero (transparent logo video) ---------- */
 
@@ -305,19 +315,13 @@ h2 {
   .stats { gap: 8vmin 10vmin; }
 }
 
-/* ---------- reduced motion: flat stacked layout ---------- */
+/* ---------- reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  body { height: auto; }
-  .scene { position: static; perspective: none; overflow: visible; }
-  .panel {
-    position: relative; opacity: 1 !important;
-    transform: none !important; filter: none !important;
-    pointer-events: auto;
-    min-height: 100vh;
-    min-height: 100dvh; /* mobile browsers: track the real visible height */
-  }
+  html { scroll-behavior: auto; scroll-snap-type: none; }
   .grain, #dust { display: none; }
   .hero__scrollhint { animation: none; }
-  .hero { position: relative; height: 100vh; height: 100dvh; }
+  .panel .content, .panel .hero__logo {
+    opacity: 1 !important; transform: none !important; transition: none !important;
+  }
 }

@@ -1,7 +1,7 @@
 /* ============================================================
-   RED DOOR STUDIO — 3D fly-through scroll engine
-   Scrolling moves a virtual camera forward in Z; each panel
-   sits deeper in space and flies past you as you scroll.
+   RED DOOR STUDIOS — normal vertical scroll
+   Stacked full-screen sections with reveal-on-scroll, section
+   dots, a progress bar, and ambient dust.
    ============================================================ */
 
 (function () {
@@ -14,37 +14,33 @@
   var progressBar = document.getElementById("progressBar");
   var heroVideo = document.querySelector(".hero__logo");
 
+  /* ---------------- autoplay fallback ---------------- */
+
   if (heroVideo) {
     heroVideo.play().catch(function () {});
     // iOS blocks autoplay in Low Power Mode — start on the first touch instead.
     var kickVideo = function () {
       window.removeEventListener("touchstart", kickVideo);
       window.removeEventListener("pointerdown", kickVideo);
-      if (activeIndex <= 0 && heroVideo.paused) {
-        heroVideo.play().catch(function () {});
-      }
+      if (heroVideo.paused) heroVideo.play().catch(function () {});
     };
     window.addEventListener("touchstart", kickVideo, { passive: true });
     window.addEventListener("pointerdown", kickVideo, { passive: true });
   }
 
-  var N = panels.length;
-  var DEPTH = 1100;          // z-distance between panels (px)
-  var FADE_BEHIND = 260;     // how far past the camera before a panel is gone
-  var PAGES_PER_PANEL = 1;   // scroll pages per panel
+  /* ---------------- progress bar ---------------- */
 
-  document.body.style.setProperty("--pages", (N - 1) * PAGES_PER_PANEL + 1);
-
-  /* ---------------- camera fly-through ---------------- */
-
-  var scrollY = window.scrollY;
-  var smoothY = scrollY;      // eased camera position
-  var maxScroll = 1;
-  var activeIndex = -1;
-
-  function measure() {
-    maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
+  function onScroll() {
+    if (!progressBar) return;
+    var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    progressBar.style.width = ((window.scrollY / max) * 100).toFixed(2) + "%";
   }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  /* ---------------- section tracking ---------------- */
+
+  var activeIndex = -1;
 
   function setActive(i) {
     if (i === activeIndex) return;
@@ -52,10 +48,7 @@
     dots.forEach(function (d, k) {
       d.classList.toggle("is-active", k === i);
     });
-    panels.forEach(function (p, k) {
-      p.classList.toggle("is-live", k === i);
-    });
-    // Only run the hero video while it's on screen
+    // Only run the hero logo video while its section is on screen
     if (heroVideo) {
       if (i === 0) {
         if (heroVideo.paused) heroVideo.play().catch(function () {});
@@ -65,52 +58,50 @@
     }
   }
 
-  function render() {
-    var progress = smoothY / maxScroll;              // 0..1 through the site
-    var camZ = progress * (N - 1) * DEPTH;           // camera depth
+  var spy = new IntersectionObserver(
+    function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          setActive(panels.indexOf(entry.target));
+        }
+      });
+    },
+    { threshold: 0.55 }
+  );
+  panels.forEach(function (p) { spy.observe(p); });
 
-    for (var i = 0; i < N; i++) {
-      var z = camZ - i * DEPTH;                      // panel position relative to camera
-      var el = panels[i];
+  /* ---------------- reveal on scroll ---------------- */
 
-      // Visibility window: far ahead -> invisible, at 0 -> in focus,
-      // slightly behind camera -> flies past and fades.
-      var opacity, blur = 0;
-
-      if (z > FADE_BEHIND || z < -DEPTH * 1.15) {
-        opacity = 0;
-      } else if (z > 0) {
-        // passing the camera
-        var t = z / FADE_BEHIND;
-        opacity = 1 - t;
-        blur = t * 14;
-      } else {
-        // approaching from the dark
-        var a = Math.min(1, 1 + z / (DEPTH * 0.92));
-        opacity = a * a;
-        blur = (1 - a) * 6;
-      }
-
-      el.style.opacity = opacity.toFixed(3);
-      el.style.transform = "translateZ(" + z.toFixed(1) + "px)";
-      el.style.filter = blur > 0.3 ? "blur(" + blur.toFixed(1) + "px)" : "none";
-      el.style.visibility = opacity <= 0.001 ? "hidden" : "visible";
-    }
-
-    if (progressBar) progressBar.style.width = (progress * 100).toFixed(2) + "%";
-    setActive(Math.max(0, Math.min(N - 1, Math.round(camZ / DEPTH))));
+  if (!reduceMotion) {
+    var reveal = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            reveal.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
+    panels.forEach(function (p) {
+      p.classList.add("will-reveal");
+      reveal.observe(p);
+    });
   }
 
-  function tick() {
-    scrollY = window.scrollY;
-    // ease the camera toward the real scroll position for a weighty feel
-    smoothY += (scrollY - smoothY) * 0.09;
-    if (Math.abs(scrollY - smoothY) < 0.05) smoothY = scrollY;
-    render();
-    requestAnimationFrame(tick);
-  }
+  /* ---------------- dots navigation ---------------- */
+
+  dots.forEach(function (d) {
+    d.addEventListener("click", function () {
+      var i = parseInt(d.getAttribute("data-i"), 10);
+      if (panels[i]) panels[i].scrollIntoView({ behavior: "smooth" });
+    });
+  });
 
   /* ---------------- dust particles ---------------- */
+
+  if (reduceMotion) return;
 
   var canvas = document.getElementById("dust");
   var ctx = canvas ? canvas.getContext("2d") : null;
@@ -158,36 +149,12 @@
     requestAnimationFrame(drawMotes);
   }
 
-  /* ---------------- dots navigation ---------------- */
-
-  dots.forEach(function (d) {
-    d.addEventListener("click", function () {
-      var i = parseInt(d.getAttribute("data-i"), 10);
-      var y = (i / (N - 1)) * maxScroll;
-      window.scrollTo({ top: y, behavior: "smooth" });
-    });
-  });
-
-  /* ---------------- boot ---------------- */
-
-  if (reduceMotion) {
-    // CSS handles the flat stacked fallback; just wire progress + dots.
-    window.addEventListener("scroll", function () {
-      var p = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
-      if (progressBar) progressBar.style.width = (p * 100).toFixed(2) + "%";
-    }, { passive: true });
-    return;
-  }
-
-  measure();
   window.addEventListener("resize", function () {
-    measure();
     resizeCanvas();
     initMotes();
   });
+
   resizeCanvas();
   initMotes();
   drawMotes();
-  render();
-  requestAnimationFrame(tick);
 })();
