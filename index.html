@@ -2,154 +2,286 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Red Door Studios — Step Through. Press Record.</title>
-  <meta name="description" content="Red Door Studios — an analog-soul recording studio. Tracking, mixing, mastering and production behind the red door." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%230a0505'/%3E%3Crect x='9' y='6' width='14' height='22' rx='2' fill='%23b3161c'/%3E%3Ccircle cx='19.5' cy='17' r='1.6' fill='%23e9dfd2'/%3E%3C/svg%3E" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AActivated Credit Repair — Fix Your Credit. Activate Your Future.</title>
+  <meta name="description" content="AActivated Credit Repair helps you dispute errors, rebuild your score and unlock better rates. Book your free credit consultation today." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23060a12'/%3E%3Cpath d='M16 5 6 27h5l5-12 5 12h5L16 5z' fill='%231b6ef5'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- Film grain + vignette overlays -->
-  <div class="grain" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
+  <!-- ══════════ OPT-IN POPUP ══════════ -->
+  <div class="popup-overlay" id="optinOverlay" aria-hidden="true">
+    <div class="popup" role="dialog" aria-modal="true" aria-labelledby="optinTitle">
+      <button class="popup__close" id="optinClose" aria-label="Close popup">&times;</button>
+      <div class="popup__badge">FREE</div>
+      <h2 id="optinTitle">Get Your <span class="blue">Free Credit Analysis</span></h2>
+      <p>Join our list and get a free review of your credit report, plus insider tips to boost your score — straight to your inbox.</p>
+      <form id="optinForm" novalidate>
+        <div class="field">
+          <label for="optinName">Full Name</label>
+          <input type="text" id="optinName" name="name" placeholder="Jane Doe" autocomplete="name" required />
+          <span class="field__error" id="optinNameError"></span>
+        </div>
+        <div class="field">
+          <label for="optinEmail">Email Address</label>
+          <input type="email" id="optinEmail" name="email" placeholder="you@email.com" autocomplete="email" required />
+          <span class="field__error" id="optinEmailError"></span>
+        </div>
+        <button type="submit" class="btn btn--full" id="optinSubmit">Claim My Free Analysis</button>
+        <p class="popup__fine">No spam. Unsubscribe anytime.</p>
+      </form>
+      <div class="popup__success" id="optinSuccess" hidden>
+        <div class="success-check">✓</div>
+        <h3>You're on the list!</h3>
+        <p>Thanks for opting in — check your inbox soon. Ready to go further? Book your free consultation below.</p>
+        <button class="btn btn--full" id="optinBookBtn">Schedule My Consultation</button>
+      </div>
+    </div>
+  </div>
 
-  <!-- Dust particles -->
-  <canvas id="dust" aria-hidden="true"></canvas>
+  <!-- ══════════ NAVBAR ══════════ -->
+  <header class="nav" id="nav">
+    <div class="container nav__inner">
+      <a class="nav__logo" href="#home">
+        <span class="nav__logo-mark">A</span>
+        <span>Activated<em>Credit</em></span>
+      </a>
+      <nav class="nav__links" id="navLinks" aria-label="Main navigation">
+        <a href="#services">Services</a>
+        <a href="#how">How It Works</a>
+        <a href="#results">Results</a>
+        <a href="#schedule">Schedule</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a class="btn btn--sm nav__cta" href="#schedule">Free Consultation</a>
+      <button class="nav__burger" id="navBurger" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
 
-  <!-- Scroll progress -->
-  <div class="progress" aria-hidden="true"><div class="progress__bar" id="progressBar"></div></div>
+  <!-- ══════════ HERO ══════════ -->
+  <section class="hero" id="home">
+    <div class="hero__glow" aria-hidden="true"></div>
+    <div class="container hero__inner">
+      <div class="hero__copy">
+        <p class="eyebrow">Trusted Credit Repair Specialists</p>
+        <h1>Fix Your Credit.<br /><span class="blue">Activate</span> Your Future.</h1>
+        <p class="lede">
+          Errors, collections and late payments dragging your score down? We dispute
+          inaccurate items, coach you through rebuilding, and help you unlock the
+          approvals and rates you deserve.
+        </p>
+        <div class="hero__actions">
+          <a class="btn" href="#schedule">Book Free Consultation</a>
+          <a class="btn btn--ghost" href="#how">See How It Works</a>
+        </div>
+        <ul class="hero__trust">
+          <li><strong>500+</strong><span>clients helped</span></li>
+          <li><strong>90&nbsp;day</strong><span>avg. first results</span></li>
+          <li><strong>100%</strong><span>money-back guarantee</span></li>
+        </ul>
+      </div>
+      <div class="hero__card" aria-hidden="true">
+        <div class="score-card">
+          <p class="score-card__label">Credit Score</p>
+          <div class="score-card__ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="52" />
+              <circle class="ring-fill" id="scoreRing" cx="60" cy="60" r="52" />
+            </svg>
+            <div class="score-card__num" id="scoreNum">300</div>
+          </div>
+          <p class="score-card__delta">▲ +142 pts <span>in 6 months*</span></p>
+          <p class="score-card__fine">*Illustrative example. Results vary.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <!-- Section dots -->
-  <nav class="dots" id="dots" aria-label="Sections">
-    <button data-i="0" class="dot is-active" aria-label="Enter"></button>
-    <button data-i="1" class="dot" aria-label="Behind the Door"></button>
-    <button data-i="2" class="dot" aria-label="Services"></button>
-    <button data-i="3" class="dot" aria-label="The Room"></button>
-    <button data-i="4" class="dot" aria-label="Sessions"></button>
-    <button data-i="5" class="dot" aria-label="Book"></button>
-  </nav>
+  <!-- ══════════ SERVICES ══════════ -->
+  <section class="section" id="services">
+    <div class="container">
+      <p class="eyebrow">What We Do</p>
+      <h2>Full-service <span class="blue">credit restoration</span></h2>
+      <div class="grid grid--4">
+        <article class="card">
+          <div class="card__icon">🔍</div>
+          <h3>Credit Report Audit</h3>
+          <p>Line-by-line analysis of all three bureau reports to find every error, duplicate and outdated item hurting your score.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">✉️</div>
+          <h3>Dispute &amp; Removal</h3>
+          <p>Custom dispute letters to Equifax, Experian and TransUnion targeting inaccurate collections, charge-offs and late payments.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">📈</div>
+          <h3>Score Building</h3>
+          <p>A personal action plan — utilization, credit mix and payment strategy — engineered to push your score up and keep it there.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">🛡️</div>
+          <h3>Ongoing Monitoring</h3>
+          <p>We watch your reports month over month, respond to bureau updates and keep you protected from new inaccuracies.</p>
+        </article>
+      </div>
+    </div>
+  </section>
 
-  <!-- Fixed 3D scene ; scrolling flies the camera through the panels -->
-  <div class="scene" id="scene">
+  <!-- ══════════ HOW IT WORKS ══════════ -->
+  <section class="section section--dark" id="how">
+    <div class="container">
+      <p class="eyebrow">The Process</p>
+      <h2>Three steps to a <span class="blue">stronger score</span></h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step__num">1</div>
+          <h3>Free Consultation</h3>
+          <p>Book a call on our calendar below. We review your situation and pull your reports — no cost, no obligation.</p>
+        </div>
+        <div class="step">
+          <div class="step__num">2</div>
+          <h3>Custom Game Plan</h3>
+          <p>We build your dispute strategy and rebuilding roadmap, then get to work with the bureaus on your behalf.</p>
+        </div>
+        <div class="step">
+          <div class="step__num">3</div>
+          <h3>Track Your Progress</h3>
+          <p>Watch negative items come off and your score climb with monthly progress updates until the job is done.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <!-- 0 · HERO -->
-    <section class="panel panel--hero" data-panel>
-      <div class="hero">
-        <h1 class="visually-hidden">Red Door Studios</h1>
-        <video class="hero__logo" poster="assets/hero-logo-poster.png"
-               autoplay muted loop playsinline preload="auto">
-          <source src="assets/hero-logo.webm" type="video/webm" />
-          <source src="assets/hero-logo.mp4" type="video/mp4" />
-        </video>
-        <div class="hero__overlay">
-          <div class="hero__scrollhint" aria-hidden="true">
-            <span class="hero__mouse"></span>
-            <span>Scroll to enter</span>
+  <!-- ══════════ RESULTS / TESTIMONIALS ══════════ -->
+  <section class="section" id="results">
+    <div class="container">
+      <p class="eyebrow">Client Wins</p>
+      <h2>Real people. <span class="blue">Real results.</span></h2>
+      <div class="grid grid--3">
+        <blockquote class="quote">
+          <p>“Two collections and five late payments deleted in under four months. I finally got approved for my first home.”</p>
+          <footer><strong>Marcus T.</strong><span>+118 points</span></footer>
+        </blockquote>
+        <blockquote class="quote">
+          <p>“They explained everything in plain English and handled all the letters. My score went from poor to good in one year.”</p>
+          <footer><strong>Alicia R.</strong><span>+164 points</span></footer>
+        </blockquote>
+        <blockquote class="quote">
+          <p>“Professional, responsive, and honest about what they could and couldn't do. Worth every penny.”</p>
+          <footer><strong>Devon S.</strong><span>+92 points</span></footer>
+        </blockquote>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ SCHEDULE / CALENDAR ══════════ -->
+  <section class="section section--dark" id="schedule">
+    <div class="container">
+      <p class="eyebrow">Book Your Spot</p>
+      <h2>Schedule your <span class="blue">free consultation</span></h2>
+      <p class="section-sub">Pick a date and time that works for you. Consultations are 30 minutes, by phone or video — completely free.</p>
+
+      <div class="scheduler" id="scheduler">
+        <!-- Calendar -->
+        <div class="scheduler__calendar">
+          <div class="cal__head">
+            <button class="cal__nav" id="calPrev" aria-label="Previous month">&#8249;</button>
+            <h3 id="calTitle">Month YYYY</h3>
+            <button class="cal__nav" id="calNext" aria-label="Next month">&#8250;</button>
+          </div>
+          <div class="cal__weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+          </div>
+          <div class="cal__grid" id="calGrid" role="grid" aria-label="Choose a date"></div>
+          <p class="cal__hint">Open Monday – Saturday. Past dates unavailable.</p>
+        </div>
+
+        <!-- Time slots -->
+        <div class="scheduler__slots">
+          <h3 id="slotsTitle">Pick a time</h3>
+          <p class="slots__date" id="slotsDate">Select a date first</p>
+          <div class="slots__grid" id="slotsGrid"></div>
+        </div>
+
+        <!-- Booking form -->
+        <div class="scheduler__form">
+          <h3>Your details</h3>
+          <div class="booking-summary" id="bookingSummary">No date &amp; time selected yet</div>
+          <form id="bookingForm" novalidate>
+            <div class="field">
+              <label for="bookName">Full Name *</label>
+              <input type="text" id="bookName" name="name" placeholder="Jane Doe" autocomplete="name" required />
+              <span class="field__error" id="bookNameError"></span>
+            </div>
+            <div class="field">
+              <label for="bookEmail">Email *</label>
+              <input type="email" id="bookEmail" name="email" placeholder="you@email.com" autocomplete="email" required />
+              <span class="field__error" id="bookEmailError"></span>
+            </div>
+            <div class="field">
+              <label for="bookPhone">Phone *</label>
+              <input type="tel" id="bookPhone" name="phone" placeholder="(555) 123-4567" autocomplete="tel" required />
+              <span class="field__error" id="bookPhoneError"></span>
+            </div>
+            <div class="field">
+              <label for="bookNotes">What's your main credit goal? (optional)</label>
+              <textarea id="bookNotes" name="notes" rows="3" placeholder="e.g. Buying a home next year, need to remove collections…"></textarea>
+            </div>
+            <button type="submit" class="btn btn--full" id="bookSubmit">Confirm My Consultation</button>
+          </form>
+          <div class="booking-success" id="bookingSuccess" hidden>
+            <div class="success-check">✓</div>
+            <h3>Consultation booked!</h3>
+            <p id="bookingSuccessText">We'll reach out to confirm your appointment shortly.</p>
+            <button class="btn btn--ghost btn--full" id="bookAnother">Book another time</button>
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 1 · ABOUT -->
-    <section class="panel" data-panel>
-      <div class="content">
-        <p class="eyebrow">01 — Behind the Door</p>
-        <h2>Some doors you knock on.<br /><span class="red">This one answers back.</span></h2>
-        <p class="lede">
-          Red Door Studios is a room built for the moment the red light goes on.
-          Tube warmth, tape saturation and a live floor that breathes — every
-          session tracked with vintage character and modern clarity.
-        </p>
-        <div class="stats">
-          <div class="stat"><strong>120<span>m²</span></strong><em>live floor</em></div>
-          <div class="stat"><strong>40<span>+</span></strong><em>mic lockers</em></div>
-          <div class="stat"><strong>24<span>/7</span></strong><em>session access</em></div>
-        </div>
+  <!-- ══════════ CTA BAND ══════════ -->
+  <section class="cta-band">
+    <div class="container cta-band__inner">
+      <h2>Your credit won't fix itself.<br /><span class="blue">Let's activate it.</span></h2>
+      <a class="btn btn--light" href="#schedule">Get Started Free</a>
+    </div>
+  </section>
+
+  <!-- ══════════ FOOTER / CONTACT ══════════ -->
+  <footer class="footer" id="contact">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a class="nav__logo" href="#home">
+          <span class="nav__logo-mark">A</span>
+          <span>Activated<em>Credit</em></span>
+        </a>
+        <p>Helping everyday people dispute errors, rebuild credit and reach their financial goals.</p>
       </div>
-    </section>
-
-    <!-- 2 · SERVICES -->
-    <section class="panel" data-panel>
-      <div class="content content--wide">
-        <p class="eyebrow">02 — What Happens Inside</p>
-        <h2>From first take to <span class="red">final master.</span></h2>
-        <div class="cards">
-          <article class="card">
-            <span class="card__num">A</span>
-            <h3>Tracking</h3>
-            <p>Full-band live tracking or overdub sessions on an analog front end that flatters everything you put in front of it.</p>
-          </article>
-          <article class="card">
-            <span class="card__num">B</span>
-            <h3>Mixing</h3>
-            <p>Hybrid in-the-box / outboard mixing with real iron in the chain. Depth, glue and punch — not just loud.</p>
-          </article>
-          <article class="card">
-            <span class="card__num">C</span>
-            <h3>Mastering</h3>
-            <p>Release-ready masters for streaming, vinyl and film. Loudness done tastefully, translation guaranteed.</p>
-          </article>
-          <article class="card">
-            <span class="card__num">D</span>
-            <h3>Production</h3>
-            <p>Writing rooms, session players and producers on call. Walk in with a hook, walk out with a record.</p>
-          </article>
-        </div>
+      <div class="footer__col">
+        <h4>Contact</h4>
+        <a href="mailto:contact@aactivatedrx.com">contact@aactivatedrx.com</a>
+        <a href="tel:+15551234567">(555) 123-4567</a>
+        <span>Mon–Sat · 9am–6pm</span>
       </div>
-    </section>
-
-    <!-- 3 · THE ROOM -->
-    <section class="panel" data-panel>
-      <div class="content">
-        <p class="eyebrow">03 — The Room</p>
-        <h2>Signal chain with <span class="red">teeth.</span></h2>
-        <ul class="gear">
-          <li><span>Microphones</span>Warm Audio WA-8000 · WA-47 · ribbon &amp; dynamic locker</li>
-          <li><span>Console</span>32-channel inline analog desk, fully recapped</li>
-          <li><span>Outboard</span>Tube compression · optical limiting · spring &amp; plate reverb</li>
-          <li><span>Monitoring</span>Main soffits + nearfields, tuned room, mastering-grade conversion</li>
-        </ul>
+      <div class="footer__col">
+        <h4>Quick Links</h4>
+        <a href="#services">Services</a>
+        <a href="#how">How It Works</a>
+        <a href="#schedule">Schedule</a>
       </div>
-    </section>
-
-    <!-- 4 · SESSIONS -->
-    <section class="panel" data-panel>
-      <div class="content content--wide">
-        <p class="eyebrow">04 — Sessions</p>
-        <h2>Pick your <span class="red">poison.</span></h2>
-        <div class="cards cards--rates">
-          <article class="card">
-            <h3>Day Rate</h3>
-            <p class="price">$450<span>/ 10 hrs</span></p>
-            <p>Engineer included. Live floor, iso booths and the full mic locker.</p>
-          </article>
-          <article class="card card--featured">
-            <h3>Lockout Week</h3>
-            <p class="price">$2,400<span>/ 7 days</span></p>
-            <p>The whole studio, keys in hand. Sleep here if you have to — records get finished this way.</p>
-          </article>
-          <article class="card">
-            <h3>Mix &amp; Master</h3>
-            <p class="price">$300<span>/ song</span></p>
-            <p>Two revision rounds, stems delivered, masters for every platform.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- 5 · CONTACT -->
-    <section class="panel" data-panel>
-      <div class="content content--center">
-        <p class="eyebrow">05 — Book a Session</p>
-        <h2>The door is <span class="red">open.</span></h2>
-        <p class="lede">Tell us about the record you're hearing in your head.</p>
-        <a class="btn" href="mailto:book@reddoorstudio.example">book@reddoorstudio.example</a>
-        <p class="fineprint">Red Door Studios · By appointment only · © MMXXVI</p>
-      </div>
-    </section>
-
-  </div>
+    </div>
+    <div class="footer__legal">
+      <p>© 2026 AActivated Credit Repair. All rights reserved.</p>
+      <p>We do not guarantee specific score increases. Results vary by individual credit history. You have the right to dispute inaccurate information yourself at no cost.</p>
+    </div>
+  </footer>
 
   <script src="main.js"></script>
 </body>
