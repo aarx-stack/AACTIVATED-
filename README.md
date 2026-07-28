@@ -1,4 +1,4 @@
-# AActivated Credit Repair — Website
+# MyTotalCreditRepair — Website
 
 A single-page credit repair business website in the brand colors **blue, black and white**.
 

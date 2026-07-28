@@ -1,5 +1,5 @@
 /* ============================================================
-   AACTIVATED CREDIT REPAIR
+   MYTOTALCREDITREPAIR
    Opt-in popup · booking calendar & time slots · lead capture
    ============================================================ */
 
@@ -92,7 +92,7 @@
     btn.textContent = "Sending…";
 
     var lead = {
-      _subject: "New opt-in lead — AActivated Credit Repair",
+      _subject: "New opt-in lead — MyTotalCreditRepair",
       type: "Email opt-in",
       name: nameInput.value.trim(),
       email: emailInput.value.trim(),
@@ -371,7 +371,7 @@
 
     var when = prettyDate(selectedDate) + " at " + selectedTime;
     var lead = {
-      _subject: "New consultation booking — AActivated Credit Repair",
+      _subject: "New consultation booking — MyTotalCreditRepair",
       type: "Consultation booking",
       name: nameInput.value.trim(),
       email: emailInput.value.trim(),
