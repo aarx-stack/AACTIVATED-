@@ -1,0 +1,765 @@
+// Affiliate & Performance Tracking Platform — Prisma schema
+// All monetary values are stored as integer cents (e.g. $199.97 = 19997).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Multi-tenancy ────────────────────────────────────────────────────────────
+
+model Organization {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  logoUrl       String?
+  primaryColor  String?
+  domain        String?
+  supportEmail  String?
+  termsUrl      String?
+  privacyUrl    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users            User[]
+  affiliates       Affiliate[]
+  advertisers      Advertiser[]
+  offers           Offer[]
+  campaigns        Campaign[]
+  products         Product[]
+  customers        Customer[]
+  orders           Order[]
+  conversions      Conversion[]
+  commissionPlans  CommissionPlan[]
+  promoCodes       PromoCode[]
+  payouts          Payout[]
+  webhookEndpoints WebhookEndpoint[]
+  webhookEvents    WebhookEvent[]
+  apiKeys          ApiKey[]
+  fraudAlerts      FraudAlert[]
+  auditLogs        AuditLog[]
+  settings         SystemSetting[]
+  clicks           Click[]
+  trackingLinks    TrackingLink[]
+  ledgerEntries    CommissionLedger[]
+  applications     AffiliateApplication[]
+}
+
+// ── Users & auth ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  AFFILIATE
+  ADVERTISER
+}
+
+model User {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  email          String    @unique
+  passwordHash   String
+  name           String
+  role           UserRole  @default(AFFILIATE)
+  emailVerified  DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  affiliate  Affiliate?
+  advertiser Advertiser?
+  auditLogs  AuditLog[]
+
+  @@index([organizationId])
+}
+
+// ── Affiliates / reps / distributors ────────────────────────────────────────
+
+enum AffiliateStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum AffiliateType {
+  AFFILIATE
+  REP
+  DISTRIBUTOR
+}
+
+model Affiliate {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  userId         String?         @unique
+  user           User?           @relation(fields: [userId], references: [id])
+  affiliateCode  String          @unique // public id e.g. AFF-1001
+  referralCode   String          @unique // used in ?ref= links
+  type           AffiliateType   @default(AFFILIATE)
+  status         AffiliateStatus @default(PENDING)
+  firstName      String
+  lastName       String
+  company        String?
+  email          String
+  phone          String?
+  address        String?
+  payoutMethod   String? // ACH | PAYPAL | VENMO | ZELLE | CHECK | MANUAL
+  payoutDetails  String?
+  taxInfoStatus  String   @default("MISSING") // MISSING | SUBMITTED | VERIFIED
+  notes          String?
+  joinedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // hierarchy (upline)
+  parentId String?
+  parent   Affiliate?  @relation("AffiliateUpline", fields: [parentId], references: [id])
+  children Affiliate[] @relation("AffiliateUpline")
+
+  commissionPlanId String?
+  commissionPlan   CommissionPlan? @relation(fields: [commissionPlanId], references: [id])
+
+  trackingLinks TrackingLink[]
+  clicks        Click[]
+  conversions   Conversion[]
+  commissions   Commission[]
+  ledgerEntries CommissionLedger[]
+  promoCodes    PromoCode[]
+  payouts       Payout[]
+  customers     Customer[]
+  fraudAlerts   FraudAlert[]
+
+  @@index([organizationId, status])
+  @@index([parentId])
+  @@index([email])
+}
+
+model AffiliateApplication {
+  id                String   @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  name              String
+  email             String
+  phone             String?
+  company           String?
+  website           String?
+  socialAccounts    String?
+  promotionStrategy String?
+  estimatedSales    String?
+  paymentInfo       String?
+  termsAccepted     Boolean  @default(false)
+  status            String   @default("PENDING") // PENDING | APPROVED | REJECTED | NEEDS_INFO
+  reviewNote        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([organizationId, status])
+}
+
+// ── Advertisers, offers, campaigns, products ────────────────────────────────
+
+model Advertiser {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String?  @unique
+  user           User?    @relation(fields: [userId], references: [id])
+  name           String
+  email          String?
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  offers Offer[]
+
+  @@index([organizationId])
+}
+
+enum OfferStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model Offer {
+  id                String      @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  advertiserId      String?
+  advertiser        Advertiser? @relation(fields: [advertiserId], references: [id])
+  name              String
+  description       String?
+  status            OfferStatus @default(DRAFT)
+  landingPageUrl    String
+  trackingDomain    String?
+  attributionWindowDays Int     @default(30)
+  defaultPayoutBps  Int?        // default payout as basis points (e.g. 3000 = 30%)
+  defaultPayoutCents Int?       // or flat cents per conversion
+  geoRules          String?     // comma-separated allowed country codes
+  deviceRules       String?     // comma-separated allowed devices
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  campaigns     Campaign[]
+  trackingLinks TrackingLink[]
+  clicks        Click[]
+  conversions   Conversion[]
+
+  @@index([organizationId, status])
+}
+
+model Campaign {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  offerId        String?
+  offer          Offer?   @relation(fields: [offerId], references: [id])
+  name           String
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  trackingLinks TrackingLink[]
+  clicks        Click[]
+  conversions   Conversion[]
+  promoCodes    PromoCode[]
+
+  @@index([organizationId])
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  sku            String
+  name           String
+  priceCents     Int      @default(0)
+  costCents      Int?     // for margin-based commission
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orderItems      OrderItem[]
+  commissionRules CommissionRule[]
+
+  @@unique([organizationId, sku])
+}
+
+// ── Tracking ────────────────────────────────────────────────────────────────
+
+model TrackingLink {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  affiliateId    String
+  affiliate      Affiliate @relation(fields: [affiliateId], references: [id])
+  offerId        String?
+  offer          Offer?   @relation(fields: [offerId], references: [id])
+  campaignId     String?
+  campaign       Campaign? @relation(fields: [campaignId], references: [id])
+  slug           String   @unique // short link path e.g. go.example.com/<slug>
+  destinationUrl String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  clicks Click[]
+
+  @@index([affiliateId])
+}
+
+model Click {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clickId        String   @unique // public id e.g. clk_8f29dj2
+  affiliateId    String
+  affiliate      Affiliate @relation(fields: [affiliateId], references: [id])
+  trackingLinkId String?
+  trackingLink   TrackingLink? @relation(fields: [trackingLinkId], references: [id])
+  offerId        String?
+  offer          Offer?   @relation(fields: [offerId], references: [id])
+  campaignId     String?
+  campaign       Campaign? @relation(fields: [campaignId], references: [id])
+  sessionId      String?
+  landingPage    String?
+  referrer       String?
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+  utmContent     String?
+  utmTerm        String?
+  ipAddress      String?
+  userAgent      String?
+  device         String?
+  browser        String?
+  country        String?
+  region         String?
+  createdAt      DateTime @default(now())
+
+  conversions Conversion[]
+
+  @@index([organizationId, createdAt])
+  @@index([affiliateId, createdAt])
+  @@index([ipAddress])
+}
+
+// ── Customers & orders ──────────────────────────────────────────────────────
+
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  externalId     String?  // storefront customer id
+  email          String?
+  name           String?
+  // lifetime attribution: the affiliate who "owns" this customer
+  ownerAffiliateId String?
+  ownerAffiliate   Affiliate? @relation(fields: [ownerAffiliateId], references: [id])
+  ownerAttributedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders Order[]
+
+  @@unique([organizationId, externalId])
+  @@index([organizationId, email])
+}
+
+enum OrderStatus {
+  COMPLETED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  externalOrderId String     // storefront order id
+  customerId     String?
+  customer       Customer?   @relation(fields: [customerId], references: [id])
+  status         OrderStatus @default(COMPLETED)
+  subtotalCents  Int
+  discountCents  Int         @default(0)
+  shippingCents  Int         @default(0)
+  taxCents       Int         @default(0)
+  totalCents     Int
+  refundedCents  Int         @default(0)
+  currency       String      @default("USD")
+  promoCode      String?
+  source         String?     // adapter that ingested the order (sellavi, shopify, ...)
+  placedAt       DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items       OrderItem[]
+  conversions Conversion[]
+
+  @@unique([organizationId, externalOrderId])
+  @@index([organizationId, placedAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  sku       String
+  name      String
+  quantity  Int
+  unitPriceCents Int
+  totalCents     Int
+
+  @@index([orderId])
+}
+
+// ── Conversions ─────────────────────────────────────────────────────────────
+
+enum ConversionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUNDED
+  CHARGEBACK
+  PAID
+}
+
+enum AttributionMethod {
+  EXPLICIT_AFFILIATE_ID
+  CLICK_ID
+  PROMO_CODE
+  CUSTOMER_OWNER
+  COOKIE
+  UNATTRIBUTED
+}
+
+model Conversion {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  orderId        String
+  order          Order            @relation(fields: [orderId], references: [id])
+  affiliateId    String?
+  affiliate      Affiliate?       @relation(fields: [affiliateId], references: [id])
+  offerId        String?
+  offer          Offer?           @relation(fields: [offerId], references: [id])
+  campaignId     String?
+  campaign       Campaign?        @relation(fields: [campaignId], references: [id])
+  clickRecordId  String?
+  click          Click?           @relation(fields: [clickRecordId], references: [id])
+  status         ConversionStatus @default(PENDING)
+  attributionMethod AttributionMethod @default(UNATTRIBUTED)
+  revenueCents   Int              // commissionable revenue at time of conversion
+  grossCents     Int
+  commissionCents Int             @default(0) // personal commission
+  overrideCents   Int             @default(0) // total team overrides
+  promoCode      String?
+  clickIdRaw     String?
+  riskScore      Int              @default(0)
+  reviewRequired Boolean          @default(false)
+  convertedAt    DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  commissions Commission[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, convertedAt])
+  @@index([affiliateId, convertedAt])
+}
+
+// ── Commission engine ───────────────────────────────────────────────────────
+
+enum CommissionBasis {
+  GROSS_TOTAL
+  SUBTOTAL
+  SUBTOTAL_AFTER_DISCOUNT
+  SUBTOTAL_EX_TAX
+  SUBTOTAL_EX_SHIPPING
+  PROFIT
+}
+
+model CommissionPlan {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  basis          CommissionBasis @default(SUBTOTAL_AFTER_DISCOUNT)
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  recurring      Boolean  @default(true) // repeat purchases keep paying originating affiliate
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  rules      CommissionRule[]
+  affiliates Affiliate[]
+
+  @@index([organizationId])
+}
+
+enum CommissionRuleType {
+  PERCENTAGE
+  FLAT
+  PRODUCT_PERCENTAGE
+  PRODUCT_FLAT
+  TIERED_PERCENTAGE
+}
+
+model CommissionRule {
+  id        String @id @default(cuid())
+  planId    String
+  plan      CommissionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  type      CommissionRuleType
+  // PERCENTAGE / PRODUCT_PERCENTAGE / TIERED_PERCENTAGE: rateBps (basis points, 3000 = 30%)
+  rateBps   Int?
+  // FLAT / PRODUCT_FLAT: flatCents per order/unit
+  flatCents Int?
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  // tiers: monthly sales threshold (cents) at which this tier starts
+  tierMinCents Int?
+  priority  Int    @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([planId])
+}
+
+// Multi-level override configuration (per organization)
+model OverrideLevel {
+  id             String @id @default(cuid())
+  organizationId String
+  level          Int    // 1 = direct upline, 2 = next, ...
+  rateBps        Int    // e.g. 500 = 5%
+  isActive       Boolean @default(true)
+
+  @@unique([organizationId, level])
+}
+
+// ── Commissions & ledger ────────────────────────────────────────────────────
+
+enum CommissionType {
+  PERSONAL
+  OVERRIDE
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  REVERSED
+  PAID
+}
+
+model Commission {
+  id             String           @id @default(cuid())
+  organizationId String
+  conversionId   String
+  conversion     Conversion       @relation(fields: [conversionId], references: [id])
+  affiliateId    String
+  affiliate      Affiliate        @relation(fields: [affiliateId], references: [id])
+  type           CommissionType   @default(PERSONAL)
+  overrideLevel  Int?             // set when type = OVERRIDE
+  amountCents    Int
+  reversedCents  Int              @default(0)
+  status         CommissionStatus @default(PENDING)
+  approvedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  payoutItems PayoutItem[]
+
+  @@index([organizationId, status])
+  @@index([affiliateId, status])
+  @@index([conversionId])
+}
+
+enum LedgerType {
+  COMMISSION_EARNED
+  COMMISSION_ADJUSTMENT
+  OVERRIDE_EARNED
+  REFUND_REVERSAL
+  CHARGEBACK_REVERSAL
+  BONUS
+  MANUAL_ADJUSTMENT
+  PAYOUT
+  PAYOUT_REVERSAL
+}
+
+// Immutable append-only ledger. Rows are never updated or deleted;
+// corrections are made with balancing entries.
+model CommissionLedger {
+  id             String     @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  affiliateId    String
+  affiliate      Affiliate  @relation(fields: [affiliateId], references: [id])
+  type           LedgerType
+  amountCents    Int        // positive = credit to affiliate, negative = debit
+  commissionId   String?
+  conversionId   String?
+  payoutId       String?
+  description    String?
+  createdAt      DateTime   @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([affiliateId, createdAt])
+}
+
+// ── Promo codes ─────────────────────────────────────────────────────────────
+
+model PromoCode {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  code           String
+  affiliateId    String?
+  affiliate      Affiliate? @relation(fields: [affiliateId], references: [id])
+  campaignId     String?
+  campaign       Campaign? @relation(fields: [campaignId], references: [id])
+  discountCents  Int?
+  discountBps    Int?     // percentage discount in basis points
+  startsAt       DateTime?
+  endsAt         DateTime?
+  usageLimit     Int?
+  usageCount     Int      @default(0)
+  minPurchaseCents Int?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([affiliateId])
+}
+
+// ── Payouts ─────────────────────────────────────────────────────────────────
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  HELD
+  REVERSED
+}
+
+model Payout {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  affiliateId    String
+  affiliate      Affiliate    @relation(fields: [affiliateId], references: [id])
+  batchKey       String       // e.g. 2026-08-21 (payout Friday)
+  amountCents    Int
+  method         String?
+  status         PayoutStatus @default(PENDING)
+  paidAt         DateTime?
+  reference      String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  items PayoutItem[]
+
+  @@index([organizationId, batchKey])
+  @@index([affiliateId])
+}
+
+model PayoutItem {
+  id           String     @id @default(cuid())
+  payoutId     String
+  payout       Payout     @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  commissionId String
+  commission   Commission @relation(fields: [commissionId], references: [id])
+  amountCents  Int
+
+  @@index([payoutId])
+}
+
+// ── Webhooks (inbound log + outbound endpoints) ─────────────────────────────
+
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  direction      String   // INBOUND | OUTBOUND
+  source         String?  // sellavi | shopify | custom | api
+  eventType      String
+  idempotencyKey String?
+  rawPayload     String
+  normalizedPayload String?
+  signatureValid Boolean?
+  httpStatus     Int?
+  error          String?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+}
+
+model WebhookEndpoint {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  url            String
+  description    String?
+  secret         String   // encrypted at rest via ENCRYPTION_KEY
+  events         String   // comma-separated event names
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  endpointId  String
+  endpoint    WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  eventType   String
+  payload     String
+  attempts    Int      @default(0)
+  lastStatus  Int?
+  lastError   String?
+  status      String   @default("PENDING") // PENDING | DELIVERED | FAILED
+  nextRetryAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([endpointId, status])
+  @@index([status, nextRetryAt])
+}
+
+// ── API keys ────────────────────────────────────────────────────────────────
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  prefix         String    // e.g. live_sk_ab12 (first chars, for display)
+  keyHash        String    @unique // sha256 of full key
+  permissions    String    // comma-separated e.g. conversion:write,affiliate:read
+  mode           String    @default("LIVE") // LIVE | TEST
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
+}
+
+// ── Fraud & audit ───────────────────────────────────────────────────────────
+
+model FraudAlert {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  affiliateId    String?
+  affiliate      Affiliate? @relation(fields: [affiliateId], references: [id])
+  conversionId   String?
+  type           String   // DUPLICATE_ORDER | SELF_REFERRAL | IP_VELOCITY | HIGH_CVR | ...
+  riskScore      Int
+  details        String?
+  status         String   @default("OPEN") // OPEN | REVIEWED | DISMISSED
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, status])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  action         String
+  targetType     String?
+  targetId       String?
+  oldValue       String?
+  newValue       String?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+model SystemSetting {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  key            String
+  value          String
+
+  @@unique([organizationId, key])
+}
