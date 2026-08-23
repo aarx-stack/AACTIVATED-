@@ -45,6 +45,20 @@ test('idempotency memory fallback claims each key exactly once', async () => {
   assert.equal(await store.markProcessed(key), true);
 });
 
+test('idempotency pending claims expire; finalize makes them durable', async () => {
+  // Pending TTL of ~0 seconds: an unfinalized claim lapses almost immediately.
+  const store = createIdempotencyStore({ IDEMPOTENCY_PENDING_TTL_MINUTES: '0.000001' });
+  const key = `tapfiliate:conv:${Math.random()}`;
+  assert.equal(await store.markProcessed(key), true);
+  await new Promise((r) => setTimeout(r, 1100));
+  assert.equal(await store.markProcessed(key), true, 'unfinalized claim should have expired');
+
+  // Finalized claims stick around for the long TTL.
+  await store.finalize(key);
+  await new Promise((r) => setTimeout(r, 1100));
+  assert.equal(await store.markProcessed(key), false, 'finalized claim must persist');
+});
+
 test('config defaults: DRY_RUN true, pending counts, protected keywords present', () => {
   const cfg = loadConfig({ TAPFILIATE_API_KEY: 'k', WEBHOOK_TOKEN: 't' });
   assert.equal(cfg.dryRun, true);

@@ -1,7 +1,12 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import handler, { extractConversionEvent, resolveGroups, __resetGroupCacheForTests } from '../api/tapfiliate-webhook.js';
+import handler, {
+  extractConversionEvent,
+  resolveGroups,
+  readAffiliateGroupState,
+  __resetGroupCacheForTests,
+} from '../api/tapfiliate-webhook.js';
 import { __resetWriteStyleForTests } from '../api/_lib/tapfiliate.js';
 import { loadConfig } from '../api/_lib/config.js';
 
@@ -35,9 +40,12 @@ function fixtureState() {
       { id: 2, amount: 700, created_at: `${NOW_MONTH}-10T12:00:00+00:00`, commissions: [commission(null)] },
       { id: 3, amount: 9999, created_at: `${NOW_MONTH}-11T12:00:00+00:00`, commissions: [commission(false)] }, // refunded
     ],
+    groups: GROUPS,
     writes: [],
     rejectedWrites: 0,
     failAffiliateFetch: false,
+    missingConversions: false, // GET /conversions/{id}/ -> 404
+    conversionAffiliate: 'player1name', // affiliate on the authoritative conversion (null = none)
     // Which PUT /affiliates/{id}/group/ body shape the fake API accepts:
     // 'group_id' | 'group_obj' | 'group_flat' | 'query' | 'none' | 'silent_noop'
     acceptWriteShape: 'group_id',
@@ -89,21 +97,30 @@ function installMockFetch() {
       return respond(200, state.affiliate);
     }
     if (method === 'GET' && /\/affiliates\/[^/]+\/$/.test(u.pathname)) {
-      if (state.failAffiliateFetch) return respond(500, { error: 'boom' });
+      if (state.failAffiliateFetch) return respond(500, { message: 'boom' });
       return respond(200, state.affiliate);
     }
     if (method === 'GET' && u.pathname.endsWith('/affiliate-groups/')) {
       const page = Number(u.searchParams.get('page') || 1);
-      return respond(200, page === 1 ? GROUPS : []);
+      return respond(200, page === 1 ? state.groups : []);
     }
     if (method === 'GET' && u.pathname.endsWith('/conversions/')) {
       const page = Number(u.searchParams.get('page') || 1);
       return respond(200, page === 1 ? state.conversions : []);
     }
     if (method === 'GET' && /\/conversions\/[^/]+\/$/.test(u.pathname)) {
-      return respond(200, state.conversions[0]);
+      if (state.missingConversions) return respond(404, { message: 'not found' });
+      const cid = u.pathname.split('/').filter(Boolean).pop();
+      return respond(200, {
+        id: Number(cid) || cid,
+        amount: 800,
+        created_at: `${NOW_MONTH}-15T12:00:00+00:00`,
+        affiliate: state.conversionAffiliate === null ? null : { id: state.conversionAffiliate },
+        program: { id: 'aactivatedrx', currency: 'USD' },
+        commissions: [commission(true)],
+      });
     }
-    return respond(404, { error: `unmocked ${method} ${u.pathname}` });
+    return respond(404, { message: `unmocked ${method} ${u.pathname}` });
   };
 }
 
@@ -121,7 +138,7 @@ function makeReq({ body, token = 'test-token', method = 'POST', headers = {}, to
 }
 
 function makeRes() {
-  const res = {
+  return {
     statusCode: null,
     body: null,
     headers: {},
@@ -129,7 +146,28 @@ function makeRes() {
     status(code) { this.statusCode = code; return this; },
     json(obj) { this.body = obj; return this; },
   };
-  return res;
+}
+
+/** Run the handler while capturing its structured log lines. */
+async function run(req) {
+  const res = makeRes();
+  const logs = [];
+  const orig = console.log;
+  console.log = (msg) => {
+    try {
+      const o = JSON.parse(msg);
+      if (o.source === 'tapfiliate-tier-webhook') logs.push(o);
+      else orig(msg);
+    } catch {
+      orig(msg);
+    }
+  };
+  try {
+    await handler(req, res);
+  } finally {
+    console.log = orig;
+  }
+  return { res, logs, decision: logs.findLast((l) => l.action && l.conversion_id) ?? null };
 }
 
 function webhookBody(conversionId, overrides = {}) {
@@ -171,10 +209,11 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Auth & transport
+// ---------------------------------------------------------------------------
 
 test('rejects requests without the webhook token', async () => {
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()), token: null, tokenInUrl: false }), res);
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()), token: null, tokenInUrl: false }));
   assert.equal(res.statusCode, 401);
   assert.equal(state.writes.length, 0);
 });
@@ -183,53 +222,93 @@ test('accepts HMAC-signed requests without a token', async () => {
   setEnv({ WEBHOOK_TOKEN: '', TAPFILIATE_WEBHOOK_SECRET: 'sig-secret' });
   const body = JSON.stringify(webhookBody(nextConvId()));
   const sig = crypto.createHmac('sha256', 'sig-secret').update(body).digest('base64');
-  const res = makeRes();
-  await handler(makeReq({ body, tokenInUrl: false, headers: { 'x-tapfiliate-hmac': sig } }), res);
+  const { res } = await run(makeReq({ body, tokenInUrl: false, headers: { 'x-tapfiliate-hmac': sig } }));
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, 'processed');
 });
 
 test('GET is a harmless health check; other methods are 405', async () => {
-  const resGet = makeRes();
-  await handler(makeReq({ method: 'GET', tokenInUrl: false }), resGet);
+  const { res: resGet } = await run(makeReq({ method: 'GET', tokenInUrl: false }));
   assert.equal(resGet.statusCode, 200);
-
-  const resDel = makeRes();
-  await handler(makeReq({ method: 'DELETE', tokenInUrl: false }), resDel);
+  const { res: resDel } = await run(makeReq({ method: 'DELETE', tokenInUrl: false }));
   assert.equal(resDel.statusCode, 405);
 });
 
-test('500 misconfigured when no API key / no auth secret configured', async () => {
+test('misconfigured deployment returns a generic 500 without leaking which secret is missing', async () => {
   setEnv({ TAPFILIATE_API_KEY: '', WEBHOOK_TOKEN: '' });
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()), tokenInUrl: false }), res);
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()), tokenInUrl: false }));
   assert.equal(res.statusCode, 500);
-  assert.equal(res.body.error, 'misconfigured');
+  assert.deepEqual(res.body, { error: 'misconfigured' }); // no problems array
 });
 
 test('bad JSON is rejected with 400', async () => {
-  const res = makeRes();
-  await handler(makeReq({ body: '{not json' }), res);
+  const { res } = await run(makeReq({ body: '{not json' }));
   assert.equal(res.statusCode, 400);
 });
 
+test('oversized bodies are rejected with 413 before processing', async () => {
+  const huge = JSON.stringify({ event: 'conversion.created', pad: 'x'.repeat(300 * 1024) });
+  const { res } = await run(makeReq({ body: huge }));
+  assert.equal(res.statusCode, 413);
+});
+
 test('non-conversion events are acknowledged and ignored', async () => {
-  const res = makeRes();
-  await handler(makeReq({ body: { event: 'affiliate.created', data: { id: 'x' } } }), res);
+  const { res } = await run(makeReq({ body: { event: 'affiliate.created', data: { id: 'x' } } }));
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, 'ignored');
 });
 
-test('DRY_RUN (default): computes tier but performs no write', async () => {
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+// ---------------------------------------------------------------------------
+// Authoritative conversion lookup
+// ---------------------------------------------------------------------------
+
+test('a conversion id that does not exist in Tapfiliate is ignored and never claimed', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  const convId = nextConvId();
+  state.missingConversions = true;
+  const { res } = await run(makeReq({ body: webhookBody(convId) }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.reason, 'conversion_not_found');
+
+  // The id was NOT pre-claimed: once the conversion is real it processes fine.
+  state.missingConversions = false;
+  const { res: res2 } = await run(makeReq({ body: webhookBody(convId) }));
+  assert.equal(res2.body.status, 'processed');
+  assert.equal(res2.body.action, 'moved');
+});
+
+test('the affiliate comes from Tapfiliate, not the payload (forged affiliate is flagged)', async () => {
+  const { res, decision } = await run(
+    makeReq({ body: webhookBody(nextConvId(), { affiliate: { id: 'attacker-chosen' } }) })
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(decision.affiliate_id, 'player1name'); // authoritative
+  assert.equal(decision.payload_affiliate_mismatch, true);
+  assert.equal(decision.payload_affiliate_id, 'attacker-chosen');
+});
+
+test('conversion without an affiliate is ignored', async () => {
+  state.conversionAffiliate = null;
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.reason, 'no_affiliate_on_conversion');
+});
+
+// ---------------------------------------------------------------------------
+// Tier math & dry run
+// ---------------------------------------------------------------------------
+
+test('DRY_RUN (default): computes tier, logs it, performs no write, response stays opaque', async () => {
+  const { res, decision } = await run(makeReq({ body: webhookBody(nextConvId()) }));
   assert.equal(res.statusCode, 200);
   // $800 approved + $700 pending = $1,500 qualifying (refunded $9,999 excluded) -> Starter
-  assert.equal(res.body.monthly_qualifying_sales_usd, '1500.00');
-  assert.equal(res.body.calculated_group.title, 'Starter 20%');
-  assert.equal(res.body.action, 'dry_run_would_move');
-  assert.equal(res.body.dry_run, true);
+  assert.equal(decision.monthly_qualifying_sales_usd, '1500.00');
+  assert.equal(decision.calculated_group.title, 'Starter 20%');
+  assert.equal(decision.action, 'dry_run_would_move');
+  assert.equal(decision.dry_run, true);
   assert.equal(state.writes.length, 0);
+  // The HTTP response must NOT leak revenue or group data.
+  assert.deepEqual(Object.keys(res.body).sort(), ['action', 'conversion_id', 'dry_run', 'status']);
 });
 
 test('refunded/disapproved conversions never count toward the tier', async () => {
@@ -239,24 +318,25 @@ test('refunded/disapproved conversions never count toward the tier', async () =>
     created_at: `${NOW_MONTH}-12T12:00:00+00:00`,
     commissions: [commission(false), commission(false)],
   });
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.body.monthly_qualifying_sales_usd, '1500.00'); // still Starter, not Elite
-  assert.equal(res.body.calculated_group.title, 'Starter 20%');
+  const { decision } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(decision.monthly_qualifying_sales_usd, '1500.00'); // still Starter, not Elite
+  assert.equal(decision.calculated_group.title, 'Starter 20%');
 });
 
 test('COUNT_PENDING_COMMISSIONS=false counts only approved sales', async () => {
   setEnv({ COUNT_PENDING_COMMISSIONS: 'false' });
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.body.monthly_qualifying_sales_usd, '800.00'); // pending $700 excluded
-  assert.equal(res.body.calculated_group.title, 'Standard 15%');
+  const { decision } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(decision.monthly_qualifying_sales_usd, '800.00'); // pending $700 excluded
+  assert.equal(decision.calculated_group.title, 'Standard 15%');
 });
+
+// ---------------------------------------------------------------------------
+// Live writes
+// ---------------------------------------------------------------------------
 
 test('live mode moves the affiliate with exactly one verified write', async () => {
   setEnv({ DRY_RUN: 'false' });
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
   assert.equal(res.body.action, 'moved');
   assert.equal(state.writes.length, 1);
   assert.deepEqual(state.writes[0], {
@@ -265,35 +345,31 @@ test('live mode moves the affiliate with exactly one verified write', async () =
     shape: 'group_id',
     groupId: '102',
   });
-  // The write was verified: the fake affiliate now carries the new group.
-  assert.equal(state.affiliate.affiliate_group_id, '102');
+  assert.equal(state.affiliate.affiliate_group_id, '102'); // verified read-back
 });
 
 test('write falls back across documented body shapes until one verifies', async () => {
   setEnv({ DRY_RUN: 'false' });
-  state.acceptWriteShape = 'group_obj'; // API only accepts the nested shape
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  state.acceptWriteShape = 'group_obj';
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
   assert.equal(res.body.action, 'moved');
   assert.equal(state.writes.length, 1);
   assert.equal(state.writes[0].shape, 'group_obj');
-  assert.equal(state.rejectedWrites, 1); // group_id shape was tried first and rejected
+  assert.equal(state.rejectedWrites, 1);
 
   // The working shape is remembered: the next move skips the probe.
   state.affiliate = { ...state.affiliate, affiliate_group_id: 105 };
-  const res2 = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res2);
+  const { res: res2 } = await run(makeReq({ body: webhookBody(nextConvId()) }));
   assert.equal(res2.body.action, 'moved');
   assert.equal(state.writes.length, 2);
   assert.equal(state.writes[1].shape, 'group_obj');
-  assert.equal(state.rejectedWrites, 1); // no new rejections
+  assert.equal(state.rejectedWrites, 1);
 });
 
 test('query-param body shape also works when it is the accepted one', async () => {
   setEnv({ DRY_RUN: 'false' });
   state.acceptWriteShape = 'query';
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
   assert.equal(res.body.action, 'moved');
   assert.equal(state.writes[0].shape, 'query');
   assert.equal(state.writes[0].groupId, '102');
@@ -302,19 +378,17 @@ test('query-param body shape also works when it is the accepted one', async () =
 test('all write shapes rejected -> 500 and idempotency released for retry', async () => {
   setEnv({ DRY_RUN: 'false' });
   state.acceptWriteShape = 'none';
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
   assert.equal(res.statusCode, 500);
   assert.equal(state.writes.length, 0);
-  assert.equal(state.rejectedWrites, 4); // every documented shape was probed
+  assert.equal(state.rejectedWrites, 4);
 });
 
 test('a 2xx that does not actually change the group is treated as failure', async () => {
   setEnv({ DRY_RUN: 'false' });
   state.acceptWriteShape = 'silent_noop';
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.statusCode, 500); // read-back verification refused the fake success
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.statusCode, 500);
   assert.equal(state.writes.length, 0);
   assert.equal(state.affiliate.affiliate_group_id, null);
 });
@@ -322,87 +396,147 @@ test('a 2xx that does not actually change the group is treated as failure', asyn
 test('duplicate conversion delivery is skipped', async () => {
   setEnv({ DRY_RUN: 'false' });
   const convId = nextConvId();
-  const res1 = makeRes();
-  await handler(makeReq({ body: webhookBody(convId) }), res1);
+  const { res: res1 } = await run(makeReq({ body: webhookBody(convId) }));
   assert.equal(res1.body.action, 'moved');
 
-  const res2 = makeRes();
-  await handler(makeReq({ body: webhookBody(convId) }), res2);
+  const { res: res2 } = await run(makeReq({ body: webhookBody(convId) }));
   assert.equal(res2.statusCode, 200);
   assert.equal(res2.body.status, 'duplicate');
-  assert.equal(state.writes.length, 1); // no second write
-});
-
-test('protected B2B groups are never touched, even live', async () => {
-  setEnv({ DRY_RUN: 'false' });
-  for (const groupId of [201, 202, 203]) {
-    state.affiliate.affiliate_group_id = groupId;
-    const res = makeRes();
-    await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-    assert.equal(res.body.action, 'skipped_protected_group', `group ${groupId}`);
-  }
-  assert.equal(state.writes.length, 0);
-});
-
-test('unknown non-tier group is left alone', async () => {
-  setEnv({ DRY_RUN: 'false' });
-  state.affiliate.affiliate_group_id = 300; // "VIP Legacy"
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.body.action, 'skipped_non_tier_group');
-  assert.equal(state.writes.length, 0);
-});
-
-test('affiliate already in the correct group: no write', async () => {
-  setEnv({ DRY_RUN: 'false' });
-  state.affiliate.affiliate_group_id = 102; // already Starter
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.body.action, 'no_change_needed');
-  assert.equal(state.writes.length, 0);
-});
-
-test('downgrade also works: Elite affiliate with low volume moves down', async () => {
-  setEnv({ DRY_RUN: 'false' });
-  state.affiliate.affiliate_group_id = 105; // Elite
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.body.action, 'moved');
-  assert.equal(state.writes[0].groupId, '102'); // down to Starter
+  assert.equal(state.writes.length, 1);
 });
 
 test('Tapfiliate API failure returns 500 and releases idempotency for retry', async () => {
   setEnv({ DRY_RUN: 'false' });
   const convId = nextConvId();
   state.failAffiliateFetch = true;
-  const res1 = makeRes();
-  await handler(makeReq({ body: webhookBody(convId) }), res1);
+  const { res: res1 } = await run(makeReq({ body: webhookBody(convId) }));
   assert.equal(res1.statusCode, 500);
 
   state.failAffiliateFetch = false;
-  const res2 = makeRes();
-  await handler(makeReq({ body: webhookBody(convId) }), res2);
+  const { res: res2 } = await run(makeReq({ body: webhookBody(convId) }));
   assert.equal(res2.statusCode, 200);
   assert.equal(res2.body.action, 'moved'); // retry succeeded, not treated as duplicate
 });
 
+// ---------------------------------------------------------------------------
+// Group-safety rules
+// ---------------------------------------------------------------------------
+
+test('protected B2B groups are never touched, even live', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  for (const groupId of [201, 202, 203]) {
+    state.affiliate = { id: 'player1name', affiliate_group_id: groupId };
+    const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+    assert.equal(res.body.action, 'skipped_protected_group', `group ${groupId}`);
+  }
+  assert.equal(state.writes.length, 0);
+});
+
+test('protected group expressed as nested group:{id} shape is also honored', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.affiliate = { id: 'player1name', group: { id: 201, title: 'Competitive 40%' } };
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'skipped_protected_group');
+  assert.equal(state.writes.length, 0);
+});
+
+test('affiliate object with NO group information is skipped conservatively', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.affiliate = { id: 'player1name', email: 'x@y.z' }; // neither field present
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'skipped_unknown_group_state');
+  assert.equal(state.writes.length, 0);
+});
+
+test('unknown non-tier group is left alone', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.affiliate = { id: 'player1name', affiliate_group_id: 300 }; // "VIP Legacy", no override
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'skipped_non_tier_group');
+  assert.equal(state.writes.length, 0);
+});
+
+test('affiliates in an override-mapped tier group are NOT stuck (regression)', async () => {
+  // TIER_GROUP_ID_ELITE points at "VIP Legacy" (no tier keyword in title).
+  setEnv({ DRY_RUN: 'false', TIER_GROUP_ID_ELITE: '300' });
+  state.affiliate = { id: 'player1name', affiliate_group_id: 300 };
+  // Month volume is $1,500 -> Starter: the affiliate must move DOWN and out.
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'moved');
+  assert.equal(state.writes[0].groupId, '102');
+});
+
+test('affiliate correctly sitting in the override-mapped tier group logs no_change_needed', async () => {
+  setEnv({ DRY_RUN: 'false', TIER_GROUP_ID_ELITE: '300' });
+  state.affiliate = { id: 'player1name', affiliate_group_id: 300 };
+  state.conversions = [
+    { id: 9, amount: 12000, created_at: `${NOW_MONTH}-05T12:00:00+00:00`, commissions: [commission(true)] },
+  ];
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'no_change_needed');
+  assert.equal(state.writes.length, 0);
+});
+
+test('affiliate already in the correct group: no write', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.affiliate = { id: 'player1name', affiliate_group_id: 102 }; // already Starter
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'no_change_needed');
+  assert.equal(state.writes.length, 0);
+});
+
+test('downgrade also works: Elite affiliate with low volume moves down', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.affiliate = { id: 'player1name', affiliate_group_id: 105 };
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.body.action, 'moved');
+  assert.equal(state.writes[0].groupId, '102'); // down to Starter
+});
+
+test('missing target tier group logs an error without writing', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.groups = GROUPS.filter((g) => g.id !== 102); // no Starter group
+  const { res, decision } = await run(makeReq({ body: webhookBody(nextConvId()) }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.action, 'error_target_group_not_found');
+  assert.equal(decision.level, 'error');
+  assert.equal(state.writes.length, 0);
+});
+
 test('payload without envelope (bare conversion object) still works', async () => {
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()).data }), res);
+  const { res } = await run(makeReq({ body: webhookBody(nextConvId()).data }));
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, 'processed');
 });
 
 // ---------------------------------------------------------------------------
+// Unit-level checks
+// ---------------------------------------------------------------------------
 
-test('extractConversionEvent handles envelope, bare, and junk payloads', () => {
+test('extractConversionEvent handles envelope, bare, junk, and commission payloads', () => {
   assert.equal(extractConversionEvent(null).ok, false);
   assert.equal(extractConversionEvent({}).ok, false);
+  assert.equal(extractConversionEvent([1, 2]).ok, false);
   assert.equal(extractConversionEvent({ event: 'affiliate.created', data: { id: 1 } }).reason, 'ignored_event_type');
   const enveloped = extractConversionEvent({ event: 'conversion.created', data: { id: 42, affiliate: { id: 'a1' } } });
   assert.deepEqual([enveloped.ok, enveloped.conversionId, enveloped.affiliateId], [true, '42', 'a1']);
   const bare = extractConversionEvent({ id: 43, affiliate: { id: 'a2' }, amount: 10 });
   assert.deepEqual([bare.ok, bare.conversionId, bare.affiliateId], [true, '43', 'a2']);
+  // A bare commission object must not be treated as a conversion.
+  const comm = extractConversionEvent({ id: 44, amount: 10, kind: 'regular', approved: true });
+  assert.deepEqual([comm.ok, comm.reason], [false, 'not_a_conversion_payload']);
+  // ...but a real conversion with a commissions array is fine.
+  const conv = extractConversionEvent({ id: 45, amount: 10, commissions: [] });
+  assert.equal(conv.ok, true);
+});
+
+test('readAffiliateGroupState reads both shapes and flags unknown state', () => {
+  assert.deepEqual(readAffiliateGroupState({ affiliate_group_id: null }), { known: true, groupId: null });
+  assert.deepEqual(readAffiliateGroupState({ affiliate_group_id: 'ag_1' }), { known: true, groupId: 'ag_1' });
+  assert.deepEqual(readAffiliateGroupState({ group: null }), { known: true, groupId: null });
+  assert.deepEqual(readAffiliateGroupState({ group: { id: 7 } }), { known: true, groupId: '7' });
+  assert.deepEqual(readAffiliateGroupState({ id: 'x' }), { known: false, groupId: null });
+  assert.deepEqual(readAffiliateGroupState(null), { known: false, groupId: null });
 });
 
 test('resolveGroups maps tiers, protects B2B groups, honors ID overrides', () => {

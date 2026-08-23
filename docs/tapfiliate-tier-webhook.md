@@ -11,12 +11,19 @@ On every Tapfiliate **Conversion created** webhook event it:
 
 1. **Authenticates** the request — a `?token=` shared secret (constant-time
    compared against `WEBHOOK_TOKEN`) and/or an HMAC-SHA256 signature check
-   against `TAPFILIATE_WEBHOOK_SECRET`. Unauthenticated requests get `401`.
-2. **Deduplicates** by conversion ID (Upstash Redis / Vercel KV when
-   configured, atomic `SET NX`). A replayed webhook is acknowledged with
-   `{"status":"duplicate"}` and does nothing.
-3. **Identifies the affiliate** from the payload (or by fetching the
-   conversion from the API when the payload is thin).
+   against `TAPFILIATE_WEBHOOK_SECRET`. Unauthenticated requests get `401`;
+   oversized bodies get `413`.
+2. **Fetches the conversion from Tapfiliate by ID** — the payload only says
+   *which* conversion to look at; the affiliate and every dollar figure come
+   from Tapfiliate's API, never from the request body. A conversion ID that
+   doesn't exist in the account is ignored (this also blocks forged payloads
+   from pre-claiming IDs or steering the evaluation).
+3. **Deduplicates** by conversion ID (Upstash Redis / Vercel KV when
+   configured, atomic `SET NX`). Claims start on a short pending TTL
+   (`IDEMPOTENCY_PENDING_TTL_MINUTES`, default 15) and are finalized to the
+   long TTL only after processing succeeds — so a crashed or timeout-killed
+   invocation can't permanently swallow a conversion. A replayed webhook is
+   acknowledged with `{"status":"duplicate"}` and does nothing.
 4. **Sums the month's qualifying sales** — every conversion for that affiliate
    in the current calendar month (`TIER_TIMEZONE`, default UTC), **excluding
    refunded/disapproved conversions** (any conversion whose commissions are
@@ -67,13 +74,18 @@ On every Tapfiliate **Conversion created** webhook event it:
   Enterprise plan. If group API calls fail despite correct configuration,
   check the plan first.
 
-## Logging
+## Logging & responses
 
 One JSON line per event in the Vercel function logs
 (`source: "tapfiliate-tier-webhook"`), containing: `conversion_id`,
 `affiliate_id`, `monthly_qualifying_sales_usd`, `current_group`,
 `calculated_group`, `action`, `dry_run`, excluded conversions with reasons,
 month, and timezone.
+
+The **HTTP response is deliberately opaque** — `{status, conversion_id,
+action, dry_run}` only. Revenue figures, tiers, and group names never leave
+the server, so a leaked webhook token cannot be used to read affiliate
+earnings. Read the details in the Vercel logs.
 
 Possible `action` values: `moved`, `dry_run_would_move`, `no_change_needed`,
 `skipped_protected_group`, `skipped_non_tier_group`,
@@ -152,5 +164,13 @@ Everything is dependency-free Node (ES modules, built-in test runner).
   or replay can reprocess safely. Tapfiliate does not document trigger retry
   behavior, so if a delivery is lost the affiliate is simply re-evaluated on
   their *next* conversion — the math always uses the full month from the API,
-  so no volume is ever lost, only the move is deferred.
+  so no volume is ever lost, only the move is deferred. The same logic covers
+  the rare cases this endpoint deliberately does not over-engineer: a
+  timeout-killed invocation (its pending idempotency claim expires within
+  minutes) and two near-simultaneous conversions racing each other — the
+  next event always recomputes from the authoritative month totals.
+- **This repo's GitHub Pages workflow does not serve the webhook.** Pages is
+  static hosting; the function only runs when the repo is imported as a
+  Vercel project. The Pages deploy now strips `api/` and server tooling from
+  the published site.
 - Currency is assumed to be the program currency (USD).

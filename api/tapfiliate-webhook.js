@@ -3,9 +3,11 @@
  *
  * Flow per event:
  *   1. Authenticate the request (shared token and/or HMAC signature).
- *   2. Idempotency: claim the conversion ID; duplicates are acknowledged and skipped.
- *   3. Identify the affiliate on the conversion (fetching the conversion from
- *      the API if the payload is thin).
+ *   2. Fetch the conversion from Tapfiliate by the ID in the payload — the
+ *      payload only tells us WHICH conversion to look at; the affiliate and
+ *      all business data come from Tapfiliate's API, never from the caller.
+ *   3. Idempotency: claim the conversion ID (short pending TTL, finalized to
+ *      a long TTL only after success); duplicates are acknowledged and skipped.
  *   4. Pull the affiliate's conversions for the current calendar month and sum
  *      qualifying sales (refunded/disapproved conversions excluded).
  *   5. Map the volume to the tier ladder and, unless the affiliate sits in a
@@ -13,6 +15,10 @@
  *
  * DRY_RUN defaults to true: decisions are logged, no write is made, until
  * DRY_RUN=false is set in Vercel env vars.
+ *
+ * The HTTP response is deliberately an opaque acknowledgement — no revenue
+ * figures or group names are echoed to callers. Full detail goes to the
+ * structured server logs only.
  */
 
 import { loadConfig, validateConfig } from './_lib/config.js';
@@ -28,8 +34,7 @@ import {
 } from './_lib/tiers.js';
 import { currentMonthWindow, makeInMonth } from './_lib/month.js';
 
-// Raw body needed for HMAC verification — disable Vercel's body parser.
-export const config = { api: { bodyParser: false } };
+const MAX_BODY_BYTES = 256 * 1024; // far above any real Tapfiliate payload
 
 const idempotencyStore = createIdempotencyStore();
 
@@ -42,18 +47,27 @@ export function __resetGroupCacheForTests() {
   groupCache = { at: 0, groups: null };
 }
 
+class BodyTooLargeError extends Error {}
+
 async function readRawBody(req) {
-  // Preferred path: consume the raw stream (bodyParser disabled above).
+  // Preferred path: consume the raw stream (needed for exact HMAC bytes).
   try {
     const chunks = [];
-    for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    let total = 0;
+    for await (const chunk of req) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (total > MAX_BODY_BYTES) throw new BodyTooLargeError();
+      chunks.push(buf);
+    }
     if (chunks.length > 0) return Buffer.concat(chunks).toString('utf8');
-  } catch {
+  } catch (err) {
+    if (err instanceof BodyTooLargeError) throw err;
     // stream already consumed by a platform body-parser helper — fall through
   }
-  // Fallback: some runtimes pre-read the body regardless of the config
-  // export. Token auth is unaffected; HMAC (optional) needs the true raw
-  // bytes, so proxy-signed setups must keep the raw stream path working.
+  // Fallback: some runtimes pre-read the body. Token auth is unaffected;
+  // HMAC (optional) needs true raw bytes, so proxy-signed setups must keep
+  // the raw stream path working.
   const body = req.body;
   if (typeof body === 'string') return body;
   if (Buffer.isBuffer(body)) return body.toString('utf8');
@@ -62,12 +76,15 @@ async function readRawBody(req) {
 }
 
 /**
- * Tolerant extraction of the conversion event. Tapfiliate webhook payloads
- * carry the conversion object; depending on webhook version the object may be
- * wrapped in an envelope with the event name.
+ * Tolerant extraction of the conversion reference from the webhook payload.
+ * Tapfiliate's standard trigger posts the bare conversion object; enveloped
+ * shapes ({event, data}) are also accepted. Only the conversion ID is
+ * ultimately trusted — everything else is re-fetched from the API.
  */
 export function extractConversionEvent(payload) {
-  if (!payload || typeof payload !== 'object') return { ok: false, reason: 'payload_not_object' };
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { ok: false, reason: 'payload_not_object' };
+  }
 
   const eventType = payload.event || payload.event_type || payload.type || null;
   if (eventType && !/conversion[._-]?(created|new)/i.test(String(eventType))) {
@@ -75,15 +92,20 @@ export function extractConversionEvent(payload) {
   }
 
   const data = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+
+  // A bare commission object (from e.g. a "Commission approved" trigger
+  // pointed at this URL) also has an id — don't mistake it for a conversion.
+  if (!eventType && ('approved' in data || 'kind' in data) && !('commissions' in data)) {
+    return { ok: false, reason: 'not_a_conversion_payload' };
+  }
+
   const conversionId = data.id ?? data.conversion_id ?? null;
   const affiliateId = data.affiliate?.id ?? data.affiliate_id ?? null;
-  const programId = data.program?.id ?? data.program_id ?? null;
-  const amount = data.amount ?? null;
 
   if (conversionId === null || conversionId === undefined || conversionId === '') {
     return { ok: false, reason: 'missing_conversion_id' };
   }
-  return { ok: true, eventType, conversionId: String(conversionId), affiliateId, programId, amount };
+  return { ok: true, eventType, conversionId: String(conversionId), affiliateId };
 }
 
 /**
@@ -131,6 +153,22 @@ function groupLabel(group) {
   return { id: String(group.id), title: group.title ?? group.name ?? null };
 }
 
+/**
+ * The affiliate's current group, reading both shapes seen in the wild:
+ * a scalar `affiliate_group_id` (observed live) or a nested `group: {id}`
+ * (modeled by the API reference reconstructions). When NEITHER field is
+ * present the group state is unknown and the caller must skip conservatively
+ * rather than assume "ungrouped" (which could bypass protected-group checks).
+ */
+export function readAffiliateGroupState(affiliate) {
+  if (!affiliate || typeof affiliate !== 'object') return { known: false, groupId: null };
+  const hasScalar = Object.prototype.hasOwnProperty.call(affiliate, 'affiliate_group_id');
+  const hasNested = Object.prototype.hasOwnProperty.call(affiliate, 'group');
+  if (!hasScalar && !hasNested) return { known: false, groupId: null };
+  const raw = affiliate.affiliate_group_id ?? (affiliate.group && typeof affiliate.group === 'object' ? affiliate.group.id : null);
+  return { known: true, groupId: raw != null ? String(raw) : null };
+}
+
 export default async function handler(req, res) {
   const cfg = loadConfig();
 
@@ -144,11 +182,21 @@ export default async function handler(req, res) {
 
   const configProblems = validateConfig(cfg);
   if (configProblems.length > 0) {
+    // Details go to the server log only — never to unauthenticated callers.
     logEvent({ level: 'error', action: 'misconfigured', problems: configProblems });
-    return res.status(500).json({ error: 'misconfigured', problems: configProblems });
+    return res.status(500).json({ error: 'misconfigured' });
   }
 
-  const rawBody = await readRawBody(req);
+  let rawBody;
+  try {
+    rawBody = await readRawBody(req);
+  } catch (err) {
+    if (err instanceof BodyTooLargeError) {
+      logEvent({ level: 'warn', action: 'rejected_body_too_large' });
+      return res.status(413).json({ error: 'payload_too_large' });
+    }
+    throw err;
+  }
 
   const auth = authenticate(req, rawBody, cfg);
   if (!auth.ok) {
@@ -171,6 +219,37 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'ignored', reason: event.reason });
   }
 
+  const client = createTapfiliateClient(cfg);
+
+  // --- Authoritative lookup: the conversion must exist in Tapfiliate. ---
+  // This also prevents forged payloads from pre-claiming future conversion
+  // IDs or steering the evaluation with caller-chosen affiliate IDs.
+  let conversion;
+  try {
+    conversion = await client.getConversion(event.conversionId);
+  } catch (err) {
+    if (err instanceof TapfiliateError && err.status === 404) {
+      logEvent({ level: 'warn', action: 'ignored', reason: 'conversion_not_found', conversion_id: event.conversionId });
+      return res.status(200).json({ status: 'ignored', reason: 'conversion_not_found' });
+    }
+    logEvent({
+      level: 'error',
+      action: 'processing_failed',
+      stage: 'fetch_conversion',
+      conversion_id: event.conversionId,
+      error: String(err?.message ?? err),
+    });
+    return res.status(500).json({ error: 'processing_failed', conversion_id: event.conversionId });
+  }
+
+  const affiliateId = conversion?.affiliate?.id != null ? String(conversion.affiliate.id) : null;
+  if (!affiliateId) {
+    logEvent({ level: 'warn', action: 'ignored', reason: 'no_affiliate_on_conversion', conversion_id: event.conversionId });
+    return res.status(200).json({ status: 'ignored', reason: 'no_affiliate_on_conversion' });
+  }
+  const payloadAffiliateMismatch = Boolean(event.affiliateId && String(event.affiliateId) !== affiliateId);
+
+  // --- Idempotency: claim only after the conversion is known to be real. ---
   const idemKey = `tapfiliate:conversion:${event.conversionId}`;
   const firstDelivery = await idempotencyStore.markProcessed(idemKey).catch((err) => {
     // Idempotency store outage: log and continue — reprocessing is safe
@@ -183,20 +262,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'duplicate', conversion_id: event.conversionId });
   }
 
-  const client = createTapfiliateClient(cfg);
-
   try {
-    // --- Identify the affiliate ---
-    let affiliateId = event.affiliateId;
-    if (!affiliateId) {
-      const conversion = await client.getConversion(event.conversionId);
-      affiliateId = conversion?.affiliate?.id ?? null;
-    }
-    if (!affiliateId) {
-      logEvent({ level: 'warn', action: 'ignored', reason: 'no_affiliate_on_conversion', conversion_id: event.conversionId });
-      return res.status(200).json({ status: 'ignored', reason: 'no_affiliate_on_conversion' });
-    }
-
     const affiliate = await client.getAffiliate(affiliateId);
 
     // --- Load and classify groups (cached) ---
@@ -204,6 +270,11 @@ export default async function handler(req, res) {
       groupCache = { at: Date.now(), groups: await client.listAffiliateGroups() };
     }
     const { byId, tierGroups, protectedIds } = resolveGroups(groupCache.groups, cfg);
+    const tierGroupIds = new Set(
+      Object.values(tierGroups)
+        .filter(Boolean)
+        .map((g) => String(g.id))
+    );
 
     // --- Sum this month's qualifying sales ---
     const window = currentMonthWindow(new Date(), cfg.timeZone);
@@ -221,20 +292,33 @@ export default async function handler(req, res) {
     const tier = tierForVolumeCents(volume.totalCents);
     const targetGroup = tierGroups[tier.key] ?? null;
 
-    const currentGroupId = affiliate?.affiliate_group_id != null ? String(affiliate.affiliate_group_id) : null;
+    const groupState = readAffiliateGroupState(affiliate);
+    const currentGroupId = groupState.groupId;
     const currentGroup = currentGroupId ? byId.get(currentGroupId) ?? null : null;
+
+    // A group is "tier-managed" when its id is one of the resolved tier
+    // groups (covers TIER_GROUP_ID_* overrides whose titles carry no tier
+    // keyword) OR its title matches a tier name.
+    const currentIsTierManaged =
+      currentGroup !== null &&
+      (tierGroupIds.has(currentGroupId) || Boolean(tierKeyForGroupTitle(currentGroup.title ?? currentGroup.name ?? '')));
 
     // --- Decide the action ---
     let action;
     let detail = null;
     let writeEndpoint = null;
 
-    if (currentGroupId && protectedIds.has(currentGroupId)) {
+    if (!groupState.known) {
+      // The affiliate object exposed no group information at all — never
+      // assume "ungrouped", that could move a protected B2B affiliate.
+      action = 'skipped_unknown_group_state';
+      detail = 'Affiliate object carried neither affiliate_group_id nor group; refusing to act on unknown state';
+    } else if (currentGroupId && protectedIds.has(currentGroupId)) {
       action = 'skipped_protected_group';
     } else if (currentGroupId && !currentGroup) {
       // Group ID not in the account's group list — never touch what we can't identify.
       action = 'skipped_unrecognized_group';
-    } else if (currentGroup && !tierKeyForGroupTitle(currentGroup.title ?? currentGroup.name ?? '')) {
+    } else if (currentGroup && !currentIsTierManaged) {
       // In a group that is neither a tier group nor explicitly protected —
       // treat as manually managed and leave it alone.
       action = 'skipped_non_tier_group';
@@ -253,7 +337,14 @@ export default async function handler(req, res) {
       action = 'moved';
     }
 
-    const logFields = {
+    if (action === 'error_target_group_not_found') {
+      // Leave the claim on its short pending TTL so a replay after the
+      // configuration is fixed can reprocess this conversion.
+    } else {
+      await idempotencyStore.finalize(idemKey).catch(() => {});
+    }
+
+    logEvent({
       level: action.startsWith('error') ? 'error' : 'info',
       conversion_id: event.conversionId,
       affiliate_id: affiliateId,
@@ -269,19 +360,17 @@ export default async function handler(req, res) {
       action,
       dry_run: cfg.dryRun,
       auth_method: auth.method,
+      ...(payloadAffiliateMismatch ? { payload_affiliate_mismatch: true, payload_affiliate_id: String(event.affiliateId) } : {}),
       ...(detail ? { detail } : {}),
       ...(writeEndpoint ? { write_endpoint: writeEndpoint } : {}),
       ...(truncated ? { warning: 'conversion_list_truncated_at_page_cap' } : {}),
-    };
-    logEvent(logFields);
+    });
 
+    // Opaque acknowledgement only — no revenue, tier, or group data leaves
+    // the server. Operators read the details in the Vercel function logs.
     return res.status(200).json({
       status: 'processed',
       conversion_id: event.conversionId,
-      affiliate_id: affiliateId,
-      monthly_qualifying_sales_usd: centsToDollars(volume.totalCents),
-      current_group: logFields.current_group,
-      calculated_group: logFields.calculated_group,
       action,
       dry_run: cfg.dryRun,
     });

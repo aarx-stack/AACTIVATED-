@@ -193,12 +193,15 @@ export function createTapfiliateClient(cfg, fetchImpl = globalThis.fetch) {
         }
 
         // 2xx alone is not trusted: confirm the membership actually changed.
+        // Both observed response shapes are accepted: scalar affiliate_group_id
+        // (seen live) or nested group.id (per the reference reconstructions).
         const after = await request(`/affiliates/${encodeURIComponent(affiliateId)}/`);
-        if (after && String(after.affiliate_group_id) === gid) {
+        const afterGroupId = after?.affiliate_group_id ?? (after?.group && typeof after.group === 'object' ? after.group.id : null);
+        if (afterGroupId != null && String(afterGroupId) === gid) {
           knownGoodWriteStyle = attempt.style;
           return { endpoint: attempt.label, verified: true };
         }
-        failures.push(`${attempt.label} -> 2xx but affiliate_group_id is still ${after?.affiliate_group_id ?? 'null'}`);
+        failures.push(`${attempt.label} -> 2xx but affiliate group is still ${afterGroupId ?? 'null'}`);
       }
       throw new TapfiliateError(
         `Tapfiliate group assignment could not be verified with any documented request shape: ${failures.join(' | ')}`,

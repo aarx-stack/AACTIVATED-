@@ -25,6 +25,10 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      # The Tapfiliate webhook (api/) runs on Vercel, not Pages — keep its
+      # source and the server-side tooling out of the published static site.
+      - name: Exclude server-side files from the static artifact
+        run: rm -rf api test docs vercel.json package.json .env.example
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
