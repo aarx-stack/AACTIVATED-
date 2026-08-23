@@ -36,10 +36,11 @@ function fixtureState() {
       { id: 3, amount: 9999, created_at: `${NOW_MONTH}-11T12:00:00+00:00`, commissions: [commission(false)] }, // refunded
     ],
     writes: [],
+    rejectedWrites: 0,
     failAffiliateFetch: false,
-    // Which group-assignment endpoint shapes the fake API accepts.
-    acceptPostGroupMembers: true,
-    acceptPutAffiliateGroup: true,
+    // Which PUT /affiliates/{id}/group/ body shape the fake API accepts:
+    // 'group_id' | 'group_obj' | 'group_flat' | 'query' | 'none' | 'silent_noop'
+    acceptWriteShape: 'group_id',
   };
 }
 
@@ -56,15 +57,36 @@ function installMockFetch() {
       text: async () => JSON.stringify(body),
     });
 
-    if (method === 'POST' && /\/affiliate-groups\/[^/]+\/affiliates\/$/.test(u.pathname)) {
-      if (!state.acceptPostGroupMembers) return respond(404, { error: 'not found' });
-      state.writes.push({ method, path: u.pathname, body: JSON.parse(opts.body) });
-      return respond(200, { ok: true });
-    }
     if (method === 'PUT' && /\/affiliates\/[^/]+\/group\/$/.test(u.pathname)) {
-      if (!state.acceptPutAffiliateGroup) return respond(404, { error: 'not found' });
-      state.writes.push({ method, path: u.pathname, body: JSON.parse(opts.body) });
-      return respond(200, { ok: true });
+      const body = opts.body ? JSON.parse(opts.body) : null;
+      const shape = u.searchParams.has('group_id')
+        ? 'query'
+        : body && 'group_id' in body
+          ? 'group_id'
+          : body && typeof body.group === 'object' && body.group !== null
+            ? 'group_obj'
+            : body && typeof body.group === 'string'
+              ? 'group_flat'
+              : 'unknown';
+      if (state.acceptWriteShape === 'silent_noop') {
+        // Pathological API: returns 2xx but never applies the change.
+        return respond(200, { ok: true });
+      }
+      if (shape !== state.acceptWriteShape) {
+        state.rejectedWrites += 1;
+        return respond(400, { message: 'invalid payload' });
+      }
+      const gid =
+        shape === 'query'
+          ? u.searchParams.get('group_id')
+          : shape === 'group_id'
+            ? body.group_id
+            : shape === 'group_obj'
+              ? body.group.id
+              : body.group;
+      state.affiliate = { ...state.affiliate, affiliate_group_id: gid };
+      state.writes.push({ method, path: u.pathname, shape, groupId: String(gid) });
+      return respond(200, state.affiliate);
     }
     if (method === 'GET' && /\/affiliates\/[^/]+\/$/.test(u.pathname)) {
       if (state.failAffiliateFetch) return respond(500, { error: 'boom' });
@@ -231,22 +253,8 @@ test('COUNT_PENDING_COMMISSIONS=false counts only approved sales', async () => {
   assert.equal(res.body.calculated_group.title, 'Standard 15%');
 });
 
-test('live mode moves the affiliate with exactly one write call', async () => {
+test('live mode moves the affiliate with exactly one verified write', async () => {
   setEnv({ DRY_RUN: 'false' });
-  const res = makeRes();
-  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
-  assert.equal(res.body.action, 'moved');
-  assert.equal(state.writes.length, 1);
-  assert.deepEqual(state.writes[0], {
-    method: 'POST',
-    path: '/1.6/affiliate-groups/102/affiliates/',
-    body: { affiliate: { id: 'player1name' } },
-  });
-});
-
-test('write falls back to the alternate documented endpoint shape on 404', async () => {
-  setEnv({ DRY_RUN: 'false' });
-  state.acceptPostGroupMembers = false; // primary form rejected by fake API
   const res = makeRes();
   await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
   assert.equal(res.body.action, 'moved');
@@ -254,26 +262,61 @@ test('write falls back to the alternate documented endpoint shape on 404', async
   assert.deepEqual(state.writes[0], {
     method: 'PUT',
     path: '/1.6/affiliates/player1name/group/',
-    body: { group: { id: '102' } },
+    shape: 'group_id',
+    groupId: '102',
   });
+  // The write was verified: the fake affiliate now carries the new group.
+  assert.equal(state.affiliate.affiliate_group_id, '102');
+});
 
-  // The working shape is remembered: the next move goes straight to PUT.
-  state.affiliate.affiliate_group_id = 105;
+test('write falls back across documented body shapes until one verifies', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.acceptWriteShape = 'group_obj'; // API only accepts the nested shape
+  const res = makeRes();
+  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  assert.equal(res.body.action, 'moved');
+  assert.equal(state.writes.length, 1);
+  assert.equal(state.writes[0].shape, 'group_obj');
+  assert.equal(state.rejectedWrites, 1); // group_id shape was tried first and rejected
+
+  // The working shape is remembered: the next move skips the probe.
+  state.affiliate = { ...state.affiliate, affiliate_group_id: 105 };
   const res2 = makeRes();
   await handler(makeReq({ body: webhookBody(nextConvId()) }), res2);
   assert.equal(res2.body.action, 'moved');
   assert.equal(state.writes.length, 2);
-  assert.equal(state.writes[1].method, 'PUT');
+  assert.equal(state.writes[1].shape, 'group_obj');
+  assert.equal(state.rejectedWrites, 1); // no new rejections
 });
 
-test('both write shapes rejected -> 500 and idempotency released for retry', async () => {
+test('query-param body shape also works when it is the accepted one', async () => {
   setEnv({ DRY_RUN: 'false' });
-  state.acceptPostGroupMembers = false;
-  state.acceptPutAffiliateGroup = false;
+  state.acceptWriteShape = 'query';
+  const res = makeRes();
+  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  assert.equal(res.body.action, 'moved');
+  assert.equal(state.writes[0].shape, 'query');
+  assert.equal(state.writes[0].groupId, '102');
+});
+
+test('all write shapes rejected -> 500 and idempotency released for retry', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.acceptWriteShape = 'none';
   const res = makeRes();
   await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
   assert.equal(res.statusCode, 500);
   assert.equal(state.writes.length, 0);
+  assert.equal(state.rejectedWrites, 4); // every documented shape was probed
+});
+
+test('a 2xx that does not actually change the group is treated as failure', async () => {
+  setEnv({ DRY_RUN: 'false' });
+  state.acceptWriteShape = 'silent_noop';
+  const res = makeRes();
+  await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
+  assert.equal(res.statusCode, 500); // read-back verification refused the fake success
+  assert.equal(state.writes.length, 0);
+  assert.equal(state.affiliate.affiliate_group_id, null);
 });
 
 test('duplicate conversion delivery is skipped', async () => {
@@ -325,7 +368,7 @@ test('downgrade also works: Elite affiliate with low volume moves down', async (
   const res = makeRes();
   await handler(makeReq({ body: webhookBody(nextConvId()) }), res);
   assert.equal(res.body.action, 'moved');
-  assert.equal(state.writes[0].path, '/1.6/affiliate-groups/102/affiliates/'); // down to Starter
+  assert.equal(state.writes[0].groupId, '102'); // down to Starter
 });
 
 test('Tapfiliate API failure returns 500 and releases idempotency for retry', async () => {

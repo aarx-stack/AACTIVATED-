@@ -49,17 +49,23 @@ On every Tapfiliate **Conversion created** webhook event it:
 - **`DRY_RUN` defaults to `true`.** Until you set `DRY_RUN=false` in Vercel,
   the endpoint logs `dry_run_would_move` decisions and performs **zero writes**.
 - The only write call in the whole system is the group **membership**
-  assignment. Tapfiliate's v1.6 docs describe it as adding the affiliate to an
-  existing group; two request shapes exist for it, and the client tries them
-  in order (a wrong shape fails 4xx with no side effect, and the accepted
-  shape is remembered and logged as `write_endpoint`):
-  1. `POST /1.6/affiliate-groups/{group_id}/affiliates/` with
-     `{"affiliate": {"id": "<affiliate_id>"}}`
-  2. `PUT /1.6/affiliates/{affiliate_id}/group/` with
-     `{"group": {"id": "<group_id>"}}`
+  assignment: `PUT /1.6/affiliates/{affiliate_id}/group/` (the path and
+  method every known reconstruction of Tapfiliate's v1.6 reference agrees
+  on). Tapfiliate does not publish the exact request body verbatim, so the
+  client tries the four documented candidate shapes in evidence order —
+  `{"group_id": "ag_…"}`, `{"group": {"id": "ag_…"}}`, `{"group": "ag_…"}`,
+  then `?group_id=ag_…` with an empty body. A wrong shape fails 4xx with no
+  side effect, and **every 2xx is verified by re-reading the affiliate and
+  checking `affiliate_group_id` actually changed** — an unverified success
+  is treated as failure. The shape the live API accepts is remembered and
+  logged as `write_endpoint`.
 
   Nothing else is ever written: no group creation, no commission changes,
   no affiliate edits.
+
+- Note: Tapfiliate's Affiliate Groups feature requires their Scale or
+  Enterprise plan. If group API calls fail despite correct configuration,
+  check the plan first.
 
 ## Logging
 

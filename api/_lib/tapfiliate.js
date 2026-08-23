@@ -145,46 +145,36 @@ export function createTapfiliateClient(cfg, fetchImpl = globalThis.fetch) {
      * Moves an affiliate into an EXISTING affiliate group — membership only;
      * commission rates and group definitions are never touched.
      *
-     * The official reference (https://tapfiliate.com/docs/rest/) documents
-     * group assignment under Affiliate Groups; two request shapes exist in
-     * the wild for API v1.6 (docs page unreachable from this build network,
-     * verified as far as official support articles + Tapfiliate's own
-     * endpoint conventions allow):
+     * Endpoint path+method (corroborated by every known reconstruction of
+     * the official v1.6 reference, with no competing form found anywhere):
      *
-     *   A) POST /1.6/affiliate-groups/{affiliate_group_id}/affiliates/
-     *      body: { "affiliate": { "id": "<affiliate_id>" } }
-     *      (mirrors the documented "add affiliate to program" call
-     *       POST /1.6/programs/{program_id}/affiliates/)
-     *   B) PUT  /1.6/affiliates/{affiliate_id}/group/
-     *      body: { "group": { "id": "<affiliate_group_id>" } }
+     *   PUT /1.6/affiliates/{affiliate_id}/group/
      *
-     * A wrong-shape call fails with 4xx and has NO side effect, so this
-     * method tries A then B, remembers which form the live API accepted
-     * (module-level, survives warm invocations), and reports it in the
-     * result for logging. An affiliate belongs to at most one group
-     * (scalar `affiliate_group_id`), so assignment replaces any previous
-     * membership — no separate removal call is needed.
+     * The exact request body is NOT published verbatim by Tapfiliate; four
+     * candidate shapes exist across the official support article and
+     * production integrations. A wrong shape fails 4xx with no side effect,
+     * so the shapes are tried in evidence order, and — critically — EVERY
+     * 2xx is verified by re-reading the affiliate and checking that
+     * affiliate_group_id actually changed to the target. Only a verified
+     * write counts as success; the working shape is remembered
+     * (module-level, survives warm invocations) and reported for logging.
+     *
+     * An affiliate belongs to at most one group (scalar affiliate_group_id),
+     * so assignment replaces any previous membership — no removal needed.
      */
     async setAffiliateGroup(affiliateId, groupId) {
+      const path = `/affiliates/${encodeURIComponent(affiliateId)}/group/`;
+      const gid = String(groupId);
       const attempts = [
-        {
-          style: 'post_group_members',
-          label: 'POST /affiliate-groups/{group_id}/affiliates/',
-          fn: () =>
-            request(`/affiliate-groups/${encodeURIComponent(groupId)}/affiliates/`, {
-              method: 'POST',
-              body: { affiliate: { id: String(affiliateId) } },
-            }),
-        },
-        {
-          style: 'put_affiliate_group',
-          label: 'PUT /affiliates/{affiliate_id}/group/',
-          fn: () =>
-            request(`/affiliates/${encodeURIComponent(affiliateId)}/group/`, {
-              method: 'PUT',
-              body: { group: { id: String(groupId) } },
-            }),
-        },
+        // A: flat group_id — official support article: "group_id is a required parameter"
+        { style: 'body_group_id', label: `PUT ${path} {"group_id"}`, opts: { method: 'PUT', body: { group_id: gid } } },
+        // B: nested object — api-evangelist capture of the docs reference
+        { style: 'body_group_obj', label: `PUT ${path} {"group":{"id"}}`, opts: { method: 'PUT', body: { group: { id: gid } } } },
+        // C: flat string — metorial integration client
+        { style: 'body_group_flat', label: `PUT ${path} {"group"}`, opts: { method: 'PUT', body: { group: gid } } },
+        // D: query param, empty body — support article: "all required data
+        //    will be added to the request URL as query parameters"
+        { style: 'query_group_id', label: `PUT ${path}?group_id=`, opts: { method: 'PUT', query: { group_id: gid } } },
       ];
       if (knownGoodWriteStyle) {
         attempts.sort((a, b) => (a.style === knownGoodWriteStyle ? -1 : b.style === knownGoodWriteStyle ? 1 : 0));
@@ -193,22 +183,26 @@ export function createTapfiliateClient(cfg, fetchImpl = globalThis.fetch) {
       const failures = [];
       for (const attempt of attempts) {
         try {
-          const result = await attempt.fn();
-          knownGoodWriteStyle = attempt.style;
-          return { endpoint: attempt.label, result };
+          await request(path, attempt.opts);
         } catch (err) {
-          // 400/404/405 on one shape = endpoint-shape mismatch (or a genuinely
-          // missing entity, in which case the other shape fails the same way).
-          if (err instanceof TapfiliateError && [400, 404, 405].includes(err.status)) {
-            failures.push(`${attempt.label} -> HTTP ${err.status} ${err.body ?? ''}`.trim());
+          if (err instanceof TapfiliateError && [400, 404, 405, 415, 422].includes(err.status)) {
+            failures.push(`${attempt.label} -> HTTP ${err.status} ${String(err.body ?? '').slice(0, 120)}`.trim());
             continue;
           }
           throw err;
         }
+
+        // 2xx alone is not trusted: confirm the membership actually changed.
+        const after = await request(`/affiliates/${encodeURIComponent(affiliateId)}/`);
+        if (after && String(after.affiliate_group_id) === gid) {
+          knownGoodWriteStyle = attempt.style;
+          return { endpoint: attempt.label, verified: true };
+        }
+        failures.push(`${attempt.label} -> 2xx but affiliate_group_id is still ${after?.affiliate_group_id ?? 'null'}`);
       }
       throw new TapfiliateError(
-        `Tapfiliate group assignment failed on all documented endpoint forms: ${failures.join(' | ')}`,
-        { status: 404 }
+        `Tapfiliate group assignment could not be verified with any documented request shape: ${failures.join(' | ')}`,
+        { status: 502 }
       );
     },
   };
