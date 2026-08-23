@@ -33,3 +33,18 @@ then visit <http://localhost:8000>.
 | `styles.css` | Theme, panel styling, overlays, reduced-motion fallback |
 | `main.js` | Camera fly-through engine, hero tilt, dust particles, dots/progress |
 | `assets/red-door-studio.png` | Source artwork |
+
+## Tapfiliate affiliate tier webhook
+
+`api/tapfiliate-webhook.js` is a Vercel serverless function that receives
+Tapfiliate **Conversion created** webhooks and automatically moves affiliates
+between the AACTIVATED RX commission tiers (Standard 15% → Elite 35%) based on
+their current-month qualifying sales, while never touching the protected B2B
+groups. It ships with `DRY_RUN=true` by default.
+
+Full setup, environment variables, and safety rules:
+[`docs/tapfiliate-tier-webhook.md`](docs/tapfiliate-tier-webhook.md).
+
+```sh
+npm test   # run the webhook's test suite (no network needed)
+```

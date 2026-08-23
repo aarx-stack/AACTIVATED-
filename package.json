@@ -1,0 +1,10 @@
+{
+  "name": "aactivated-rx-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AACTIVATED RX static site + Tapfiliate affiliate tier webhook (Vercel serverless)",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  }
+}
