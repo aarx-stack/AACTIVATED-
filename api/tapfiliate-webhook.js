@@ -43,9 +43,22 @@ export function __resetGroupCacheForTests() {
 }
 
 async function readRawBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  return Buffer.concat(chunks).toString('utf8');
+  // Preferred path: consume the raw stream (bodyParser disabled above).
+  try {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    if (chunks.length > 0) return Buffer.concat(chunks).toString('utf8');
+  } catch {
+    // stream already consumed by a platform body-parser helper — fall through
+  }
+  // Fallback: some runtimes pre-read the body regardless of the config
+  // export. Token auth is unaffected; HMAC (optional) needs the true raw
+  // bytes, so proxy-signed setups must keep the raw stream path working.
+  const body = req.body;
+  if (typeof body === 'string') return body;
+  if (Buffer.isBuffer(body)) return body.toString('utf8');
+  if (body && typeof body === 'object') return JSON.stringify(body);
+  return '';
 }
 
 /**

@@ -128,7 +128,7 @@ Set `DRY_RUN=false` in Vercel env vars and redeploy. Watch the first few
 ## Development
 
 ```bash
-npm test            # 38 unit + integration tests, no network needed
+npm test            # full unit + integration suite, no network needed
 ```
 
 Everything is dependency-free Node (ES modules, built-in test runner).
