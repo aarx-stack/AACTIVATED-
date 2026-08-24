@@ -1,0 +1,21 @@
+{
+  "name": "@aactivated/data-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AACTIVATED Data Core — multi-tenant operational database schema, migrations, and financial engine (Phase 3)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "migrate": "node src/migrate.js up",
+    "migrate:status": "node src/migrate.js status",
+    "seed": "node src/seed.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:unit": "node --test test/money.test.js test/costing.test.js test/financials.test.js",
+    "test:integration": "node --test test/integration.test.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
+}
