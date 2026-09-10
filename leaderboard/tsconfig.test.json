@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node", "@cloudflare/workers-types"],
+    "paths": {
+      "@shared/*": ["./shared/*"],
+      "@worker/*": ["./worker/*"]
+    }
+  },
+  "include": [
+    "tests",
+    "shared",
+    "worker",
+    "src/data/fixtures.ts",
+    "src/data/store.ts",
+    "src/data/rng.ts"
+  ]
+}

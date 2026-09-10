@@ -1,0 +1,27 @@
+# Copy to .dev.vars for local `wrangler dev`. NEVER commit .dev.vars.
+# Production values are set with `wrangler secret put <NAME>` — they must not
+# appear in source control, frontend code, or chat.
+
+# ——— Tapfiliate (attribution authority) ———
+# REST API key from Tapfiliate. VERIFY current docs before enabling:
+# endpoints/limits at tapfiliate.com/docs (unreachable from the build
+# environment — see docs/SETUP.md → "Verify before connecting").
+TAPFILIATE_API_KEY=
+
+# Random high-entropy path segment for the inbound webhook URL
+# (/api/webhooks/tapfiliate/<this value>). Generate with: openssl rand -hex 24
+# Webhook payloads are never trusted directly — the Worker re-fetches the
+# referenced record from the REST API before writing anything.
+TAPFILIATE_WEBHOOK_SECRET=
+
+# ——— Sellavi (payment verification) ———
+# Leave empty until a Sellavi API/webhook contract is confirmed. While empty,
+# payment verification runs through the admin review queue (manual mode).
+SELLAVI_API_KEY=
+
+# ——— Authentication (Cloudflare Access) ———
+# Protect the app with Cloudflare Access; the Worker validates the
+# Cf-Access-Jwt-Assertion JWT on every /api request. Without these set, every
+# protected endpoint fails closed (401/503) — there is no demo bypass.
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=

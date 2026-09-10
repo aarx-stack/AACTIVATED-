@@ -1,0 +1,38 @@
+{
+  "name": "aactivated-rx-leaderboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AACTIVATED RX affiliate leaderboard — React/Vite frontend + Cloudflare Worker/D1 backend",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host --port 4173",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "verify": "npm run typecheck && npm run test && npm run build",
+    "worker:dev": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply aactivated_leaderboard --local",
+    "db:migrate:remote": "wrangler d1 migrations apply aactivated_leaderboard --remote",
+    "screenshots": "node scripts/screenshots.mjs",
+    "build:singlefile": "vite build && node scripts/singlefile.mjs"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260908.1",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.20.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "playwright-core": "^1.55.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0",
+    "wrangler": "^4.33.0"
+  }
+}

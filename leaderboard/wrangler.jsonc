@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aactivated-leaderboard",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+
+  // SPA assets: the Worker handles /api/* first; everything else falls back
+  // to the built frontend (dist). Run `npm run build` before `wrangler dev`.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "aactivated_leaderboard",
+      // Replace after `wrangler d1 create aactivated_leaderboard`:
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ],
+
+  // Reconciliation + daily leaderboard snapshots (movement needs history).
+  "triggers": {
+    "crons": [
+      "*/15 * * * *", // reconcile recent source changes
+      "0 10 * * *"    // daily snapshot ≈ 2–3 AM Pacific (10:00 UTC)
+    ]
+  },
+
+  "observability": { "enabled": true }
+
+  /*
+   * Secrets (never in this file, never in the frontend — set via
+   * `wrangler secret put <NAME>`):
+   *   TAPFILIATE_API_KEY        — REST API key
+   *   TAPFILIATE_WEBHOOK_SECRET — random path segment for the webhook URL
+   *   SELLAVI_API_KEY           — only if a Sellavi API integration is confirmed
+   * Vars (wrangler.jsonc "vars" or dashboard):
+   *   ACCESS_TEAM_DOMAIN        — e.g. "aactivatedrx.cloudflareaccess.com"
+   *   ACCESS_AUD                — Access application AUD tag
+   * See .dev.vars.example for local development.
+   */
+}
