@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fmtLaTime } from "@shared/time";
+import { fmtLaDateTime, fmtLaTime } from "@shared/time";
 import { store, type ViewMode } from "@/data/store";
 import { useStoreVersion } from "@/data/useStore";
 import { Banner, Button, Chip, cx } from "./ui";
@@ -8,12 +8,18 @@ import { IconShield, IconSync } from "./icons";
 function StatusCluster() {
   useStoreVersion();
   const err = store.syncError;
+  const snapshot = store.mode === "snapshot";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
       {err ? (
         <Chip tone="warn">
           <span className="size-1.5 rounded-full bg-warn-400" />
           SYNC ISSUE
+        </Chip>
+      ) : snapshot ? (
+        <Chip tone="accent">
+          <span className="size-1.5 rounded-full bg-accent-300" />
+          REAL DATA · SNAPSHOT
         </Chip>
       ) : (
         <Chip tone="cyan">
@@ -22,12 +28,14 @@ function StatusCluster() {
         </Chip>
       )}
       <span className="num text-[12.5px] text-mist-500">
-        {err ? "Last good data " : "Updated "}
-        <span className="text-mist-300">{fmtLaTime(store.lastSyncMs)}</span>
+        {err ? "Last good data " : snapshot ? "Synced " : "Updated "}
+        <span className="text-mist-300">{fmtLaDateTime(store.lastSyncMs)}</span>
       </span>
-      <Button sm aria-label="Refresh now" onClick={() => store.refreshNow()} title="Refresh (demo polls every 60s)">
-        <IconSync size={14} />
-      </Button>
+      {snapshot ? null : (
+        <Button sm aria-label="Refresh now" onClick={() => store.refreshNow()} title="Refresh (demo polls every 60s)">
+          <IconSync size={14} />
+        </Button>
+      )}
     </div>
   );
 }
@@ -38,12 +46,20 @@ export function AppShell(props: { view: ViewMode; children: ReactNode }) {
     <div className="min-h-dvh">
       <div className="scene-bg" />
 
-      {/* DEMO ribbon — always visible, unmistakable */}
-      <div className="sticky top-0 z-40 border-b border-warn-500/25 bg-[#1c1406]/95 px-4 py-1.5 text-center backdrop-blur">
-        <span className="text-[11.5px] font-semibold tracking-[0.14em] text-warn-400">
-          DEMO — NOT LIVE · ALL NAMES &amp; FIGURES ARE FICTIONAL SAMPLE DATA
-        </span>
-      </div>
+      {/* mode ribbon — always visible, unmistakable */}
+      {store.mode === "snapshot" ? (
+        <div className="sticky top-0 z-40 border-b border-accent-500/25 bg-[#071130]/95 px-4 py-1.5 text-center backdrop-blur">
+          <span className="text-[11.5px] font-semibold tracking-[0.14em] text-accent-300">
+            REAL DATA — POINT-IN-TIME SNAPSHOT · SYNCED {fmtLaDateTime(store.lastSyncMs).toUpperCase()} · NOT AUTO-UPDATING YET
+          </span>
+        </div>
+      ) : (
+        <div className="sticky top-0 z-40 border-b border-warn-500/25 bg-[#1c1406]/95 px-4 py-1.5 text-center backdrop-blur">
+          <span className="text-[11.5px] font-semibold tracking-[0.14em] text-warn-400">
+            DEMO — NOT LIVE · ALL NAMES &amp; FIGURES ARE FICTIONAL SAMPLE DATA
+          </span>
+        </div>
+      )}
 
       <header className="mx-auto w-full max-w-7xl px-4 pt-7 sm:px-6 sm:pt-9">
         <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
@@ -67,10 +83,18 @@ export function AppShell(props: { view: ViewMode; children: ReactNode }) {
             <StatusCluster />
             <span className="inline-flex items-center gap-1.5 text-[12px] text-mist-600">
               <IconShield size={13} />
-              Production requires sign-in · demo preview is read-only sample data
+              {store.mode === "snapshot"
+                ? "Owner preview · read-only until the production API is deployed"
+                : "Production requires sign-in · demo preview is read-only sample data"}
             </span>
           </div>
         </div>
+
+        {store.mode === "snapshot" && store.policyNote ? (
+          <p className="mb-0 mt-4 max-w-3xl text-[12px] leading-relaxed text-mist-600">
+            Counting policy: {store.policyNote}
+          </p>
+        ) : null}
 
         {store.syncError ? (
           <div className="mt-5">
@@ -99,9 +123,10 @@ export function AppShell(props: { view: ViewMode; children: ReactNode }) {
       </main>
 
       <footer className="mx-auto w-full max-w-7xl border-t border-white/5 px-4 py-8 text-[12px] leading-relaxed text-mist-600 sm:px-6">
-        AACTIVATED RX · Affiliate Leaderboard (demo build). Times shown in America/Los_Angeles.
-        Qualification does not guarantee a payout; pool value and distribution rules are not shown
-        because none are configured. Rankings use eligible sales only.
+        AACTIVATED RX · Affiliate Leaderboard{" "}
+        {store.mode === "snapshot" ? "(real-data snapshot)" : "(demo build)"}. Times shown in
+        America/Los_Angeles. Qualification does not guarantee a payout; pool value and distribution
+        rules are not shown because none are configured. Rankings use eligible sales only.
       </footer>
     </div>
   );

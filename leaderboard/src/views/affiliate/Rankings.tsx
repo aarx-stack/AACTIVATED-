@@ -190,7 +190,7 @@ export function Rankings(props: {
                         <span className="flex items-center gap-3">
                           <Avatar name={r.displayName} size={30} ring={r.rank <= 3 ? (["gold", "silver", "bronze"] as const)[r.rank - 1]! : null} />
                           <span className="truncate text-[14.5px] font-medium text-mist-100">{r.displayName}</span>
-                          {r.isMe ? <Chip tone="accent">You</Chip> : null}
+                          {r.isMe ? <Chip tone="accent">{store.meLabel}</Chip> : null}
                         </span>
                       </td>
                       <td className="num px-3 py-3 text-right text-[14.5px] font-semibold text-mist-50">

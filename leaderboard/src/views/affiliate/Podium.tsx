@@ -1,4 +1,4 @@
-import type { BoardRow } from "@/data/store";
+import { store, type BoardRow } from "@/data/store";
 import { fmtInt, fmtUsd } from "@shared/money";
 import { useCountUp } from "@/data/useStore";
 import { Avatar, Chip, MovementCell, cx } from "@/components/ui";
@@ -38,7 +38,7 @@ function PodiumCard({ row, big }: { row: BoardRow; big?: boolean }) {
       <Avatar name={row.displayName} size={big ? 72 : 56} ring={place.ring} />
       <div className={cx("font-display mt-3 font-semibold text-mist-50", big ? "text-xl" : "text-[16px]")}>
         {row.displayName}
-        {row.isMe ? <Chip tone="accent" className="ml-2 align-middle">You</Chip> : null}
+        {row.isMe ? <Chip tone="accent" className="ml-2 align-middle">{store.meLabel}</Chip> : null}
       </div>
       <div className={cx("mt-0.5 text-[12px] font-semibold tracking-[0.16em] uppercase", place.label)}>
         {row.rank === 1 ? "First place" : row.rank === 2 ? "Second place" : "Third place"}

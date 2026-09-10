@@ -1,7 +1,7 @@
 import { fmtLaDate } from "@shared/time";
 import { store } from "@/data/store";
 import { useStoreVersion } from "@/data/useStore";
-import { Avatar, SkeletonPanel, cx } from "@/components/ui";
+import { Avatar, EmptyState, SkeletonPanel, cx } from "@/components/ui";
 import { IconShield, IconTrophy } from "@/components/icons";
 
 export function Recognition() {
@@ -10,6 +10,18 @@ export function Recognition() {
 
   const rows = store.recognition();
   const activeCount = rows.filter((r) => !r.expired).length;
+
+  if (rows.length === 0) {
+    return (
+      <div className="panel p-5 sm:p-6">
+        <EmptyState
+          icon={<IconTrophy size={22} />}
+          title="No verified members yet"
+          body={`The first ${store.data.config.seatCap} verified qualifiers appear here with their approved display names. Purchases, progress and commissions always stay private.`}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="panel p-5 sm:p-6">

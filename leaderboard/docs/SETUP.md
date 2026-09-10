@@ -4,30 +4,57 @@ The demo needs nothing. This guide is for wiring the built backend to real
 services. Do these in order; the app stays honest at every step — anything
 unconnected shows as unconnected, never as fake data.
 
-## 0 · Verify before connecting (required)
+## Snapshot mode (working today, no credentials in code)
 
-The build environment could not reach `tapfiliate.com` (network egress
-blocked), so the Tapfiliate adapter follows the historically documented REST
-API v1.6 and is marked with `verify` notes. Before enabling:
+Real Tapfiliate data can be rendered right now via the authorized Claude
+Tapfiliate connector: raw pulls are transformed by
+`scripts/build-snapshot.mjs` into the git-ignored
+`src/data/live-snapshot.json` (PII stripped — no emails, phones, addresses
+or customer data; display names derived as “First L.”), and
 
-1. Open the current Tapfiliate REST docs (tapfiliate.com/docs) and confirm:
-   base URL/version, the `Api-Key` auth header, `/conversions/` +
-   `/affiliates/` endpoints and their pagination (Link header vs. params),
-   rate limits, and the exact webhook event payloads (Conversion created,
-   Commission created/updated, Customer created/updated are advertised).
-2. Confirm what **your subscription includes** — especially MLM/team
-   relationship data (`parent_id` on affiliates). If MLM data isn't
-   available, leave team edges unverified: the app will show **“Team data
-   not connected”** rather than guessing.
-3. Confirm how your Sellavi store can expose **paid-order status** (API,
-   webhook, or export). Until that contract is confirmed, payment
-   verification stays in **manual mode** (admin review queue) — unpaid
-   Zelle/manual orders can never count as paid sales.
-4. Confirm the amount semantics of your Tapfiliate conversions (gross vs.
-   net, tax/shipping included?) so `conversionToTxn` maps fields correctly.
+```sh
+node scripts/build-snapshot.mjs <raw-affiliates.json> <raw-conversions.json>
+VITE_DATA_MODE=snapshot npm run build
+```
 
-Update `worker/adapters/*.ts` where a `verify` note disagrees with current
-docs. Do not invent endpoints or headers.
+produces a **read-only, point-in-time** board labeled with its exact sync
+time. Snapshot counting policy (confirm before production): a conversion
+recorded by the Sellavi→Tapfiliate integration counts as checkout revenue;
+conversions whose direct commission is dis-approved in Tapfiliate are
+excluded. Refreshing = re-pulling and re-running the transform. This mode
+never auto-updates and never fakes “live”.
+
+## 0 · Verified against the live account (Sep 2026)
+
+Checked through the real `aactivatedrx` program (advertiser 64407) via the
+Claude connector — these are facts, not doc assumptions:
+
+- REST v1.6 shapes match the adapter: `/affiliates/` and `/conversions/`
+  paginate at 25 rows/page; conversions carry `external_id`
+  (`SELLAVI-####`, occasionally a doubled `SELLAVI-SELLAVI-####` prefix —
+  ledger keys on the raw id), `amount` as a single number (**no
+  tax/shipping/discount breakdown**), `created_at`, `affiliate.id`, and a
+  `commissions[]` array (`kind: regular|level`, `approved:
+  null|true|false`).
+- **MLM is active on this plan**: `parent_id` is populated (e.g. a real
+  3-level chain), so team rollups have a live source. Production still
+  keeps imported edges behind admin verification.
+- Commission records are per-level (`level-2` rows exist) — confirming why
+  revenue must come from conversions, never summed commissions.
+- Conversions include customer emails — the transform and the Worker
+  adapter must keep dropping them (they never reach the frontend or D1
+  public fields).
+
+Still to confirm with Tapfiliate docs/support before the Worker goes live:
+current webhook event payload shapes and any rate limits (tapfiliate.com
+was unreachable from the build environment).
+
+Also confirm how your Sellavi store can expose **paid-order status** (API,
+webhook, or export). Until that contract is confirmed, payment verification
+stays in **manual mode** (admin review queue) — unpaid Zelle/manual orders
+can never count as paid sales. Update `worker/adapters/*.ts` where a
+`verify` note disagrees with current docs. Do not invent endpoints or
+headers.
 
 ## 1 · Create the database
 

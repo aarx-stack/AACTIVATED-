@@ -33,9 +33,12 @@ import {
   type PersonaDef,
   type ReviewItem,
 } from "./fixtures";
+import { buildSnapshotData, loadSnapshotFile } from "./snapshot";
+import { DATA_MODE } from "../config";
 import { mulberry32, pick } from "./rng";
 
 export type ViewMode = "affiliate" | "admin";
+export type StoreMode = "demo" | "snapshot";
 export type SortKey = "sales" | "orders" | "name";
 export type SortDir = "asc" | "desc";
 
@@ -132,8 +135,19 @@ export interface HierarchyNode {
 
 type Listener = () => void;
 
+export interface StoreInit {
+  data: DemoData;
+  mode: StoreMode;
+  /** Snapshot generation instant — the honest "last successful sync". */
+  generatedAtMs?: number;
+  /** Shown alongside snapshot figures so the counting policy is explicit. */
+  policyNote?: string;
+}
+
 export class DemoStore {
   data: DemoData;
+  readonly mode: StoreMode;
+  readonly policyNote: string | null;
   version = 0;
   loading = true;
   viewerId: string;
@@ -147,22 +161,48 @@ export class DemoStore {
   private listeners = new Set<Listener>();
   private saleRng = mulberry32(0x51e5);
 
-  constructor() {
-    this.data = buildDemoData(Date.now());
-    this.viewerId = this.data.personas[0]!.affiliateId;
-    this.lastSyncMs = Date.now() - 90_000;
-    // Simulated initial fetch so loading skeletons are demonstrable.
+  constructor(init?: StoreInit) {
+    this.mode = init?.mode ?? "demo";
+    this.policyNote = init?.policyNote ?? null;
+    this.data = init?.data ?? buildDemoData(Date.now());
+    this.viewerId = this.defaultViewer();
+    this.lastSyncMs = init?.generatedAtMs ?? Date.now() - 90_000;
+    // Brief simulated fetch so loading skeletons are demonstrable.
     setTimeout(() => {
       this.loading = false;
       this.bump();
     }, 750);
-    // Demo feed heartbeat: refresh the "last update" stamp every 60s.
-    setInterval(() => {
-      if (!this.syncError) {
-        this.lastSyncMs = Date.now();
-        this.bump();
-      }
-    }, 60_000);
+    if (this.mode === "demo") {
+      // Demo feed heartbeat: refresh the "last update" stamp every 60s. A
+      // snapshot's timestamp never moves — it is a point-in-time export.
+      setInterval(() => {
+        if (!this.syncError) {
+          this.lastSyncMs = Date.now();
+          this.bump();
+        }
+      }, 60_000);
+    }
+  }
+
+  /** Demo: the scripted default persona. Snapshot: the top eligible seller. */
+  private defaultViewer(): string {
+    if (this.mode === "demo") return this.data.personas[0]!.affiliateId;
+    const month = periodRange("monthly", Date.now());
+    let best: { id: string; amount: number } | null = null;
+    for (const a of this.data.affiliates) {
+      const t = totalsInRange(this.data.txnsByAffiliate.get(a.id) ?? [], this.data.config.policy, month);
+      if (!best || t.amountCents > best.amount) best = { id: a.id, amount: t.amountCents };
+    }
+    return best?.id ?? this.data.affiliates[0]!.id;
+  }
+
+  /** Snapshot previews inspect other people's rows — never claim to be them. */
+  get meLabel(): string {
+    return this.mode === "snapshot" ? "Viewing" : "You";
+  }
+
+  get readOnly(): boolean {
+    return this.mode === "snapshot";
   }
 
   subscribe = (fn: Listener): (() => void) => {
@@ -285,12 +325,13 @@ export class DemoStore {
 
     const ranked = rank(entrants);
 
-    // Movement only where a comparable snapshot exists (demo: monthly only).
+    // Movement only where a comparable snapshot exists (an empty history —
+    // e.g. the first real sync — means none, not "everyone is new").
     let moves: Map<string, Movement> | null = null;
     if (q.period === "monthly") {
       const snap =
         q.scope === "personal" ? this.data.monthlySnapshotPersonal : this.data.monthlySnapshotTeam;
-      moves = movement(ranked, snap);
+      moves = movement(ranked, snap.length > 0 ? snap : null);
     }
 
     const toRow = (r: (typeof ranked)[number]): BoardRow => ({
@@ -644,11 +685,13 @@ export class DemoStore {
   }
 
   setSeatsFull(on: boolean) {
+    if (this.readOnly) return;
     this.seatsFull = on;
     this.bump();
   }
 
   setSyncError(on: boolean) {
+    if (this.readOnly) return;
     this.syncError = on;
     if (!on) {
       this.failedRetryAtMs = null;
@@ -658,6 +701,7 @@ export class DemoStore {
   }
 
   refreshNow() {
+    if (this.readOnly) return; // a snapshot's timestamp is fixed by design
     if (this.syncError) {
       this.failedRetryAtMs = Date.now();
     } else {
@@ -668,6 +712,9 @@ export class DemoStore {
 
   /** Demo-only: post one new verified sale to a random leader so updates are visible on demand. */
   simulateSale(): { affiliateId: string; name: string; amountCents: number } {
+    if (this.readOnly) {
+      return { affiliateId: this.viewerId, name: "read-only snapshot", amountCents: 0 };
+    }
     // Exclude open-window personas (Ava/Elena/Chris) so their scripted
     // challenge figures stay exact for the walkthrough.
     const candidates = this.board({
@@ -715,6 +762,7 @@ export class DemoStore {
 
   /** Approve a queue item. Founders-pack approvals claim a seat atomically-in-spirit (capacity checked at claim). */
   approve(reviewId: string, reason: string): { ok: boolean; message: string } {
+    if (this.readOnly) return { ok: false, message: "Read-only snapshot — actions activate with the production deploy." };
     const item = this.data.reviewQueue.find((r) => r.id === reviewId && r.status === "pending");
     if (!item) return { ok: false, message: "Item not found" };
 
@@ -764,6 +812,7 @@ export class DemoStore {
   }
 
   reject(reviewId: string, reason: string): { ok: boolean; message: string } {
+    if (this.readOnly) return { ok: false, message: "Read-only snapshot — actions activate with the production deploy." };
     const item = this.data.reviewQueue.find((r) => r.id === reviewId && r.status === "pending");
     if (!item) return { ok: false, message: "Item not found" };
     item.status = "rejected";
@@ -779,6 +828,7 @@ export class DemoStore {
     change: { paymentStatus?: Txn["paymentStatus"]; paymentVerified?: boolean; refundedCents?: number },
     reason: string,
   ): { ok: boolean; message: string } {
+    if (this.readOnly) return { ok: false, message: "Read-only snapshot — corrections activate with the production deploy." };
     const txn = this.findTxn(txnId);
     if (!txn) return { ok: false, message: "Transaction not found" };
     if (!reason.trim()) return { ok: false, message: "A reason is required" };
@@ -795,6 +845,7 @@ export class DemoStore {
   }
 
   setLaunchDate(isoOrNull: string | null, reason: string): { ok: boolean; message: string } {
+    if (this.readOnly) return { ok: false, message: "Read-only snapshot — configure the launch date on the production deploy." };
     if (!reason.trim()) return { ok: false, message: "A reason is required" };
     this.data.config = {
       ...this.data.config,
@@ -807,6 +858,7 @@ export class DemoStore {
   }
 
   retryFailedEvent(idArg: string) {
+    if (this.readOnly) return;
     const ev = this.data.failedEvents.find((e) => e.id === idArg);
     if (!ev) return;
     ev.resolved = true;
@@ -827,4 +879,20 @@ export class DemoStore {
   }
 }
 
-export const store = new DemoStore();
+function createStore(): DemoStore {
+  if (DATA_MODE === "snapshot") {
+    const file = loadSnapshotFile();
+    if (file) {
+      return new DemoStore({
+        data: buildSnapshotData(file),
+        mode: "snapshot",
+        generatedAtMs: Date.parse(file.generatedAt),
+        policyNote: file.policyNote,
+      });
+    }
+    console.warn("snapshot mode requested but src/data/live-snapshot.json is absent — falling back to demo");
+  }
+  return new DemoStore();
+}
+
+export const store = createStore();

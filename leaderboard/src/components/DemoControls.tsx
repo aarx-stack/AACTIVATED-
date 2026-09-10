@@ -35,14 +35,21 @@ function Toggle(props: { label: string; on: boolean; onChange: (v: boolean) => v
 }
 
 /**
- * DEMO-ONLY panel. It swaps which fictional persona/view the preview renders —
- * nothing here exists in production builds, where identity and the admin role
- * come exclusively from the server-side session (see worker/lib/auth.ts).
+ * Preview-only panel. Demo mode: swaps fictional personas and failure states.
+ * Snapshot mode: an owner tool to inspect real affiliates' dashboards.
+ * Neither exists in production builds, where identity and the admin role come
+ * exclusively from the server-side session (see worker/lib/auth.ts).
  */
 export function DemoControls() {
   useStoreVersion();
   // Open by default on desktop; collapsed on phones so it never buries content.
   const [open, setOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768);
+  const snapshot = store.mode === "snapshot";
+  const headerLabel = snapshot ? "OWNER PREVIEW" : "DEMO CONTROLS";
+  const fabLabel = snapshot ? "PREVIEW" : "DEMO";
+  const headerTone = snapshot
+    ? "bg-accent-500/10 text-accent-300"
+    : "bg-warn-500/10 text-warn-400";
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,320px)]">
@@ -50,10 +57,13 @@ export function DemoControls() {
         <div className="panel panel-strong overflow-hidden shadow-lift">
           <button
             onClick={() => setOpen(false)}
-            className="flex w-full cursor-pointer items-center justify-between gap-2 border-0 border-b border-solid border-white/8 bg-warn-500/10 px-4 py-2.5 text-left"
+            className={cx(
+              "flex w-full cursor-pointer items-center justify-between gap-2 border-0 border-b border-solid border-white/8 px-4 py-2.5 text-left",
+              headerTone,
+            )}
           >
-            <span className="inline-flex items-center gap-2 text-[12px] font-bold tracking-[0.12em] text-warn-400">
-              <IconEye size={14} /> DEMO CONTROLS
+            <span className="inline-flex items-center gap-2 text-[12px] font-bold tracking-[0.12em]">
+              <IconEye size={14} /> {headerLabel}
             </span>
             <IconChevronD size={14} className="text-mist-500" />
           </button>
@@ -81,10 +91,10 @@ export function DemoControls() {
             {store.view === "affiliate" ? (
               <div>
                 <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mist-600">
-                  Demo persona
+                  {snapshot ? "Inspect affiliate" : "Demo persona"}
                 </div>
                 <select
-                  aria-label="Demo persona"
+                  aria-label={snapshot ? "Inspect affiliate" : "Demo persona"}
                   value={store.viewerId}
                   onChange={(e) => store.setViewer(e.target.value)}
                   className="w-full cursor-pointer rounded-lg border border-white/10 bg-ink-900/80 px-2.5 py-2 text-[13px] text-mist-100 focus:border-accent-500/50 focus:outline-none"
@@ -95,42 +105,54 @@ export function DemoControls() {
                     </option>
                   ))}
                 </select>
+                {snapshot ? (
+                  <p className="mb-0 mt-1.5 text-[11px] leading-snug text-mist-600">
+                    Shows that affiliate’s dashboard as they would see it.
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
-            <div className="space-y-3 border-t border-white/8 pt-3.5">
-              <Toggle
-                label="All 50 seats claimed"
-                hint="Preview Capacity reached + a full recognition wall"
-                on={store.seatsFull}
-                onChange={(v) => store.setSeatsFull(v)}
-              />
-              <Toggle
-                label="Simulate sync failure"
-                hint="Preview the degraded-connection state"
-                on={store.syncError}
-                onChange={(v) => store.setSyncError(v)}
-              />
-            </div>
+            {snapshot ? null : (
+              <>
+                <div className="space-y-3 border-t border-white/8 pt-3.5">
+                  <Toggle
+                    label="All 50 seats claimed"
+                    hint="Preview Capacity reached + a full recognition wall"
+                    on={store.seatsFull}
+                    onChange={(v) => store.setSeatsFull(v)}
+                  />
+                  <Toggle
+                    label="Simulate sync failure"
+                    hint="Preview the degraded-connection state"
+                    on={store.syncError}
+                    onChange={(v) => store.setSyncError(v)}
+                  />
+                </div>
 
-            <Button
-              variant="soft"
-              className="w-full"
-              onClick={() => {
-                const r = store.simulateSale();
-                notify(`Demo sale: ${fmtUsd(r.amountCents)} for ${r.name}`);
-              }}
-            >
-              <IconBolt size={14} /> Simulate a new sale
-            </Button>
+                <Button
+                  variant="soft"
+                  className="w-full"
+                  onClick={() => {
+                    const r = store.simulateSale();
+                    notify(`Demo sale: ${fmtUsd(r.amountCents)} for ${r.name}`);
+                  }}
+                >
+                  <IconBolt size={14} /> Simulate a new sale
+                </Button>
+              </>
+            )}
           </div>
         </div>
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="panel panel-strong ml-auto flex cursor-pointer items-center gap-2 px-4 py-2.5 text-[12px] font-bold tracking-[0.12em] text-warn-400 shadow-lift"
+          className={cx(
+            "panel panel-strong ml-auto flex cursor-pointer items-center gap-2 px-4 py-2.5 text-[12px] font-bold tracking-[0.12em] shadow-lift",
+            snapshot ? "text-accent-300" : "text-warn-400",
+          )}
         >
-          <IconEye size={14} /> DEMO
+          <IconEye size={14} /> {fabLabel}
         </button>
       )}
     </div>

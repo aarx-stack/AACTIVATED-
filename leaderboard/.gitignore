@@ -1,6 +1,9 @@
 node_modules/
 dist/
 dist-artifact/
+# Real program data never enters source control:
+src/data/live-snapshot.json
+raw-*.json
 .wrangler/
 .dev.vars
 *.local

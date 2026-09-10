@@ -30,6 +30,14 @@ refunds, excluding tax and shipping; unpaid/pending (e.g. Zelle) orders
 excluded until verified. Confirm, or adjust the policy flags in
 `challenge_config.policy_json`.
 
+Two facts from the live account to fold into this decision:
+- Tapfiliate reports **one amount per conversion** (no tax/shipping split),
+  so “excluding tax and shipping” depends on what the Sellavi integration
+  sends — confirm whether that amount is product subtotal or order total.
+- Snapshot mode currently counts Sellavi-tracked checkouts and excludes
+  Tapfiliate-dis-approved conversions; dashboards also round whole dollars
+  ($99.97 shows as $100 — the admin ledger stays exact). Confirm both.
+
 ## 3 · Team rollup policy
 
 Sample policy in the demo: **self + verified descendants**, every

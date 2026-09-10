@@ -461,7 +461,13 @@ function Ledger() {
                   )}
                 </Td>
                 <Td right>
-                  <Button sm onClick={() => setCorrecting(r.txn)}>Correct</Button>
+                  {store.readOnly ? (
+                    <span className="text-[11.5px] text-mist-700" title="Read-only snapshot — corrections activate with the production deploy">
+                      read-only
+                    </span>
+                  ) : (
+                    <Button sm onClick={() => setCorrecting(r.txn)}>Correct</Button>
+                  )}
                 </Td>
               </tr>
             ))}
@@ -600,16 +606,27 @@ function Integrations() {
         <div className="panel p-5">
           <div className="flex items-center justify-between">
             <span className="font-display text-[15px] font-semibold text-mist-100">Tapfiliate</span>
-            <Chip tone="cyan">demo feed</Chip>
+            {store.readOnly ? <Chip tone="accent">snapshot</Chip> : <Chip tone="cyan">demo feed</Chip>}
           </div>
-          <p className="mb-0 mt-2 text-[13px] leading-relaxed text-mist-500">{integ.tapfiliate.note}</p>
+          <p className="mb-0 mt-2 text-[13px] leading-relaxed text-mist-500">
+            {store.readOnly
+              ? "Real data imported through the authorized Claude Tapfiliate connector — MLM parent links and commission statuses verified against the live account."
+              : integ.tapfiliate.note}
+          </p>
           <div className="num mt-3 text-[12.5px] text-mist-400">
             Last successful sync: <span className="text-mist-200">{fmtLaDateTime(integ.tapfiliate.lastSyncMs)}</span>
           </div>
           <ul className="m-0 mt-3 list-none space-y-1 p-0 text-[12.5px] text-mist-500">
-            <li>· API key — <span className="text-warn-400">not configured</span></li>
+            <li>· API key (Worker) — <span className="text-warn-400">not configured</span></li>
             <li>· Webhook endpoint — <span className="text-mist-300">/api/webhooks/tapfiliate/&lt;secret&gt;</span></li>
-            <li>· Initial import — <span className="text-warn-400">not run</span></li>
+            <li>
+              · Initial import —{" "}
+              {store.readOnly ? (
+                <span className="text-pos-400">snapshot loaded (one-time)</span>
+              ) : (
+                <span className="text-warn-400">not run</span>
+              )}
+            </li>
           </ul>
         </div>
         <div className="panel p-5">
@@ -696,35 +713,46 @@ function LaunchConfig() {
         </div>
         <div className="panel p-5">
           <div className="flex items-center justify-between">
-            <span className="text-[12.5px] font-semibold text-mist-500">Demo sample launch date</span>
-            <Chip tone="warn">sample</Chip>
+            <span className="text-[12.5px] font-semibold text-mist-500">
+              {store.readOnly ? "Snapshot launch date" : "Demo sample launch date"}
+            </span>
+            <Chip tone="warn">{store.readOnly ? "read-only" : "sample"}</Chip>
           </div>
           <div className="font-display num mt-2 text-2xl font-semibold text-mist-50">
-            {cfg.launchAt ? fmtLaDateTime(Date.parse(cfg.launchAt)) : "— cleared"}
+            {cfg.launchAt ? fmtLaDateTime(Date.parse(cfg.launchAt)) : "— not configured"}
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <input
-              type="datetime-local"
-              aria-label="New sample launch date"
-              value={dt}
-              onChange={(e) => setDt(e.target.value)}
-              className="rounded-lg border border-white/10 bg-ink-900/70 px-2.5 py-2 text-[13px] text-mist-100 focus:border-accent-500/50 focus:outline-none"
-            />
-            <Button
-              variant="soft"
-              sm
-              disabled={!dt}
-              onClick={() => setConfirm({ iso: new Date(dt).toISOString(), label: "Set sample launch date" })}
-            >
-              Set sample date
-            </Button>
-            <Button sm onClick={() => setConfirm({ iso: null, label: "Clear launch date (production behavior)" })}>
-              Clear
-            </Button>
-          </div>
-          <p className="mb-0 mt-3 text-[12px] text-mist-600">
-            Demo store only — the production value lives in D1 and changes are audited.
-          </p>
+          {store.readOnly ? (
+            <p className="mb-0 mt-3 text-[12.5px] leading-relaxed text-mist-500">
+              This snapshot mirrors production truth: no launch date is configured. Setting the real
+              date (audited) happens on the production deploy — see docs/SETUP.md.
+            </p>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <input
+                  type="datetime-local"
+                  aria-label="New sample launch date"
+                  value={dt}
+                  onChange={(e) => setDt(e.target.value)}
+                  className="rounded-lg border border-white/10 bg-ink-900/70 px-2.5 py-2 text-[13px] text-mist-100 focus:border-accent-500/50 focus:outline-none"
+                />
+                <Button
+                  variant="soft"
+                  sm
+                  disabled={!dt}
+                  onClick={() => setConfirm({ iso: new Date(dt).toISOString(), label: "Set sample launch date" })}
+                >
+                  Set sample date
+                </Button>
+                <Button sm onClick={() => setConfirm({ iso: null, label: "Clear launch date (production behavior)" })}>
+                  Clear
+                </Button>
+              </div>
+              <p className="mb-0 mt-3 text-[12px] text-mist-600">
+                Demo store only — the production value lives in D1 and changes are audited.
+              </p>
+            </>
+          )}
         </div>
       </div>
 

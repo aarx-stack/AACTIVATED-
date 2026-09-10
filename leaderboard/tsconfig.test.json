@@ -20,7 +20,9 @@
     "tests",
     "shared",
     "worker",
+    "src/config.ts",
     "src/data/fixtures.ts",
+    "src/data/snapshot.ts",
     "src/data/store.ts",
     "src/data/rng.ts"
   ]
