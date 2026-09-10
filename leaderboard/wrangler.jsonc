@@ -4,6 +4,19 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-01",
 
+  // The Worker shares domain logic with the frontend via the @shared/* alias;
+  // esbuild (Wrangler's bundler) needs these mapped explicitly. Keep in sync
+  // with tsconfig.worker.json's paths and vite.config.ts.
+  "alias": {
+    "@shared/types": "./shared/types.ts",
+    "@shared/time": "./shared/time.ts",
+    "@shared/money": "./shared/money.ts",
+    "@shared/eligibility": "./shared/eligibility.ts",
+    "@shared/challenge": "./shared/challenge.ts",
+    "@shared/leaderboard": "./shared/leaderboard.ts",
+    "@shared/rollup": "./shared/rollup.ts"
+  },
+
   // SPA assets: the Worker handles /api/* first; everything else falls back
   // to the built frontend (dist). Run `npm run build` before `wrangler dev`.
   "assets": {
