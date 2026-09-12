@@ -38,7 +38,7 @@
       "binding": "DB",
       "database_name": "aactivated_leaderboard",
       // Replace after `wrangler d1 create aactivated_leaderboard`:
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_id": "2c089a03-15d1-4011-83ba-39335eeb573c"
     }
   ],
 
