@@ -11,6 +11,7 @@
     "@shared/types": "./shared/types.ts",
     "@shared/time": "./shared/time.ts",
     "@shared/money": "./shared/money.ts",
+    "@shared/names": "./shared/names.ts",
     "@shared/eligibility": "./shared/eligibility.ts",
     "@shared/challenge": "./shared/challenge.ts",
     "@shared/leaderboard": "./shared/leaderboard.ts",
@@ -24,6 +25,12 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
+  },
+
+  // Option A: serve the public read-only leaderboard (permitted fields only).
+  // My Performance and Admin remain behind Cloudflare Access.
+  "vars": {
+    "PUBLIC_BOARD": "1"
   },
 
   "d1_databases": [

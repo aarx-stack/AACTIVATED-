@@ -2,16 +2,21 @@ import type { Env } from "../index";
 import { d1Db, nowIso, uid } from "../lib/db";
 import { upsertTxn } from "../domain/ingest";
 import { leaderboard } from "../domain/queries";
+import { importAffiliates } from "./import";
 import { TapfiliateClient, conversionToTxn } from "../adapters/tapfiliate";
 import { periodRange } from "@shared/time";
 
 /**
- * Scheduled reconciliation: pulls recent conversions from the source of
- * truth and re-upserts them, recovering anything a missed/failed webhook
- * dropped. Every run is recorded honestly in sync_runs — the dashboard's
- * "last successful update" comes from there and nowhere else.
+ * Scheduled reconciliation: refresh affiliates + hierarchy, then pull
+ * conversions from the source of truth and re-upsert them, recovering
+ * anything a missed/failed webhook dropped. Every run is recorded honestly in
+ * sync_runs — the dashboard's "last successful update" comes from there and
+ * nowhere else.
+ *
+ * `full` (used for the one-time backfill) pulls all history instead of the
+ * rolling look-back window.
  */
-export async function reconcile(env: Env): Promise<void> {
+export async function reconcile(env: Env, opts: { full?: boolean } = {}): Promise<void> {
   const db = d1Db(env.DB);
   const runId = uid();
   const startedAt = nowIso();
@@ -28,10 +33,17 @@ export async function reconcile(env: Env): Promise<void> {
   let scanned = 0;
   let updated = 0;
   let discrepancies = 0;
+  let importedAffiliates = 0;
   try {
     const client = new TapfiliateClient({ apiKey: env.TAPFILIATE_API_KEY });
-    // Look back 7 days so late edits/refunds are recovered.
-    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+    // Keep affiliates + team hierarchy current before counting conversions
+    // (a conversion for an unknown affiliate would otherwise be a discrepancy).
+    const imported = await importAffiliates(db, client);
+    importedAffiliates = imported.affiliates;
+
+    // Backfill pulls everything; steady-state looks back 7 days for late edits.
+    const since = opts.full ? undefined : new Date(Date.now() - 7 * 86_400_000).toISOString();
     const tapIds = new Map<string, string>(); // tapfiliate_id -> affiliate id
     for (const row of await db.all<{ id: string; tapfiliate_id: string | null }>(
       "SELECT id, tapfiliate_id FROM affiliates WHERE tapfiliate_id IS NOT NULL",
@@ -58,8 +70,9 @@ export async function reconcile(env: Env): Promise<void> {
     }
     await db.run(
       `INSERT INTO sync_runs (id, kind, source, started_at, finished_at, ok, scanned, updated, discrepancies, note)
-       VALUES (?1,'reconcile','tapfiliate',?2,?3,1,?4,?5,?6,'ok')`,
+       VALUES (?1,'reconcile','tapfiliate',?2,?3,1,?4,?5,?6,?7)`,
       runId, startedAt, nowIso(), scanned, updated, discrepancies,
+      `${opts.full ? "backfill" : "ok"}: ${importedAffiliates} affiliates`,
     );
   } catch (e) {
     await db.run(

@@ -46,6 +46,7 @@ export function AffiliateView() {
         ) : (
           <Podium
             podium={board.podium}
+            meLabel={store.meLabel}
             caption={`${controls.scope === "personal" ? "Personal" : "Team"} eligible sales · ${periodCaption} · Pacific Time`}
           />
         )}

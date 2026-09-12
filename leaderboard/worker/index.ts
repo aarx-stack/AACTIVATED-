@@ -18,6 +18,9 @@ export interface Env {
   // Cloudflare Access config (vars).
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
+  // "1" enables the public read-only leaderboard (option A); unset keeps every
+  // endpoint behind auth.
+  PUBLIC_BOARD?: string;
 }
 
 export default {

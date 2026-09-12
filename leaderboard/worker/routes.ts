@@ -4,16 +4,95 @@ import { HttpError, json, readJson, sha256Hex, timingSafeEqual } from "./lib/htt
 import { d1Db, nowIso, uid } from "./lib/db";
 import { authenticate, requireAdmin, requireAffiliate } from "./lib/auth";
 import { challengeFor, leaderboard, loadConfig, recognition } from "./domain/queries";
-import { claimSeat } from "./domain/seats";
+import { claimSeat, seatsClaimed } from "./domain/seats";
 import { finishDelivery, recordDelivery, upsertTxn } from "./domain/ingest";
+import { reconcile } from "./jobs/reconcile";
 import { membershipExpiry } from "@shared/challenge";
 import { TapfiliateClient, conversionToTxn, type TapConversion } from "./adapters/tapfiliate";
+import type { PeriodType, Scope } from "@shared/types";
 
 export const router = new Router<Env>();
+
+const parseScope = (v: string | null): Scope => (v === "team" ? "team" : "personal");
+const parsePeriod = (v: string | null): PeriodType =>
+  v === "weekly" ? "weekly" : v === "alltime" ? "alltime" : "monthly";
 
 /* ————— public ————— */
 
 router.get("/api/health", () => json({ ok: true, at: nowIso() }));
+
+/**
+ * Public read-only board (option A). Enabled only when PUBLIC_BOARD=1, and it
+ * returns ONLY permitted leaderboard fields — approved display names, eligible
+ * sales, order counts, rank movement, and recognition names. Never customer
+ * data, per-transaction records, per-affiliate performance, or admin data;
+ * those stay behind authentication. When PUBLIC_BOARD is unset the routes 404.
+ */
+function requirePublic(env: Env): void {
+  if (env.PUBLIC_BOARD !== "1") throw new HttpError(404, "not_found");
+}
+
+router.get("/api/public/summary", async ({ env }) => {
+  requirePublic(env);
+  const db = d1Db(env.DB);
+  const cfg = await loadConfig(db);
+  const last = await db.first<{ finished_at: string | null }>(
+    "SELECT finished_at FROM sync_runs WHERE ok = 1 ORDER BY started_at DESC LIMIT 1",
+  );
+  const lastFailed = await db.first<{ started_at: string }>(
+    "SELECT started_at FROM sync_runs WHERE ok = 0 ORDER BY started_at DESC LIMIT 1",
+  );
+  const degraded =
+    lastFailed && (!last?.finished_at || Date.parse(lastFailed.started_at) > Date.parse(last.finished_at));
+  return json({
+    lastSuccessfulSyncAt: last?.finished_at ?? null,
+    health: degraded ? "degraded" : "ok",
+    seatsClaimed: await seatsClaimed(db),
+    config: {
+      launchAt: cfg.launchAt, // null → "Launch date pending"
+      windowDays: cfg.windowDays,
+      directTargetCents: cfg.directTargetCents,
+      teamTargetCents: cfg.teamTargetCents,
+      foundersPackMinCents: cfg.foundersPackMinCents,
+      seatCap: cfg.seatCap,
+    },
+  });
+});
+
+router.get("/api/public/board", async ({ env, url }) => {
+  requirePublic(env);
+  const db = d1Db(env.DB);
+  const board = await leaderboard(
+    db,
+    parseScope(url.searchParams.get("scope")),
+    parsePeriod(url.searchParams.get("period")),
+    Date.now(),
+  );
+  return json(board);
+});
+
+router.get("/api/public/recognition", async ({ env }) => {
+  requirePublic(env);
+  const db = d1Db(env.DB);
+  return json({ members: await recognition(db, Date.now()) });
+});
+
+/**
+ * Internal backfill/refresh trigger, gated by the webhook secret (constant-time
+ * compare). Lets an operator kick the import immediately after deploy instead
+ * of waiting for the 15-minute cron: POST .../reconcile/<secret>?full=1
+ */
+router.post("/api/internal/reconcile/:secret", async ({ req, env, params, url }) => {
+  if (!env.TAPFILIATE_WEBHOOK_SECRET) throw new HttpError(503, "not_configured");
+  if (!timingSafeEqual(params.secret!, env.TAPFILIATE_WEBHOOK_SECRET)) throw new HttpError(404, "not_found");
+  void req;
+  await reconcile(env, { full: url.searchParams.get("full") === "1" });
+  const db = d1Db(env.DB);
+  const last = await db.first<Record<string, unknown>>(
+    "SELECT scanned, updated, discrepancies, note, ok FROM sync_runs ORDER BY started_at DESC LIMIT 1",
+  );
+  return json({ ok: true, lastRun: last });
+});
 
 /* ————— authenticated (affiliate or admin) ————— */
 

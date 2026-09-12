@@ -111,11 +111,26 @@ export function conversionToTxn(c: TapConversion, affiliateId: string): SourceTx
     const n = typeof v === "string" ? Number.parseFloat(v) : typeof v === "number" ? v : 0;
     return Number.isFinite(n) ? Math.round(n * 100) : 0;
   };
+
+  // Counting policy (same as snapshot mode; documented in docs/DECISIONS_NEEDED.md,
+  // configurable, confirm before final activation): a Sellavi→Tapfiliate
+  // conversion is treated as verified checkout revenue UNLESS its own
+  // ("regular") commission has been dis-approved in Tapfiliate (a
+  // test/cancelled order), which excludes it. This is deliberately NOT
+  // "any conversion = paid": a dis-approval is an explicit source signal.
+  const regular = (c.commissions ?? []).find(
+    (k): k is { kind?: string; approved?: boolean | null } =>
+      typeof k === "object" && k !== null && (k as { kind?: string }).kind === "regular",
+  );
+  const disapproved = regular?.approved === false;
+  const rawExternal = String(c.external_id ?? c.id);
+
   return {
     id: crypto.randomUUID(),
     source: "tapfiliate",
-    externalId: String(c.external_id ?? c.id),
-    orderRef: c.external_id ? String(c.external_id) : null,
+    externalId: rawExternal,
+    // Tidy the occasional doubled "SELLAVI-SELLAVI-" prefix for display only.
+    orderRef: c.external_id ? `#${rawExternal.replace(/^(SELLAVI-)+/, "SELLAVI-")}` : null,
     affiliateId,
     occurredAt: c.created_at ?? new Date().toISOString(),
     grossCents: Math.round(amount * 100),
@@ -123,9 +138,9 @@ export function conversionToTxn(c: TapConversion, affiliateId: string): SourceTx
     taxCents: num(meta["tax"]),
     shippingCents: num(meta["shipping"]),
     refundedCents: 0,
-    paymentStatus: "pending",
-    paymentVerified: false,
-    paymentVerifiedVia: null,
+    paymentStatus: disapproved ? "unpaid" : "paid",
+    paymentVerified: !disapproved,
+    paymentVerifiedVia: disapproved ? null : "sellavi",
     isFoundersPack: meta["product_sku"] === "FOUNDERS-PACK" || meta["founders_pack"] === true,
     sourceUpdatedAt: c.created_at ?? null,
   };

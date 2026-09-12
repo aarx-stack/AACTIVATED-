@@ -12,6 +12,8 @@
     "test": "vitest run",
     "verify": "npm run typecheck && npm run test && npm run build",
     "worker:dev": "wrangler dev",
+    "deploy": "bash scripts/deploy.sh",
+    "build:live": "VITE_DATA_MODE=live vite build",
     "db:migrate:local": "wrangler d1 migrations apply aactivated_leaderboard --local",
     "db:migrate:remote": "wrangler d1 migrations apply aactivated_leaderboard --remote",
     "screenshots": "node scripts/screenshots.mjs",

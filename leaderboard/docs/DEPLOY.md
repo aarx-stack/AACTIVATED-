@@ -22,7 +22,31 @@ never pasted into chat or committed):
 | `TAPFILIATE_API_KEY` | Tapfiliate → Settings → API. Read access to affiliates + conversions. Stored as a Worker secret, never in the frontend. |
 | `TAPFILIATE_WEBHOOK_SECRET` | A random high-entropy string (Claude generated one for you). Becomes the secret path segment of the webhook URL. |
 
-## Deploy sequence (Claude runs these once the vars are set)
+## Where this can run
+
+`wrangler` talks to `api.cloudflare.com`. **Claude's managed cloud
+environment blocks that host by egress policy** (verified: the proxy returns
+`403` to the CONNECT), so the deploy cannot run from a normal Claude Code web
+session. Run it from any of:
+
+1. **Your own machine** — `git clone`, `cd leaderboard`, `npm ci`, export the
+   four vars, `npm run deploy`.
+2. **A Claude Code environment whose network policy allows Cloudflare** — then
+   Claude can run `npm run deploy` for you.
+3. **Cloudflare Workers Builds** — connect this repo in the Cloudflare
+   dashboard (Workers & Pages → Create → Connect to Git), set the build
+   command to `VITE_DATA_MODE=live npm run build` and add the same secrets +
+   vars there; every push deploys automatically, no local egress needed.
+
+## One command
+
+With the four vars exported, `npm run deploy` (→ `scripts/deploy.sh`) does the
+whole sequence below idempotently: ensure D1, write its id into
+`wrangler.jsonc`, migrate, store secrets, build live, deploy, and backfill.
+`PUBLIC_BOARD=1` is already set in `wrangler.jsonc` (option A). The manual
+steps, for reference:
+
+## Deploy sequence (what the script runs)
 
 ```sh
 cd leaderboard
@@ -42,11 +66,16 @@ printf '%s' "$TAPFILIATE_WEBHOOK_SECRET" | npx wrangler secret put TAPFILIATE_WE
 VITE_DATA_MODE=live npm run build
 npx wrangler deploy
 
-# 5. Backfill history once (widen the reconcile look-back, then trigger)
-#    then confirm the first cron run wrote rows:
+# 5. Backfill all history now (don't wait for the first cron):
+curl -X POST "https://<worker-subdomain>.workers.dev/api/internal/reconcile/$TAPFILIATE_WEBHOOK_SECRET?full=1"
+#    then confirm rows landed:
 npx wrangler d1 execute aactivated_leaderboard --remote \
   --command "SELECT COUNT(*) AS affiliates FROM affiliates; SELECT COUNT(*) AS txns FROM transactions;"
 ```
+
+The reconcile job imports affiliates + MLM hierarchy first, then conversions,
+so a fresh database populates in one call. After that the `*/15` cron keeps it
+current and webhooks push near-instant updates.
 
 ## Register the Tapfiliate webhook
 

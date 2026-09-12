@@ -1,4 +1,4 @@
-import { store, type BoardRow } from "@/data/store";
+import type { BoardRow } from "@/data/store";
 import { fmtInt, fmtUsd } from "@shared/money";
 import { useCountUp } from "@/data/useStore";
 import { Avatar, Chip, MovementCell, cx } from "@/components/ui";
@@ -10,7 +10,7 @@ const PLACE = {
   3: { ring: "bronze" as const, card: "bronze-card", label: "text-bronze-300", medal: "bg-bronze-400 text-ink-950" },
 };
 
-function PodiumCard({ row, big }: { row: BoardRow; big?: boolean }) {
+function PodiumCard({ row, big, meLabel }: { row: BoardRow; big?: boolean; meLabel: string }) {
   const place = PLACE[row.rank as 1 | 2 | 3] ?? PLACE[3];
   const amount = useCountUp(row.amountCents);
   return (
@@ -38,7 +38,7 @@ function PodiumCard({ row, big }: { row: BoardRow; big?: boolean }) {
       <Avatar name={row.displayName} size={big ? 72 : 56} ring={place.ring} />
       <div className={cx("font-display mt-3 font-semibold text-mist-50", big ? "text-xl" : "text-[16px]")}>
         {row.displayName}
-        {row.isMe ? <Chip tone="accent" className="ml-2 align-middle">{store.meLabel}</Chip> : null}
+        {row.isMe ? <Chip tone="accent" className="ml-2 align-middle">{meLabel}</Chip> : null}
       </div>
       <div className={cx("mt-0.5 text-[12px] font-semibold tracking-[0.16em] uppercase", place.label)}>
         {row.rank === 1 ? "First place" : row.rank === 2 ? "Second place" : "Third place"}
@@ -54,22 +54,30 @@ function PodiumCard({ row, big }: { row: BoardRow; big?: boolean }) {
   );
 }
 
-export function Podium({ podium, caption }: { podium: BoardRow[]; caption: string }) {
+export function Podium({
+  podium,
+  caption,
+  meLabel = "You",
+}: {
+  podium: BoardRow[];
+  caption: string;
+  meLabel?: string;
+}) {
   if (podium.length < 3) return null;
   const [first, second, third] = podium as [BoardRow, BoardRow, BoardRow];
   return (
     <div>
       {/* Desktop: 2 · 1 · 3 with the leader elevated; mobile: 1 then 2/3 */}
       <div className="hidden items-end gap-4 sm:grid sm:grid-cols-3">
-        <PodiumCard row={second} />
-        <PodiumCard row={first} big />
-        <PodiumCard row={third} />
+        <PodiumCard row={second} meLabel={meLabel} />
+        <PodiumCard row={first} big meLabel={meLabel} />
+        <PodiumCard row={third} meLabel={meLabel} />
       </div>
       <div className="grid gap-3 sm:hidden">
-        <PodiumCard row={first} big />
+        <PodiumCard row={first} big meLabel={meLabel} />
         <div className="grid grid-cols-2 gap-3">
-          <PodiumCard row={second} />
-          <PodiumCard row={third} />
+          <PodiumCard row={second} meLabel={meLabel} />
+          <PodiumCard row={third} meLabel={meLabel} />
         </div>
       </div>
       <p className="mb-0 mt-3 text-center text-[12px] text-mist-600">{caption}</p>
