@@ -20,8 +20,10 @@ need TAPFILIATE_WEBHOOK_SECRET
 DB_NAME="aactivated_leaderboard"
 
 echo "▸ 1/6  Ensuring D1 database '$DB_NAME' exists"
+# Wrangler may print an informational note before the JSON, so slice from the
+# first '[' and parse tolerantly.
 DB_ID="$(npx wrangler d1 list --json 2>/dev/null | node -e \
-  'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s||"[]");const m=j.find(d=>d.name===process.argv[1]);process.stdout.write(m?m.uuid||m.database_id||"":"")})' "$DB_NAME" || true)"
+  'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const i=s.indexOf("[");let j=[];try{j=JSON.parse(i>=0?s.slice(i):s)}catch{}const m=Array.isArray(j)?j.find(d=>d.name===process.argv[1]):null;process.stdout.write(m?(m.uuid||m.database_id||""):"")})' "$DB_NAME" || true)"
 if [ -z "$DB_ID" ]; then
   CREATE_OUT="$(npx wrangler d1 create "$DB_NAME")"
   DB_ID="$(printf '%s' "$CREATE_OUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)"
