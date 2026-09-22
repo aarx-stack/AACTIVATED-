@@ -7,6 +7,7 @@
 
 import { store } from './store.js';
 import { el } from './dom.js';
+import { initSharedBackend } from './backend.js';
 import { initNotifications } from './notify.js';
 import { BrandHeader } from './components/BrandHeader.js';
 import { Scoreboard } from './components/Scoreboard.js';
@@ -61,6 +62,23 @@ root.append(
 
 // Email notifications (no-op until configured in app/config.js).
 initNotifications();
+
+// Shared storage: on claude.ai the artifact's live database keeps every
+// device in sync; elsewhere this resolves null and localStorage stays in
+// charge. The banner warns if the shared connection later degrades.
+initSharedBackend(store)
+  .then((backend) => {
+    if (backend) store.attachBackend(backend);
+  })
+  .catch((err) => console.warn('[shared] backend init failed:', err));
+
+store.subscribe((event) => {
+  if (event.type === 'backend-degraded') {
+    storageBanner.textContent =
+      'Heads up: the shared task database is unreachable right now — recent changes may not have saved for the rest of the team.';
+    storageBanner.hidden = false;
+  }
+});
 
 // Trigger a save probe so a storage problem surfaces immediately on load.
 store.save();

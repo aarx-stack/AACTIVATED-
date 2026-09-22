@@ -127,6 +127,18 @@ button:disabled {
   filter: brightness(1.07);
 }
 
+.btn-success {
+  background: linear-gradient(180deg, var(--green-bright), var(--green));
+  color: #051408;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 8px 20px -10px rgba(34, 197, 94, 0.7);
+}
+
+.btn-success:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
 .btn-ghost {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.1);

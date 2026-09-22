@@ -1,8 +1,11 @@
 // @ts-check
 
 /**
- * A single task card. Active cards offer Complete / Delete / move (drag, or
- * an accessible category menu on the status chip); completed cards show who
+ * A single task card. Clicking anywhere on an active card (or pressing
+ * Enter on its stretched hit button) opens the completion popup — the
+ * green Complete button lives there, next to the initials field, not on
+ * the card face. Cards still offer Delete and move (drag, or an
+ * accessible category menu on the status chip); completed cards show who
  * scored and when. While a card's completion shot is in flight it renders
  * locked, so it can't be completed or deleted twice.
  */
@@ -88,21 +91,40 @@ export function TaskCard(task, handlers) {
       ),
     );
   } else {
-    const completeBtn = el(
-      'button',
-      {
-        class: 'btn btn-complete',
-        type: 'button',
-        disabled: locked,
-        onclick: (/** @type {MouseEvent} */ e) => {
-          const r = /** @type {HTMLElement} */ (e.currentTarget).getBoundingClientRect();
-          handlers.onComplete(task, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
-        },
-      },
-      icon('check', 15),
-      el('span', { text: locked ? 'SHOOTING…' : 'COMPLETE' }),
+    card.append(
+      el(
+        'footer',
+        { class: 'card-foot' },
+        el(
+          'span',
+          { class: `card-hint${locked ? ' is-shooting-hint' : ''}`, 'aria-hidden': 'true' },
+          el('span', { class: 'card-hint-ball', text: '🏀' }),
+          el('span', { text: locked ? 'SHOOTING…' : 'Click to complete' }),
+        ),
+        deleteBtn,
+      ),
     );
-    card.append(el('footer', { class: 'card-foot' }, completeBtn, deleteBtn));
+
+    // Stretched hit target: the whole card opens the completion popup
+    // (where the green Complete button lives). It sits under the delete
+    // button and category chip, which are raised above it in CSS.
+    const hit = el('button', {
+      class: 'card-hit',
+      type: 'button',
+      disabled: locked,
+      'aria-label': `Complete task #${task.ticketNumber}: ${task.title}`,
+      onclick: (/** @type {MouseEvent} */ e) => {
+        // Mouse clicks launch the shot from where you clicked; keyboard
+        // activation (no coordinates) uses the card's center.
+        const r = card.getBoundingClientRect();
+        const origin =
+          e.clientX || e.clientY
+            ? { x: e.clientX, y: e.clientY }
+            : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        handlers.onComplete(task, origin);
+      },
+    });
+    card.append(hit);
 
     // Drag between active columns (dropping on Completed opens the
     // initials flow — see TaskColumn).

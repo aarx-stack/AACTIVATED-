@@ -298,20 +298,72 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 11px;
+  margin-top: 9px;
 }
 
-.btn-complete {
-  padding: 7px 13px;
-  font-size: 11.5px;
-  background: rgb(var(--rgb-green) / 0.12);
-  border-color: rgb(var(--rgb-green) / 0.35);
+/* Whole-card hit target: opens the completion popup. Sits under the
+   delete button and category chip, which are raised above it. */
+.card-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.card-hit:disabled {
+  cursor: default;
+}
+
+.card-hit:focus-visible {
+  outline: 2px solid var(--blue-bright);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.task-card .chip-menu-wrap,
+.task-card .card-delete {
+  position: relative;
+  z-index: 2;
+}
+
+.card-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-deep);
+  transition: color 0.15s ease;
+}
+
+.card-hint-ball {
+  font-size: 11px;
+  line-height: 1;
+  filter: saturate(0.4) opacity(0.7);
+  transition: filter 0.15s ease;
+}
+
+.task-card:hover .card-hint,
+.task-card:focus-within .card-hint {
   color: var(--green-bright);
 }
 
-.btn-complete:hover:not(:disabled) {
-  background: rgb(var(--rgb-green) / 0.2);
-  border-color: rgb(var(--rgb-green) / 0.55);
+.task-card:hover .card-hint-ball,
+.task-card:focus-within .card-hint-ball {
+  filter: none;
+}
+
+.card-hint.is-shooting-hint {
+  color: var(--cyan-soft);
+  animation: shooting-pulse 1s ease-in-out infinite;
+}
+
+.card-hint.is-shooting-hint .card-hint-ball {
+  filter: none;
 }
 
 .card-delete {
@@ -468,16 +520,9 @@
   border-left-color: var(--cyan);
 }
 
-.task-card.is-shooting .btn-complete {
-  background: rgb(var(--rgb-cyan) / 0.1);
-  border-color: rgb(var(--rgb-cyan) / 0.4);
-  color: var(--cyan-soft);
-  animation: shooting-pulse 1s ease-in-out infinite;
-}
-
 @keyframes shooting-pulse {
   50% {
-    opacity: 0.6;
+    opacity: 0.55;
   }
 }
 

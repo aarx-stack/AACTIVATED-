@@ -7,9 +7,14 @@
  * counts are always derived from it (never stored separately), so they can
  * never drift out of sync — including after deletes and reloads.
  *
- * Persistence is localStorage behind load()/save(); to migrate to a real
- * backend later, replace those two functions (or debounce save() into an
- * API call) — the rest of the app only talks to the store API.
+ * Storage has two modes:
+ *  - Local (default): localStorage behind load()/save(), as before.
+ *  - Shared (when a backend is attached, see app/backend.js): every
+ *    mutation is written to the shared database and the store's state is
+ *    rebuilt from live snapshots, so all devices/viewers see the same
+ *    tasks in near-real time. localStorage then acts only as a warm-start
+ *    cache. Store events carry origin: 'local' | 'remote' so, e.g., email
+ *    notifications fire only on the device that performed the action.
  */
 
 import {
@@ -40,7 +45,13 @@ import {
  * @property {number} nextTicketNumber
  * @property {Task[]} tasks
  *
- * @typedef {{ type: string, [key: string]: any }} StoreEvent
+ * @typedef {{ type: string, origin?: 'local' | 'remote', [key: string]: any }} StoreEvent
+ *
+ * @typedef {Object} Backend
+ * @property {string} kind
+ * @property {(task: Task) => Promise<void>} createTask
+ * @property {(task: Task) => Promise<void>} writeTask
+ * @property {(id: string) => Promise<void>} deleteTask
  */
 
 /** @returns {State} */
@@ -56,8 +67,34 @@ function makeId() {
 const VALID_STATUSES = new Set(['new', 'medium', 'hot', 'completed']);
 
 /**
+ * Validate and repair a raw task record (from storage or the shared
+ * database). Returns null for anything unusable.
+ * @param {any} t
+ * @returns {Task | null}
+ */
+export function sanitizeTask(t) {
+  if (!t || typeof t !== 'object') return null;
+  if (typeof t.title !== 'string' || !t.title || !VALID_STATUSES.has(t.status)) return null;
+  const ticket = Number(t.ticketNumber);
+  if (!Number.isInteger(ticket)) return null;
+  const completed = t.status === 'completed';
+  return {
+    id: typeof t.id === 'string' && t.id ? t.id : makeId(),
+    ticketNumber: ticket,
+    title: t.title,
+    notes: typeof t.notes === 'string' ? t.notes : '',
+    status: t.status,
+    createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
+    completedAt: completed && typeof t.completedAt === 'string' ? t.completedAt : null,
+    completedBy: completed && typeof t.completedBy === 'string' ? t.completedBy : null,
+    shotId: completed ? (typeof t.shotId === 'string' ? t.shotId : `SHOT-${ticket}`) : null,
+  };
+}
+
+/**
  * Validate and repair a state object loaded from storage. Drops malformed
- * tasks and self-heals the ticket counter so numbers are never reused.
+ * or duplicate-id tasks and self-heals the ticket counter so numbers are
+ * never reused.
  * @param {unknown} raw
  * @returns {State}
  */
@@ -65,27 +102,14 @@ function sanitize(raw) {
   const state = defaultState();
   if (!raw || typeof raw !== 'object') return state;
   const src = /** @type {Record<string, any>} */ (raw);
-  const seenTickets = new Set();
+  const seenIds = new Set();
 
   if (Array.isArray(src.tasks)) {
-    for (const t of src.tasks) {
-      if (!t || typeof t !== 'object') continue;
-      if (typeof t.title !== 'string' || !VALID_STATUSES.has(t.status)) continue;
-      const ticket = Number(t.ticketNumber);
-      if (!Number.isInteger(ticket) || seenTickets.has(ticket)) continue;
-      seenTickets.add(ticket);
-      const completed = t.status === 'completed';
-      state.tasks.push({
-        id: typeof t.id === 'string' && t.id ? t.id : makeId(),
-        ticketNumber: ticket,
-        title: t.title,
-        notes: typeof t.notes === 'string' ? t.notes : '',
-        status: t.status,
-        createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
-        completedAt: completed && typeof t.completedAt === 'string' ? t.completedAt : null,
-        completedBy: completed && typeof t.completedBy === 'string' ? t.completedBy : null,
-        shotId: completed && typeof t.shotId === 'string' ? t.shotId : completed ? `SHOT-${ticket}` : null,
-      });
+    for (const entry of src.tasks) {
+      const task = sanitizeTask(entry);
+      if (!task || seenIds.has(task.id)) continue;
+      seenIds.add(task.id);
+      state.tasks.push(task);
     }
   }
 
@@ -109,13 +133,17 @@ class Store {
      * a refresh mid-shot simply leaves the task active and unscored. */
     this.completionLocks = new Set();
     this.storageOk = true;
+    /** @type {Backend | null} */
+    this.backend = null;
+    this.backendDegraded = false;
 
-    // Keep multiple open tabs in sync.
+    // Keep multiple open tabs in sync (local mode; in shared mode the
+    // live subscription covers this and the extra refresh is harmless).
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
-        if (e.key === STORAGE_KEY) {
+        if (e.key === STORAGE_KEY && !this.backend) {
           this.state = this.load();
-          this.emit({ type: 'sync' });
+          this.emit({ type: 'sync', origin: 'remote' });
         }
       });
     }
@@ -155,7 +183,78 @@ class Store {
 
   /** @param {StoreEvent} event */
   emit(event) {
+    if (!event.origin) event.origin = 'local';
     for (const fn of [...this.listeners]) fn(event);
+  }
+
+  // ----- shared backend -------------------------------------------------
+
+  /**
+   * Switch to shared storage (see app/backend.js). From here on mutations
+   * are written to the shared database and state follows its snapshots.
+   * @param {Backend} backend
+   */
+  attachBackend(backend) {
+    this.backend = backend;
+  }
+
+  noteBackendDegraded() {
+    if (!this.backendDegraded) {
+      this.backendDegraded = true;
+      this.emit({ type: 'backend-degraded' });
+    }
+  }
+
+  /**
+   * Replace state from a shared-database snapshot and emit what changed.
+   * @param {Task[]} tasks
+   * @param {{ firstSync?: boolean,
+   *           changes?: { type: 'added'|'modified'|'removed', id: string, task: Task | null }[],
+   *           isLocal?: (id: string) => boolean }} [opts]
+   */
+  applyRemoteState(tasks, { firstSync = false, changes = [], isLocal = () => false } = {}) {
+    const prevById = new Map(this.state.tasks.map((t) => [t.id, t]));
+    const sorted = [...tasks].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    const maxTicket = sorted.reduce((m, t) => Math.max(m, t.ticketNumber), FIRST_TICKET - 1);
+    this.state = {
+      version: 1,
+      nextTicketNumber: Math.max(maxTicket + 1, FIRST_TICKET),
+      tasks: sorted,
+    };
+    this.save(); // warm-start cache for the next load
+
+    if (firstSync) {
+      this.emit({ type: 'sync', origin: 'remote' });
+      return;
+    }
+    for (const change of changes) {
+      const origin = isLocal(change.id) ? 'local' : 'remote';
+      if (change.type === 'added') {
+        const task = this.getTask(change.id);
+        if (task) this.emit({ type: 'task-created', task, origin });
+      } else if (change.type === 'removed') {
+        this.emit({ type: 'task-deleted', task: change.task || prevById.get(change.id), origin });
+      } else {
+        const prev = prevById.get(change.id);
+        const now = this.getTask(change.id);
+        if (!now) continue;
+        if (prev?.status !== 'completed' && now.status === 'completed') {
+          this.emit({ type: 'task-completed', task: now, origin });
+        } else if (prev && prev.status !== now.status) {
+          this.emit({ type: 'task-moved', task: now, origin });
+        } else {
+          this.emit({ type: 'sync', origin });
+        }
+      }
+    }
+  }
+
+  /** @param {Promise<void>} write */
+  guardWrite(write) {
+    write.catch((err) => {
+      console.warn('[store] shared write failed:', err);
+      this.noteBackendDegraded();
+    });
   }
 
   // ----- queries -------------------------------------------------------
@@ -218,6 +317,14 @@ class Store {
       completedBy: null,
       shotId: null,
     };
+    if (this.backend) {
+      // Provisional bump so rapid local creates don't reuse a number; the
+      // backend claims the authoritative ticket and the snapshot echo
+      // delivers the final task (and the 'task-created' event).
+      this.state.nextTicketNumber += 1;
+      this.guardWrite(this.backend.createTask(task));
+      return task;
+    }
     this.state.nextTicketNumber += 1;
     this.state.tasks.unshift(task);
     this.save();
@@ -236,6 +343,10 @@ class Store {
     const task = this.getTask(id);
     if (!task || task.status === 'completed' || this.isLocked(id)) return false;
     if (!ACTIVE_STATUSES.includes(status) || task.status === status) return false;
+    if (this.backend) {
+      this.guardWrite(this.backend.writeTask({ ...task, status }));
+      return true;
+    }
     task.status = status;
     this.save();
     this.emit({ type: 'task-moved', task });
@@ -277,6 +388,21 @@ class Store {
     const initials = normalizeInitials(rawInitials);
     if (!isValidPlayer(initials)) return { ok: false, reason: 'invalid-initials' };
 
+    if (this.backend) {
+      /** @type {Task} */
+      const completed = {
+        ...task,
+        status: 'completed',
+        completedBy: initials,
+        completedAt: new Date().toISOString(),
+        shotId: `SHOT-${task.ticketNumber}`,
+      };
+      // The snapshot echo (latency-compensated, effectively immediate)
+      // updates state and emits 'task-completed'.
+      this.guardWrite(this.backend.writeTask(completed));
+      return { ok: true, task: completed };
+    }
+
     task.status = 'completed';
     task.completedBy = initials;
     task.completedAt = new Date().toISOString();
@@ -294,6 +420,10 @@ class Store {
     if (this.isLocked(id)) return false;
     const index = this.state.tasks.findIndex((t) => t.id === id);
     if (index === -1) return false;
+    if (this.backend) {
+      this.guardWrite(this.backend.deleteTask(id));
+      return true;
+    }
     const [task] = this.state.tasks.splice(index, 1);
     this.save();
     // Scoreboard listeners re-derive scores, so deleting a completed task

@@ -25,6 +25,10 @@ export function initNotifications() {
   store.subscribe((event) => {
     const kind = EVENT_KINDS[event.type];
     if (!kind || !event.task) return;
+    // With shared storage every open device sees every change; only the
+    // device that performed the action sends the email, so nobody gets
+    // duplicate notifications.
+    if (event.origin === 'remote') return;
     const cfg = EMAIL_NOTIFICATIONS;
     if (!cfg.notifyOn[kind]) return;
     if (!cfg.webhookUrl && cfg.recipients.length === 0) return;

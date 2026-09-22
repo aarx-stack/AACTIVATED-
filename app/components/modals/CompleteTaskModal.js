@@ -90,7 +90,7 @@ export function CompleteTaskModal() {
       el('button', { class: 'btn btn-ghost', type: 'button', text: 'Cancel', onclick: () => modal.close() }),
       el(
         'button',
-        { class: 'btn btn-primary btn-shoot', type: 'submit' },
+        { class: 'btn btn-success btn-shoot', type: 'submit' },
         el('span', { class: 'btn-ball', 'aria-hidden': 'true', text: '🏀' }),
         el('span', { text: 'Complete Task' }),
       ),

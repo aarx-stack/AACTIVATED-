@@ -34,9 +34,14 @@ the scoreboard, and the moment it drops through the net your score counts up.
   (`count of completed tasks per player`), so deleting a completed task
   immediately lowers that player's total and a refresh always reconstructs the
   right numbers
-- **Persistence** in `localStorage` (versioned schema, self-healing load,
-  multi-tab sync); swap `load()`/`save()` in `app/store.js` to move to a real
-  backend later
+- **Storage** (`app/store.js` + `app/backend.js`): running as a claude.ai
+  artifact, tasks live in the artifact's shared realtime database — every
+  device and viewer sees the same board and updates arrive live, no refresh
+  needed (ticket numbers stay unique via a short lease on a counter document,
+  and this browser's existing local tasks are migrated in once). Anywhere else
+  (GitHub Pages, localhost) storage falls back to per-browser `localStorage`
+  with multi-tab sync; wiring a real backend later means implementing the
+  three-method `Backend` interface
 - **Accessibility**: keyboard shortcuts (`/` search, `n` new task), focus
   management in modals, live-region score announcements, labelled controls, and
   a reduced-motion mode that skips the flight but keeps every update
@@ -90,6 +95,7 @@ export const EMAIL_NOTIFICATIONS = {
 | --- | --- |
 | `index.html` | Shell: fonts, styles, `#app` mount |
 | `app/config.js` | Roster, statuses, storage keys, email-notification settings |
+| `app/backend.js` | Shared realtime storage adapter (claude.ai artifact database) |
 | `app/notify.js` | Automatic email notifications (FormSubmit or webhook) |
 | `app/store.js` | Source of truth: tasks, persistence, derived scores, completion locks |
 | `app/shot.js` | ShotDirector: queued flight animation + exactly-once scoring commit |
