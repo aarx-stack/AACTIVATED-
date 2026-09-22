@@ -1,0 +1,106 @@
+/* Design tokens & self-hosted fonts (no runtime CDN dependencies). */
+
+@font-face {
+  font-family: 'DSEG7';
+  src: url('../assets/fonts/DSEG7Classic-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  src: url('../assets/fonts/Rajdhani-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  src: url('../assets/fonts/Rajdhani-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  src: url('../assets/fonts/Rajdhani-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Palette */
+  --bg: #080a0d;
+  --panel: #10151b;
+  --panel-deep: #0b0f14;
+  --card: #161c23;
+  --card-border: #232c37;
+  --line: #1e2833;
+  --line-soft: rgba(148, 163, 184, 0.12);
+
+  --orange: #f97316;
+  --orange-bright: #fb923c;
+  --orange-soft: #fdba74;
+  --red: #ef4444;
+  --red-soft: #f87171;
+  --amber: #f59e0b;
+  --blue: #3b82f6;
+  --green: #22c55e;
+  --green-bright: #4ade80;
+
+  --white: #f8fafc;
+  --text: #e2e8f0;
+  --text-strong: #f1f5f9;
+  --muted: #94a3b8;
+  --muted-deep: #64748b;
+
+  /* Category tones as RGB triplets, so alpha variants stay cheap:
+     background: rgb(var(--tone) / 0.14), border: rgb(var(--tone) / 0.35) … */
+  --rgb-blue: 59 130 246;
+  --rgb-amber: 245 158 11;
+  --rgb-red: 249 88 44; /* hot: red-orange blend */
+  --rgb-green: 34 197 94;
+  --rgb-orange: 249 115 22;
+
+  /* Typography */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Rajdhani', 'Segoe UI', system-ui, sans-serif;
+  --font-led: 'DSEG7', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Shape & depth */
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 9px;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 24px -18px rgba(0, 0, 0, 0.9);
+  --shadow-pop: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --focus-ring: 0 0 0 3px rgba(249, 115, 22, 0.28);
+}
+
+/* Tone helpers — applied via .tone-blue / .tone-amber / .tone-red / .tone-green */
+.tone-blue {
+  --tone: var(--rgb-blue);
+  --tone-strong: #60a5fa;
+}
+.tone-amber {
+  --tone: var(--rgb-amber);
+  --tone-strong: #fbbf24;
+}
+.tone-red {
+  --tone: var(--rgb-red);
+  --tone-strong: #f87171;
+}
+.tone-green {
+  --tone: var(--rgb-green);
+  --tone-strong: #4ade80;
+}
+.tone-orange {
+  --tone: var(--rgb-orange);
+  --tone-strong: #fb923c;
+}
