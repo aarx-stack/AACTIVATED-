@@ -2,15 +2,15 @@
 
 .scoreboard {
   position: relative;
-  border: 1px solid #232d3a;
+  border: 1px solid #203050;
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
-    linear-gradient(180deg, #141a22, #0e1319);
+    linear-gradient(180deg, rgba(147, 197, 253, 0.04), transparent 40%),
+    linear-gradient(180deg, #0e1728, #080e1a);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(196, 224, 255, 0.07),
     0 30px 60px -30px rgba(0, 0, 0, 0.85),
-    0 0 90px -40px rgba(249, 115, 22, 0.35);
+    0 0 100px -38px rgba(37, 99, 235, 0.55);
 }
 
 /* Thin LED strip across the top edge */
@@ -22,8 +22,8 @@
   right: 24px;
   height: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--orange) 18%, var(--orange-bright) 50%, var(--orange) 82%, transparent);
-  filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.8));
+  background: linear-gradient(90deg, transparent, var(--blue) 18%, var(--cyan-soft) 50%, var(--blue) 82%, transparent);
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.9));
   opacity: 0.9;
 }
 
@@ -35,8 +35,8 @@
   border-radius: inherit;
   pointer-events: none;
   box-shadow:
-    inset 0 0 70px rgba(249, 115, 22, 0.14),
-    0 0 60px -8px rgba(249, 115, 22, 0.4);
+    inset 0 0 70px rgba(34, 211, 238, 0.13),
+    0 0 64px -8px rgba(59, 130, 246, 0.5);
   opacity: 0;
   transition: opacity 0.45s ease;
 }
@@ -53,7 +53,7 @@
   align-items: center;
   gap: 14px;
   padding: 13px 20px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  border-bottom: 1px solid rgba(148, 184, 226, 0.12);
 }
 
 .sb-title {
@@ -71,8 +71,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--orange-bright);
-  box-shadow: 0 0 8px rgba(251, 146, 60, 0.9);
+  background: var(--cyan);
+  box-shadow: 0 0 9px rgba(34, 211, 238, 0.95);
   animation: sb-dot-pulse 3.2s ease-in-out infinite;
   flex: none;
 }
@@ -101,8 +101,8 @@
 .led {
   font-family: var(--font-led);
   font-weight: 700;
-  color: var(--orange-bright);
-  text-shadow: 0 0 14px rgba(251, 146, 60, 0.5);
+  color: var(--blue-bright);
+  text-shadow: 0 0 15px rgba(59, 130, 246, 0.65);
   font-variant-numeric: tabular-nums;
 }
 
@@ -142,8 +142,8 @@
 }
 
 .sb-sound[aria-pressed='true'] {
-  color: var(--orange-soft);
-  border-color: rgba(249, 115, 22, 0.4);
+  color: var(--cyan-soft);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 /* ----- main area ------------------------------------------------------ */
@@ -170,11 +170,11 @@
   justify-content: center;
   gap: 6px;
   padding: clamp(12px, 1.8vw, 20px) 10px clamp(10px, 1.6vw, 16px);
-  border: 1px solid #222b36;
+  border: 1px solid #1e2c48;
   border-radius: 14px;
-  background: linear-gradient(180deg, #161c23, #10151b);
+  background: linear-gradient(180deg, #101a2e, #0a111d);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(196, 224, 255, 0.06),
     inset 0 -18px 30px -24px rgba(0, 0, 0, 0.8);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
@@ -199,7 +199,7 @@
    the lit digits sit on top, right-aligned, like a real segment display. */
 .score-ghost {
   display: block;
-  color: rgba(251, 146, 60, 0.08);
+  color: rgba(96, 165, 250, 0.09);
   text-shadow: none;
   font-size: clamp(38px, 5vw, 58px);
   line-height: 1;
@@ -241,17 +241,17 @@
   text-transform: uppercase;
 }
 
-/* Made-shot state: digits flash green, panel glows */
+/* Made-shot state: digits flash electric cyan, panel glows */
 .sb-player.is-scored {
-  border-color: rgba(34, 197, 94, 0.5);
+  border-color: rgba(34, 211, 238, 0.55);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 0 34px -8px rgba(34, 197, 94, 0.5);
+    inset 0 1px 0 rgba(196, 224, 255, 0.06),
+    0 0 36px -8px rgba(34, 211, 238, 0.55);
 }
 
 .sb-player.is-scored .score-roll {
-  color: var(--green-bright);
-  text-shadow: 0 0 18px rgba(74, 222, 128, 0.65);
+  color: var(--cyan-soft);
+  text-shadow: 0 0 20px rgba(103, 232, 249, 0.75);
 }
 
 .score-roll {
@@ -271,14 +271,14 @@
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.06em;
-  color: var(--green-bright);
-  background: rgba(34, 197, 94, 0.14);
-  border: 1px solid rgba(34, 197, 94, 0.45);
+  color: var(--cyan-soft);
+  background: rgba(34, 211, 238, 0.13);
+  border: 1px solid rgba(34, 211, 238, 0.5);
   border-radius: 999px;
   padding: 2px 8px;
   opacity: 0;
   pointer-events: none;
-  text-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
+  text-shadow: 0 0 11px rgba(103, 232, 249, 0.9);
 }
 
 .plus-chip.is-live {
@@ -316,10 +316,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 10px 10px;
-  border: 1px solid #1e2833;
+  border: 1px solid #1c2b47;
   border-radius: 14px;
   background:
-    radial-gradient(120px 70px at 50% 30%, rgba(249, 115, 22, 0.07), transparent 75%),
+    radial-gradient(120px 70px at 50% 30%, rgba(59, 130, 246, 0.1), transparent 75%),
     var(--panel-deep);
   box-shadow: inset 0 2px 14px rgba(0, 0, 0, 0.55);
   min-height: 168px;
@@ -369,24 +369,25 @@
 }
 
 .hoop-mount {
-  stroke: #2a3542;
+  stroke: #263a5c;
   stroke-width: 5;
 }
 
 .hoop-board {
-  fill: rgba(148, 163, 184, 0.07);
-  stroke: rgba(203, 213, 225, 0.4);
+  fill: rgba(147, 197, 253, 0.07);
+  stroke: rgba(191, 219, 254, 0.42);
   stroke-width: 1.6;
 }
 
 .hoop-target {
   fill: none;
-  stroke: rgba(249, 115, 22, 0.75);
+  stroke: rgba(34, 211, 238, 0.8);
   stroke-width: 1.6;
+  filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.6));
 }
 
 .hoop-bracket {
-  fill: #2a3542;
+  fill: #263a5c;
 }
 
 .hoop-rim-back {
@@ -404,7 +405,7 @@
 
 .hoop-net path {
   fill: none;
-  stroke: #e2e8f0;
+  stroke: #dbeafe;
   stroke-width: 1.1;
   stroke-linecap: round;
 }
@@ -471,6 +472,39 @@
   }
 }
 
+/* Electric burst: bolts radiating from the rim on a made shot */
+.hoop-burst path {
+  fill: none;
+  stroke: var(--cyan-soft);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.sb-stage.is-make .hoop-burst path {
+  animation: burst-zap 0.5s steps(3, jump-none) 0.02s;
+  filter: drop-shadow(0 0 5px rgba(103, 232, 249, 0.95));
+}
+
+@keyframes burst-zap {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.3;
+  }
+  75% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 .stage-swish {
   position: absolute;
   left: 0;
@@ -482,8 +516,8 @@
   font-size: 15px;
   letter-spacing: 0.42em;
   text-indent: 0.42em;
-  color: var(--orange-soft);
-  text-shadow: 0 0 16px rgba(251, 146, 60, 0.9);
+  color: var(--cyan-soft);
+  text-shadow: 0 0 18px rgba(103, 232, 249, 0.95);
   opacity: 0;
   pointer-events: none;
 }
@@ -536,7 +570,7 @@
   justify-content: space-between;
   gap: 14px;
   padding: 10px 20px 11px;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  border-top: 1px solid rgba(148, 184, 226, 0.12);
   flex-wrap: wrap;
 }
 
@@ -586,14 +620,26 @@
 }
 
 .shot-ball {
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5));
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(59, 130, 246, 0.35));
 }
 
-.shot-ball svg,
-.shot-ghost svg {
+.shot-ball svg {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* The trail is electric energy rather than ball copies */
+.shot-ghost {
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(224, 247, 255, 0.9),
+    rgba(103, 232, 249, 0.55) 35%,
+    rgba(59, 130, 246, 0.3) 58%,
+    transparent 72%
+  );
+  filter: blur(0.6px);
 }
 
 /* ----- responsive ----------------------------------------------------- */

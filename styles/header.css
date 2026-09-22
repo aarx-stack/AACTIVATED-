@@ -1,0 +1,226 @@
+/* Brand header: "Home" eyebrow + AACTIVATED RX neon title + electricity. */
+
+.brand {
+  position: relative;
+  text-align: center;
+  padding: clamp(18px, 3.5vw, 34px) 0 clamp(18px, 3vw, 28px);
+}
+
+.brand-home {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  text-transform: uppercase;
+  color: #7fb0e6;
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.55);
+  margin-bottom: clamp(8px, 1.6vw, 14px);
+}
+
+.brand-mark {
+  position: relative;
+  display: inline-block;
+  padding: 4px 10px;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(30px, 6.4vw, 62px);
+  line-height: 1.06;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  text-transform: uppercase;
+  color: #eef7ff;
+  text-shadow:
+    0 0 5px rgba(147, 197, 253, 0.95),
+    0 0 16px rgba(59, 130, 246, 0.75),
+    0 0 40px rgba(37, 99, 235, 0.45),
+    0 0 80px rgba(34, 211, 238, 0.22);
+  animation: brand-breathe 4.5s ease-in-out infinite;
+}
+
+@keyframes brand-breathe {
+  0%,
+  100% {
+    text-shadow:
+      0 0 5px rgba(147, 197, 253, 0.95),
+      0 0 16px rgba(59, 130, 246, 0.75),
+      0 0 40px rgba(37, 99, 235, 0.45),
+      0 0 80px rgba(34, 211, 238, 0.22);
+  }
+  50% {
+    text-shadow:
+      0 0 6px rgba(147, 197, 253, 1),
+      0 0 22px rgba(59, 130, 246, 0.9),
+      0 0 52px rgba(37, 99, 235, 0.6),
+      0 0 96px rgba(34, 211, 238, 0.32);
+  }
+}
+
+/* Neon underline with a slow energy sweep */
+.brand-rule {
+  position: relative;
+  width: min(78%, 560px);
+  height: 2px;
+  margin: clamp(12px, 2vw, 18px) auto 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(59, 130, 246, 0.85) 22%,
+    rgba(103, 232, 249, 0.95) 50%,
+    rgba(59, 130, 246, 0.85) 78%,
+    transparent
+  );
+  box-shadow:
+    0 0 10px rgba(59, 130, 246, 0.75),
+    0 0 26px rgba(34, 211, 238, 0.35);
+  overflow: hidden;
+}
+
+.brand-rule::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 70px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(226, 248, 255, 0.95), transparent);
+  animation: rule-sweep 5.5s ease-in-out infinite;
+}
+
+@keyframes rule-sweep {
+  0% {
+    left: -80px;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  45% {
+    left: calc(100% + 10px);
+    opacity: 1;
+  }
+  46%,
+  100% {
+    left: calc(100% + 10px);
+    opacity: 0;
+  }
+}
+
+/* Electricity bolts — invisible until they flicker */
+.brand-bolt {
+  position: absolute;
+  color: var(--cyan-soft);
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(103, 232, 249, 0.95)) drop-shadow(0 0 14px rgba(59, 130, 246, 0.7));
+}
+
+.bolt-tl {
+  top: -14px;
+  left: -22px;
+}
+
+.bolt-tr {
+  top: -12px;
+  right: -20px;
+  transform: scaleX(-1);
+}
+
+.bolt-bl {
+  bottom: -8px;
+  left: -14px;
+}
+
+.bolt-br {
+  bottom: -14px;
+  right: -24px;
+}
+
+.bolt-mid {
+  top: -18px;
+  left: 50%;
+  margin-left: -12px;
+}
+
+.brand-bolt.is-zapping {
+  animation: bolt-zap 0.34s steps(3, jump-none);
+}
+
+@keyframes bolt-zap {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  55% {
+    opacity: 0.35;
+  }
+  80% {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.bolt-tr.is-zapping {
+  animation-name: bolt-zap-flipped;
+}
+
+@keyframes bolt-zap-flipped {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.35;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand-home {
+    font-size: 11px;
+  }
+
+  .bolt-tl,
+  .bolt-bl {
+    left: -10px;
+  }
+
+  .bolt-tr,
+  .bolt-br {
+    right: -10px;
+  }
+}
+
+/* Reduced motion: static neon, no flicker or sweep (JS also stops zaps) */
+@media (prefers-reduced-motion: reduce) {
+  .brand-title {
+    animation: none;
+  }
+
+  .brand-rule::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .brand-bolt {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}

@@ -50,7 +50,7 @@ export class Scoreboard {
         'header',
         { class: 'sb-top' },
         el('span', { class: 'sb-dot', 'aria-hidden': 'true' }),
-        el('h1', { class: 'sb-title', text: 'TASK SCOREBOARD' }),
+        el('h2', { class: 'sb-title', text: 'TASK SCOREBOARD' }),
         el('span', { class: 'sb-dot', 'aria-hidden': 'true' }),
         el('span', { class: 'sb-top-right' }, this.clockEl, this.soundBtn),
       ),

@@ -14,8 +14,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(1100px 420px at 50% -140px, rgba(249, 115, 22, 0.09), transparent 70%),
-    radial-gradient(900px 500px at 85% 110%, rgba(59, 130, 246, 0.05), transparent 70%),
+    radial-gradient(1100px 460px at 50% -140px, rgba(37, 99, 235, 0.14), transparent 70%),
+    radial-gradient(760px 420px at 12% 8%, rgba(34, 211, 238, 0.05), transparent 70%),
+    radial-gradient(900px 500px at 88% 110%, rgba(59, 130, 246, 0.06), transparent 70%),
     var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
@@ -45,11 +46,11 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(249, 115, 22, 0.35);
+  background: rgba(59, 130, 246, 0.4);
 }
 
 :focus-visible {
-  outline: 2px solid var(--orange-bright);
+  outline: 2px solid var(--blue-bright);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -115,11 +116,11 @@ button:disabled {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--orange-bright), var(--orange));
-  color: #180d04;
+  background: linear-gradient(180deg, var(--blue-bright), var(--blue-deep));
+  color: #041022;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 8px 18px -10px rgba(249, 115, 22, 0.65);
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 8px 20px -10px rgba(59, 130, 246, 0.75);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -191,8 +192,8 @@ button:disabled {
 
 .field-input {
   width: 100%;
-  background: #0c1116;
-  border: 1px solid #26303c;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 10px;
   padding: 10px 12px;
   color: var(--white);
@@ -209,7 +210,7 @@ button:disabled {
 
 .field-input:focus {
   outline: none;
-  border-color: rgba(249, 115, 22, 0.65);
+  border-color: rgba(96, 165, 250, 0.7);
   box-shadow: var(--focus-ring);
 }
 
@@ -252,7 +253,7 @@ button:disabled {
 /* Subtle scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #26303c transparent;
+  scrollbar-color: #1d2a42 transparent;
 }
 
 *::-webkit-scrollbar {
@@ -261,7 +262,7 @@ button:disabled {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #26303c;
+  background: #1d2a42;
   border-radius: 8px;
   border: 2px solid var(--bg);
 }

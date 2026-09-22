@@ -35,14 +35,21 @@
 :root {
   color-scheme: dark;
 
-  /* Palette */
-  --bg: #080a0d;
-  --panel: #10151b;
-  --panel-deep: #0b0f14;
-  --card: #161c23;
-  --card-border: #232c37;
-  --line: #1e2833;
-  --line-soft: rgba(148, 163, 184, 0.12);
+  /* Palette — deep navy tech ops with electric blue neon.
+     Orange stays reserved for the basketball itself (ball, rim). */
+  --bg: #04070e;
+  --panel: #0a111d;
+  --panel-deep: #070c15;
+  --card: #0e1626;
+  --card-border: #1d2a42;
+  --line: #16233a;
+  --line-soft: rgba(148, 184, 226, 0.12);
+
+  --blue: #3b82f6;
+  --blue-bright: #60a5fa;
+  --blue-deep: #2563eb;
+  --cyan: #22d3ee;
+  --cyan-soft: #67e8f9;
 
   --orange: #f97316;
   --orange-bright: #fb923c;
@@ -50,14 +57,13 @@
   --red: #ef4444;
   --red-soft: #f87171;
   --amber: #f59e0b;
-  --blue: #3b82f6;
   --green: #22c55e;
   --green-bright: #4ade80;
 
   --white: #f8fafc;
-  --text: #e2e8f0;
-  --text-strong: #f1f5f9;
-  --muted: #94a3b8;
+  --text: #dbe7f5;
+  --text-strong: #eef4fb;
+  --muted: #92a6c0;
   --muted-deep: #64748b;
 
   /* Category tones as RGB triplets, so alpha variants stay cheap:
@@ -67,6 +73,7 @@
   --rgb-red: 249 88 44; /* hot: red-orange blend */
   --rgb-green: 34 197 94;
   --rgb-orange: 249 115 22;
+  --rgb-cyan: 34 211 238;
 
   /* Typography */
   --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -74,13 +81,17 @@
   --font-led: 'DSEG7', ui-monospace, 'SF Mono', Menlo, monospace;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
+  /* Form surfaces */
+  --input-bg: #070d18;
+  --input-border: #23334f;
+
   /* Shape & depth */
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 9px;
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 24px -18px rgba(0, 0, 0, 0.9);
+  --shadow-card: 0 1px 0 rgba(196, 224, 255, 0.04) inset, 0 10px 24px -18px rgba(0, 0, 0, 0.9);
   --shadow-pop: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
-  --focus-ring: 0 0 0 3px rgba(249, 115, 22, 0.28);
+  --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 /* Tone helpers — applied via .tone-blue / .tone-amber / .tone-red / .tone-green */

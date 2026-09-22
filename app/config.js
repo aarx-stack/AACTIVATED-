@@ -45,6 +45,28 @@ export const STORAGE_KEY = 'aarx.task-scoreboard.v1';
 export const SOUND_PREF_KEY = 'aarx.task-scoreboard.sound';
 
 /**
+ * Automatic email notifications (see app/notify.js).
+ *
+ * OFF until at least one recipient (or a webhook URL) is set — the app is
+ * fully functional without it. Two delivery modes, no backend required:
+ *
+ * 1. `recipients`: email addresses, delivered through FormSubmit
+ *    (https://formsubmit.co — free, no account). The FIRST notification
+ *    sends each recipient a one-time activation email; after they click
+ *    "Activate", every later notification arrives normally.
+ * 2. `webhookUrl`: instead POSTs the event as JSON to your own endpoint
+ *    (Zapier / Make / n8n / custom server) and no FormSubmit call is made —
+ *    useful when you want your own email template or a shared audit trail.
+ *
+ * `notifyOn` picks which events send email.
+ */
+export const EMAIL_NOTIFICATIONS = {
+  recipients: /** @type {string[]} */ ([]), // e.g. ['ops@example.com']
+  notifyOn: { completed: true, created: false, deleted: false },
+  webhookUrl: '',
+};
+
+/**
  * Normalize raw initials input ("  jg " -> "JG").
  * @param {string} raw
  */

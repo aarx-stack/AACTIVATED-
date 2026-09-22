@@ -79,6 +79,14 @@ export class HoopStage {
       `
       <g class="hoop-net net-front">${netPaths(true)}</g>
       <path d="M43 ${RIM_Y} A17 4.6 0 0 0 77 ${RIM_Y}" class="hoop-rim-front"/>
+      <g class="hoop-burst">
+        <path d="M38 ${RIM_Y - 4} l-5 -3 3 -1 -5 -4"/>
+        <path d="M82 ${RIM_Y - 4} l5 -3 -3 -1 5 -4"/>
+        <path d="M36 ${RIM_Y + 6} l-6 2 3 2 -5 3"/>
+        <path d="M84 ${RIM_Y + 6} l6 2 -3 2 5 3"/>
+        <path d="M52 ${RIM_Y - 9} l-2 -5 3 1 -1 -5"/>
+        <path d="M68 ${RIM_Y - 9} l2 -5 -3 1 1 -5"/>
+      </g>
     `,
     );
 

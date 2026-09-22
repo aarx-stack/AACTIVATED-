@@ -50,10 +50,10 @@ class ShotDirector {
     this.ball.appendChild(basketballSvg(44));
     /** @type {HTMLElement[]} */
     this.ghosts = [];
+    // Trail elements — styled as electric energy streaks in CSS.
     for (let i = 0; i < 3; i++) {
       const g = document.createElement('div');
       g.className = 'shot-ghost';
-      g.appendChild(basketballSvg(44));
       this.ghosts.push(g);
       this.layer.appendChild(g);
     }

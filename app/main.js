@@ -7,6 +7,8 @@
 
 import { store } from './store.js';
 import { el } from './dom.js';
+import { initNotifications } from './notify.js';
+import { BrandHeader } from './components/BrandHeader.js';
 import { Scoreboard } from './components/Scoreboard.js';
 import { TaskBoard } from './components/TaskBoard.js';
 import { CreateTaskModal } from './components/modals/CreateTaskModal.js';
@@ -20,6 +22,7 @@ const createModal = CreateTaskModal();
 const completeModal = CompleteTaskModal();
 const deleteModal = DeleteConfirmModal();
 
+const brand = new BrandHeader();
 const scoreboard = new Scoreboard();
 const board = new TaskBoard({
   onAddTask: () => createModal.open(),
@@ -45,15 +48,19 @@ store.subscribe((event) => {
 });
 
 root.append(
+  brand.el,
   scoreboard.el,
   storageBanner,
   board.el,
   el('footer', { class: 'app-footer' },
-    el('span', { text: 'Task Scoreboard' }),
+    el('span', { text: 'AACTIVATED RX · Task Scoreboard' }),
     el('span', { class: 'app-footer-sep', 'aria-hidden': 'true', text: '·' }),
     el('span', { text: 'Data is saved in this browser' }),
   ),
 );
+
+// Email notifications (no-op until configured in app/config.js).
+initNotifications();
 
 // Trigger a save probe so a storage problem surfaces immediately on load.
 store.save();
