@@ -58,7 +58,7 @@ button:disabled {
 .page {
   max-width: 1280px;
   margin: 0 auto;
-  padding: clamp(14px, 2.5vw, 28px) clamp(14px, 3vw, 28px) 40px;
+  padding: clamp(14px, 2.5vw, 28px) clamp(16px, 3vw, 28px) 40px;
 }
 
 .app-footer {
