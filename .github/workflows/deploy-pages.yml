@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["claude/3d-scrolling-website-s09aix"]
+    branches: ["claude/ecstatic-mendel-g2o2iq"]
   workflow_dispatch:
 
 permissions:

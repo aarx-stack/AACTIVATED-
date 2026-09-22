@@ -1,5 +1,7 @@
 # Task Scoreboard 🏀
 
+**Live site:** <https://aarx-stack.github.io/AACTIVATED-/>
+
 A team task-management dashboard with a professional basketball-arena scoreboard.
 Completing a task requires entering your initials — then a basketball is shot into
 the hoop on the scoreboard, and the moment it drops through the net your score
