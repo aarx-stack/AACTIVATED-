@@ -38,6 +38,7 @@ import {
  * @property {string} createdAt      ISO timestamp.
  * @property {string | null} completedAt
  * @property {string | null} completedBy   Player initials.
+ * @property {number | null} timeSpentMinutes  How long the task took (set at completion).
  * @property {string | null} shotId  Unique scoring-event id ("SHOT-1042").
  *
  * @typedef {Object} State
@@ -87,6 +88,10 @@ export function sanitizeTask(t) {
     createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
     completedAt: completed && typeof t.completedAt === 'string' ? t.completedAt : null,
     completedBy: completed && typeof t.completedBy === 'string' ? t.completedBy : null,
+    timeSpentMinutes:
+      completed && Number.isFinite(t.timeSpentMinutes) && t.timeSpentMinutes > 0
+        ? Math.round(t.timeSpentMinutes)
+        : null,
     shotId: completed ? (typeof t.shotId === 'string' ? t.shotId : `SHOT-${ticket}`) : null,
   };
 }
@@ -315,6 +320,7 @@ class Store {
       createdAt: new Date().toISOString(),
       completedAt: null,
       completedBy: null,
+      timeSpentMinutes: null,
       shotId: null,
     };
     if (this.backend) {
@@ -374,19 +380,25 @@ class Store {
   }
 
   /**
-   * Atomically commit a completion: status, completedBy, completedAt and the
-   * unique scoring event (shotId) are written together, then persisted once.
-   * Idempotent — a task that is already completed can never score again.
+   * Atomically commit a completion: status, completedBy, completedAt,
+   * timeSpentMinutes and the unique scoring event (shotId) are written
+   * together, then persisted once. Idempotent — a task that is already
+   * completed can never score again.
    * @param {string} id
    * @param {string} rawInitials
+   * @param {number | null} [timeSpentMinutes] Whole minutes the task took.
    * @returns {{ ok: true, task: Task } | { ok: false, reason: string }}
    */
-  completeTask(id, rawInitials) {
+  completeTask(id, rawInitials, timeSpentMinutes = null) {
     const task = this.getTask(id);
     if (!task) return { ok: false, reason: 'not-found' };
     if (task.status === 'completed' || task.shotId) return { ok: false, reason: 'already-completed' };
     const initials = normalizeInitials(rawInitials);
     if (!isValidPlayer(initials)) return { ok: false, reason: 'invalid-initials' };
+    const minutes =
+      Number.isFinite(timeSpentMinutes) && /** @type {number} */ (timeSpentMinutes) > 0
+        ? Math.round(/** @type {number} */ (timeSpentMinutes))
+        : null;
 
     if (this.backend) {
       /** @type {Task} */
@@ -395,6 +407,7 @@ class Store {
         status: 'completed',
         completedBy: initials,
         completedAt: new Date().toISOString(),
+        timeSpentMinutes: minutes,
         shotId: `SHOT-${task.ticketNumber}`,
       };
       // The snapshot echo (latency-compensated, effectively immediate)
@@ -406,6 +419,7 @@ class Store {
     task.status = 'completed';
     task.completedBy = initials;
     task.completedAt = new Date().toISOString();
+    task.timeSpentMinutes = minutes;
     task.shotId = `SHOT-${task.ticketNumber}`;
     this.save();
     this.emit({ type: 'task-completed', task });

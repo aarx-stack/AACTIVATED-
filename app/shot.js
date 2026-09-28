@@ -21,6 +21,7 @@ import { basketballSvg } from './dom.js';
  * @typedef {Object} ShotJob
  * @property {string} taskId
  * @property {string} initials
+ * @property {number | null} timeSpentMinutes
  * @property {{x: number, y: number} | null} origin  Launch point (client coords).
  * @property {boolean} committed
  * @property {boolean} finished
@@ -73,10 +74,11 @@ class ShotDirector {
    * Queue the completion shot for a task. The task must already be locked
    * via store.lockForCompletion (the modal does this); the director releases
    * the lock when the shot fully settles.
-   * @param {{ taskId: string, initials: string, origin?: {x:number,y:number} | null }} input
+   * @param {{ taskId: string, initials: string, timeSpentMinutes?: number | null,
+   *           origin?: {x:number,y:number} | null }} input
    */
-  enqueue({ taskId, initials, origin = null }) {
-    this.queue.push({ taskId, initials, origin, committed: false, finished: false });
+  enqueue({ taskId, initials, timeSpentMinutes = null, origin = null }) {
+    this.queue.push({ taskId, initials, timeSpentMinutes, origin, committed: false, finished: false });
     if (!this.running) this.run();
   }
 
@@ -88,7 +90,7 @@ class ShotDirector {
   commit(job) {
     if (job.committed) return;
     job.committed = true;
-    const result = store.completeTask(job.taskId, job.initials);
+    const result = store.completeTask(job.taskId, job.initials, job.timeSpentMinutes);
     if (result.ok) {
       // Make-shot feedback happens only on a real, first-time completion.
       try {

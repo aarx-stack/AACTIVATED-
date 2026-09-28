@@ -26,10 +26,11 @@ the scoreboard, and the moment it drops through the net your score counts up.
   automatic permanent ticket numbers (#1001, #1002, …), search (ticket, title,
   notes, initials), drag & drop between active columns, and an accessible
   "move to…" menu on each card's category chip
-- **Completion flow**: Complete → enter initials (normalized, validated against
-  the roster) → shot → task records `completedBy` + `completedAt` + a unique
-  `shotId`. Dragging a card onto Completed opens the same initials flow — it can
-  never be bypassed
+- **Completion flow**: click a task → enter initials (normalized, validated
+  against the roster) and how long it took (quick chips or free text: `45m`,
+  `1h 30m`, `1:30`, plain minutes) → green Complete Task → shot → task records
+  `completedBy` + `completedAt` + `timeSpentMinutes` + a unique `shotId`.
+  Dragging a card onto Completed opens the same flow — it can never be bypassed
 - **Derived scoreboard**: scores are always computed from the stored tasks
   (`count of completed tasks per player`), so deleting a completed task
   immediately lowers that player's total and a refresh always reconstructs the
@@ -114,7 +115,7 @@ Type checking: `npx tsc -p jsconfig.json` (JSDoc + `checkJs`, strict).
 {
   id, ticketNumber, title, notes,
   status: 'new' | 'medium' | 'hot' | 'completed',
-  createdAt, completedAt, completedBy, shotId
+  createdAt, completedAt, completedBy, timeSpentMinutes, shotId
 }
 ```
 

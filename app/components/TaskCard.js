@@ -12,7 +12,7 @@
 
 import { ACTIVE_STATUSES, statusDef } from '../config.js';
 import { store } from '../store.js';
-import { el, icon, formatDateTime } from '../dom.js';
+import { el, icon, formatDateTime, formatDuration } from '../dom.js';
 
 /**
  * @param {import('../store.js').Task} task
@@ -80,12 +80,28 @@ export function TaskCard(task, handlers) {
             icon('check', 14),
             el('span', {}, 'Completed by ', el('strong', { text: task.completedBy || '—' })),
           ),
-          task.completedAt &&
-            el('time', {
-              class: 'card-completed-at',
-              datetime: task.completedAt,
-              text: formatDateTime(task.completedAt),
-            }),
+          el(
+            'span',
+            { class: 'card-completed-meta' },
+            task.timeSpentMinutes
+              ? el(
+                  'span',
+                  {
+                    class: 'card-time',
+                    title: 'Time spent',
+                    'aria-label': `Time spent: ${formatDuration(task.timeSpentMinutes)}`,
+                  },
+                  icon('clock', 12),
+                  el('span', { text: formatDuration(task.timeSpentMinutes) }),
+                )
+              : null,
+            task.completedAt &&
+              el('time', {
+                class: 'card-completed-at',
+                datetime: task.completedAt,
+                text: formatDateTime(task.completedAt),
+              }),
+          ),
         ),
         deleteBtn,
       ),

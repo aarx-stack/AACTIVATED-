@@ -12,7 +12,7 @@
 
 import { EMAIL_NOTIFICATIONS, PLAYERS } from './config.js';
 import { store } from './store.js';
-import { formatDateTime } from './dom.js';
+import { formatDateTime, formatDuration } from './dom.js';
 
 /** @type {Record<string, 'completed' | 'created' | 'deleted'>} */
 const EVENT_KINDS = {
@@ -59,6 +59,7 @@ async function send(kind, task) {
     `Status: ${task.status}`,
     kind === 'completed' && task.completedBy ? `Completed by: ${task.completedBy}` : null,
     kind === 'completed' && task.completedAt ? `Completed at: ${formatDateTime(task.completedAt)}` : null,
+    kind === 'completed' && task.timeSpentMinutes ? `Time spent: ${formatDuration(task.timeSpentMinutes)}` : null,
     kind === 'completed' && task.shotId ? `Shot: ${task.shotId} — MADE` : null,
     '',
     `Scoreboard: ${scoreline} (team total ${store.teamTotal()})`,

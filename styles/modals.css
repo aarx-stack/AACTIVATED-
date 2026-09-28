@@ -220,6 +220,28 @@ dialog.modal > .modal-foot {
   text-indent: 0.22em;
 }
 
+/* "How long did it take?" — compact duration chips + centered input */
+.time-picks {
+  gap: 6px;
+}
+
+.time-pick {
+  min-width: 0;
+  padding: 8px 0;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-indent: 0.08em;
+}
+
+.time-input {
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-indent: 0.1em;
+}
+
 .btn-shoot .btn-ball {
   font-size: 14px;
   line-height: 1;

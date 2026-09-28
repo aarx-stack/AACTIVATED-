@@ -35,6 +35,7 @@ function taskBody(t) {
     createdAt: t.createdAt,
     completedAt: t.completedAt,
     completedBy: t.completedBy,
+    timeSpentMinutes: t.timeSpentMinutes,
     shotId: t.shotId,
   };
 }

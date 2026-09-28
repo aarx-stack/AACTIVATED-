@@ -52,6 +52,7 @@ const ICON_PATHS = {
   soundOn:
     '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>',
   soundOff: '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v4.8l3.2 1.9"/>',
 };
 
 /**
@@ -106,6 +107,39 @@ export function basketballSvg(size = 40) {
     <ellipse cx="14" cy="11.5" rx="7.5" ry="5" fill="#FFFFFF" opacity=".18" transform="rotate(-28 14 11.5)"/>
   `;
   return svg;
+}
+
+/**
+ * Parse a human duration into whole minutes, or null if unreadable.
+ * Accepts "45", "45m", "1h", "1h 30", "1h30m", "1.5h", "1:30".
+ * @param {string} raw
+ * @returns {number | null}
+ */
+export function parseDuration(raw) {
+  const s = (raw || '').trim().toLowerCase();
+  if (!s) return null;
+  let m = s.match(/^(\d{1,3}):([0-5]?\d)$/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  m = s.match(
+    /^(\d{1,3}(?:[.,]\d+)?)\s*(?:h|hr|hrs|hour|hours)\s*(?:(\d{1,3})\s*(?:m|min|mins|minute|minutes)?)?$/,
+  );
+  if (m) return Math.round(parseFloat(m[1].replace(',', '.')) * 60 + (m[2] ? Number(m[2]) : 0));
+  m = s.match(/^(\d{1,4}(?:[.,]\d+)?)\s*(?:m|min|mins|minute|minutes)?$/);
+  if (m) return Math.round(parseFloat(m[1].replace(',', '.')));
+  return null;
+}
+
+/**
+ * Format minutes like "45m", "1h", "1h 30m".
+ * @param {number} minutes
+ */
+export function formatDuration(minutes) {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
 }
 
 /**
