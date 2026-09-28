@@ -96,6 +96,18 @@ export const EMAIL_NOTIFICATIONS = {
 - Left unconfigured (the default), no network calls are made. Sending is
   fire-and-forget: a failed email can never affect tasks or scores.
 
+**Orders → tasks (Sellavi webhook)**: `supabase/functions/sellavi-order/`
+is a Supabase Edge Function that turns store-order webhooks into board
+tasks — idempotent per order, atomic ticket numbers, optional Slack
+announcement. Deploy it in the Supabase dashboard (Edge Functions →
+Deploy new function, name `sellavi-order`, paste the file, **Verify JWT
+OFF**), set secrets `HOOK_KEY` (shared secret) and optionally
+`SLACK_WEBHOOK_URL`, `ORDER_CATEGORY` (new|medium|hot), `ORDER_ASSIGNEE`
+(initials). Then point the store's "order created" webhook at
+`https://<project-ref>.functions.supabase.co/sellavi-order?key=<HOOK_KEY>`.
+The mapper reads common payload shapes (order number, customer, items,
+total) and falls back gracefully on unknown ones.
+
 **Slack**: `SLACK_NOTIFICATIONS` in `app/config.js` posts task events to a
 Slack channel (e.g. `#task_board`) via an Incoming Webhook — create one at
 <https://api.slack.com/apps> (New App → Incoming Webhooks → On → Add New
