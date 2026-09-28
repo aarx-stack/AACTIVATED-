@@ -45,6 +45,24 @@ export const STORAGE_KEY = 'aarx.task-scoreboard.v1';
 export const SOUND_PREF_KEY = 'aarx.task-scoreboard.sound';
 
 /**
+ * Shared Supabase board (see app/backend.js and supabase-setup.sql).
+ *
+ * Fill in `url` and `anonKey` from a free supabase.com project
+ * (Project Settings → API → "Project URL" and the "anon" "public" key)
+ * after running supabase-setup.sql in its SQL Editor — then everyone who
+ * opens this site shares one live task board. Both values are designed
+ * to be public; access is limited by the row-level-security policies in
+ * the setup script. Left empty, the app stores tasks per browser.
+ * (`window.__SUPABASE_OVERRIDE` exists for tests/self-hosters.)
+ */
+export const SUPABASE = (typeof window !== 'undefined' &&
+  /** @type {any} */ (window).__SUPABASE_OVERRIDE) || {
+  url: '',
+  anonKey: '',
+  pollMs: 5000,
+};
+
+/**
  * Automatic email notifications (see app/notify.js).
  *
  * OFF until at least one recipient (or a webhook URL) is set — the app is

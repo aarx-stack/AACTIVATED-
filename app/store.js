@@ -210,6 +210,13 @@ class Store {
     }
   }
 
+  noteBackendRecovered() {
+    if (this.backendDegraded) {
+      this.backendDegraded = false;
+      this.emit({ type: 'backend-recovered' });
+    }
+  }
+
   /**
    * Replace state from a shared-database snapshot and emit what changed.
    * @param {Task[]} tasks

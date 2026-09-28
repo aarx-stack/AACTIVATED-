@@ -77,6 +77,8 @@ store.subscribe((event) => {
     storageBanner.textContent =
       'Heads up: the shared task database is unreachable right now — recent changes may not have saved for the rest of the team.';
     storageBanner.hidden = false;
+  } else if (event.type === 'backend-recovered') {
+    storageBanner.hidden = true;
   }
 });
 

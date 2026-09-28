@@ -35,14 +35,20 @@ the scoreboard, and the moment it drops through the net your score counts up.
   (`count of completed tasks per player`), so deleting a completed task
   immediately lowers that player's total and a refresh always reconstructs the
   right numbers
-- **Storage** (`app/store.js` + `app/backend.js`): running as a claude.ai
-  artifact, tasks live in the artifact's shared realtime database — every
-  device and viewer sees the same board and updates arrive live, no refresh
-  needed (ticket numbers stay unique via a short lease on a counter document,
-  and this browser's existing local tasks are migrated in once). Anywhere else
-  (GitHub Pages, localhost) storage falls back to per-browser `localStorage`
-  with multi-tab sync; wiring a real backend later means implementing the
-  three-method `Backend` interface
+- **Storage** (`app/store.js` + `app/backend.js`), best available at startup:
+  1. *claude.ai artifact*: the artifact's shared realtime database — live
+     updates, lease-guarded unique tickets, one-time migration of this
+     browser's existing tasks.
+  2. *Supabase* (when `SUPABASE` in `app/config.js` is filled in): one shared
+     Postgres-backed board for **anyone who opens the site** — plain REST, no
+     SDK, light polling (5s + instant after every action and on tab focus),
+     atomic ticket numbers via an `UPDATE … RETURNING` function, same one-time
+     migration. Set up a free project with `supabase-setup.sql` (SQL Editor →
+     paste → Run), then copy Project Settings → API → Project URL + anon
+     public key into the config. Both values are publishable; the RLS
+     policies in the setup script are the access boundary — the board is
+     deliberately open to anyone with the link.
+  3. Neither: per-browser `localStorage` with multi-tab sync.
 - **Accessibility**: keyboard shortcuts (`/` search, `n` new task), focus
   management in modals, live-region score announcements, labelled controls, and
   a reduced-motion mode that skips the flight but keeps every update
