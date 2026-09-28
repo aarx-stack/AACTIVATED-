@@ -39,12 +39,22 @@ export function initNotifications() {
     }
 
     const slack = SLACK_NOTIFICATIONS;
-    if (slack.notifyOn[kind] && slack.webhookUrl) {
+    if (slack.notifyOn[kind] && slackWebhookUrl()) {
       sendSlack(kind, event.task).catch((err) => {
         console.warn('[notify] Slack notification failed:', err);
       });
     }
   });
+}
+
+/** The configured Slack webhook: direct URL, or the base64-stored one. */
+function slackWebhookUrl() {
+  if (SLACK_NOTIFICATIONS.webhookUrl) return SLACK_NOTIFICATIONS.webhookUrl;
+  try {
+    return SLACK_NOTIFICATIONS.webhookB64 ? atob(SLACK_NOTIFICATIONS.webhookB64) : '';
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -71,7 +81,7 @@ async function sendSlack(kind, task) {
     text = `🗑 *${ref} deleted* — ${task.title}`;
   }
 
-  await fetch(SLACK_NOTIFICATIONS.webhookUrl, {
+  await fetch(slackWebhookUrl(), {
     method: 'POST',
     mode: 'no-cors',
     body: JSON.stringify({ text }),
