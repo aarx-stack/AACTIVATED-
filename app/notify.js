@@ -11,7 +11,7 @@
  * task state, scoring or the shot animation.
  */
 
-import { EMAIL_NOTIFICATIONS, SLACK_NOTIFICATIONS, PLAYERS } from './config.js';
+import { EMAIL_NOTIFICATIONS, SLACK_NOTIFICATIONS, PLAYERS, statusDef } from './config.js';
 import { store } from './store.js';
 import { formatDateTime, formatDuration } from './dom.js';
 
@@ -76,7 +76,8 @@ async function sendSlack(kind, task) {
       `🏀 *${ref} completed by ${task.completedBy}* — ${task.title}${time}\n` +
       `Scoreboard: ${scoreline} · team total ${store.teamTotal()}`;
   } else if (kind === 'created') {
-    text = `🆕 *${ref} created* — ${task.title} (${task.status})`;
+    const category = statusDef(task.status).label;
+    text = `🆕 *New task has arrived* — ${ref} ${task.title} (${category})`;
   } else {
     text = `🗑 *${ref} deleted* — ${task.title}`;
   }

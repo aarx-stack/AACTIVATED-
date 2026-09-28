@@ -106,7 +106,7 @@ export const SLACK_NOTIFICATIONS = {
    */
   webhookB64:
     'aHR0cHM6Ly9ob29rcy5zbGFjay5jb20vc2VydmljZXMvVDBCUzk3SEFCMEQvQjBDNVdCWkxUSzIvRWZ2MHRxWVpkdFdWQkZEUVVQUFJYMFhz',
-  notifyOn: { completed: true, created: false, deleted: false },
+  notifyOn: { completed: true, created: true, deleted: false },
 };
 
 /**
