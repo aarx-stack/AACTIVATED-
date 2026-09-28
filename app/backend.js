@@ -39,6 +39,7 @@ function taskBody(t) {
     title: t.title,
     notes: t.notes,
     status: t.status,
+    kind: t.kind,
     assignedTo: t.assignedTo,
     createdAt: t.createdAt,
     completedAt: t.completedAt,

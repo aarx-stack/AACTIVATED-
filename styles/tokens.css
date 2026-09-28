@@ -115,3 +115,7 @@
   --tone: var(--rgb-orange);
   --tone-strong: #fb923c;
 }
+.tone-cyan {
+  --tone: var(--rgb-cyan);
+  --tone-strong: var(--cyan-soft);
+}

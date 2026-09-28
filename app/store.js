@@ -35,6 +35,7 @@ import {
  * @property {string} title
  * @property {string} notes
  * @property {StatusId} status
+ * @property {'task' | 'order'} kind  Regular task, or a store order (own columns).
  * @property {string | null} assignedTo   Player initials this task is assigned to.
  * @property {string} createdAt      ISO timestamp.
  * @property {string | null} completedAt
@@ -86,6 +87,9 @@ export function sanitizeTask(t) {
     title: t.title,
     notes: typeof t.notes === 'string' ? t.notes : '',
     status: t.status,
+    // Store orders get their own board lane. Older webhook-created rows
+    // carry no kind field, so the sellavi- id prefix also marks them.
+    kind: t.kind === 'order' || String(t.id || '').startsWith('sellavi-') ? 'order' : 'task',
     assignedTo: typeof t.assignedTo === 'string' && t.assignedTo ? t.assignedTo : null,
     createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
     completedAt: completed && typeof t.completedAt === 'string' ? t.completedAt : null,
@@ -327,6 +331,7 @@ class Store {
       title: cleanTitle,
       notes: notes.trim(),
       status,
+      kind: 'task',
       assignedTo: isValidPlayer(assignee) ? assignee : null,
       createdAt: new Date().toISOString(),
       completedAt: null,
@@ -359,6 +364,7 @@ class Store {
   moveTask(id, status) {
     const task = this.getTask(id);
     if (!task || task.status === 'completed' || this.isLocked(id)) return false;
+    if (task.kind === 'order') return false; // orders stay in their own lane
     if (!ACTIVE_STATUSES.includes(status) || task.status === status) return false;
     if (this.backend) {
       this.guardWrite(this.backend.writeTask({ ...task, status }));

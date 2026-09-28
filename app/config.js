@@ -37,8 +37,63 @@ export const STATUSES = [
 /** Statuses a task can be moved between without the completion flow. */
 export const ACTIVE_STATUSES = /** @type {StatusId[]} */ (['new', 'medium', 'hot']);
 
+/**
+ * Board columns. Regular tasks flow New/Medium/Hot → Completed; store
+ * orders (kind 'order') have their own lane: Orders → Completed Orders.
+ * `drop`: what happens when a card is dropped on the column —
+ * 'move' (category move), 'complete' (opens the initials flow), or null.
+ *
+ * @typedef {Object} ColumnDef
+ * @property {string} id
+ * @property {string} label
+ * @property {string} icon
+ * @property {string} tone
+ * @property {'move' | 'complete' | null} drop
+ * @property {string} emptyHint
+ */
+
+/** @type {ColumnDef[]} */
+export const COLUMNS = [
+  {
+    id: 'orders',
+    label: 'Orders',
+    icon: 'cart',
+    tone: 'cyan',
+    drop: null,
+    emptyHint: 'New store orders land here automatically.',
+  },
+  { id: 'new', label: 'New', icon: 'spark', tone: 'blue', drop: 'move', emptyHint: 'You can add a task using the + button.' },
+  { id: 'medium', label: 'Medium', icon: 'gauge', tone: 'amber', drop: 'move', emptyHint: 'You can add a task using the + button.' },
+  { id: 'hot', label: 'Hot', icon: 'flame', tone: 'red', drop: 'move', emptyHint: 'You can add a task using the + button.' },
+  {
+    id: 'completed',
+    label: 'Completed',
+    icon: 'check',
+    tone: 'green',
+    drop: 'complete',
+    emptyHint: 'Completed tasks land here after a made shot.',
+  },
+  {
+    id: 'completed-orders',
+    label: 'Completed Orders',
+    icon: 'cart',
+    tone: 'green',
+    drop: 'complete',
+    emptyHint: 'Completed orders land here after a made shot.',
+  },
+];
+
+/**
+ * Which column a task renders in.
+ * @param {{ kind?: string, status: string }} task
+ */
+export function columnIdFor(task) {
+  if (task.kind === 'order') return task.status === 'completed' ? 'completed-orders' : 'orders';
+  return task.status;
+}
+
 /** Shown in the footer so it's easy to tell which build a tab is running. */
-export const APP_VERSION = 'v10';
+export const APP_VERSION = 'v11';
 
 /** First ticket number ever issued. */
 export const FIRST_TICKET = 1001;

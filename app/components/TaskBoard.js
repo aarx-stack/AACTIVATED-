@@ -7,7 +7,7 @@
  * completed first).
  */
 
-import { STATUSES } from '../config.js';
+import { COLUMNS, columnIdFor } from '../config.js';
 import { store } from '../store.js';
 import { el, icon } from '../dom.js';
 import { SearchBar, taskMatches } from './SearchBar.js';
@@ -94,15 +94,15 @@ export class TaskBoard {
     const all = store.getTasks();
     const searching = this.query.length > 0;
     let matches = 0;
-    const columns = STATUSES.map((def) => {
-      let tasks = all.filter((t) => t.status === def.id && taskMatches(t, this.query));
+    const columns = COLUMNS.map((col) => {
+      let tasks = all.filter((t) => columnIdFor(t) === col.id && taskMatches(t, this.query));
       matches += tasks.length;
-      if (def.id === 'completed') {
+      if (col.id === 'completed' || col.id === 'completed-orders') {
         tasks = [...tasks].sort(
           (a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''),
         );
       }
-      return TaskColumn(def, tasks, {
+      return TaskColumn(col, tasks, {
         onComplete: this.handlers.onComplete,
         onDelete: this.handlers.onDelete,
         onDropToComplete: this.handlers.onDropToComplete,

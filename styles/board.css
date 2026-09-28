@@ -99,8 +99,8 @@
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
   align-items: start;
 }
 
@@ -149,9 +149,11 @@
 .column-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.22em;
+  font-size: 12.5px;
+  letter-spacing: 0.16em;
+  line-height: 1.15;
   color: var(--text-strong);
+  min-width: 0;
 }
 
 .column-count {
@@ -203,7 +205,8 @@
 }
 
 /* Completing by drag still requires initials — say so */
-.board-column.col-completed.is-drop-target .column-list::after {
+.board-column.col-completed.is-drop-target .column-list::after,
+.board-column.col-completed-orders.is-drop-target .column-list::after {
   content: '🏀 Drop to complete — initials required';
 }
 
@@ -261,7 +264,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+}
+
+.card-head .chip-menu-wrap,
+.card-head > .status-chip {
+  margin-left: auto;
 }
 
 .card-head-left {
@@ -643,7 +652,14 @@
 
 /* ----- responsive ----------------------------------------------------- */
 
-@media (max-width: 1100px) {
+@media (max-width: 1240px) {
+  .board-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 900px) {
   .board-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

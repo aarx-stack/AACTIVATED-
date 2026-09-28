@@ -1,25 +1,25 @@
 // @ts-check
 
 /**
- * One board column (New / Medium / Hot / Completed): header with live
- * count, task list, empty state, and drop-zone behavior. Dropping a task
- * on Completed never bypasses the completion flow — it opens the initials
- * modal instead.
+ * One board column (Orders / New / Medium / Hot / Completed / Completed
+ * Orders): header with live count, task list, empty state, and drop-zone
+ * behavior. Dropping a task on either completed column never bypasses the
+ * completion flow — it opens the initials popup instead. Orders can't be
+ * moved into category columns; they live in their own lane until
+ * completed.
  */
 
-import { ACTIVE_STATUSES } from '../config.js';
 import { store } from '../store.js';
 import { el, icon } from '../dom.js';
 import { TaskCard } from './TaskCard.js';
 
 /**
- * @param {import('../config.js').StatusDef} def
+ * @param {import('../config.js').ColumnDef} col
  * @param {import('../store.js').Task[]} tasks   Already filtered + sorted.
  * @param {{ onComplete: Function, onDelete: Function,
  *           onDropToComplete: (taskId: string) => void, searching: boolean }} opts
  */
-export function TaskColumn(def, tasks, opts) {
-  const isCompletedCol = def.id === 'completed';
+export function TaskColumn(col, tasks, opts) {
   const count = tasks.length;
 
   const list = el(
@@ -38,18 +38,14 @@ export function TaskColumn(def, tasks, opts) {
       el(
         'div',
         { class: 'column-empty' },
-        el('span', { class: 'column-empty-icon' }, icon(def.icon, 20)),
+        el('span', { class: 'column-empty-icon' }, icon(col.icon, 20)),
         el('p', {
           class: 'column-empty-title',
           text: opts.searching ? 'No matching tasks' : 'No tasks here',
         }),
         el('p', {
           class: 'column-empty-hint',
-          text: opts.searching
-            ? 'Try a different search.'
-            : isCompletedCol
-              ? 'Completed tasks land here after a made shot.'
-              : 'You can add a task using the + button.',
+          text: opts.searching ? 'Try a different search.' : col.emptyHint,
         }),
       ),
     );
@@ -58,48 +54,50 @@ export function TaskColumn(def, tasks, opts) {
   const column = el(
     'section',
     {
-      class: `board-column col-${def.id} tone-${def.tone}`,
-      'aria-label': `${def.label} column, ${count} task${count === 1 ? '' : 's'}`,
+      class: `board-column col-${col.id} tone-${col.tone}`,
+      'aria-label': `${col.label} column, ${count} task${count === 1 ? '' : 's'}`,
     },
     el(
       'header',
       { class: 'column-head' },
-      el('span', { class: 'column-icon' }, icon(def.icon, 15)),
-      el('h2', { class: 'column-title', text: def.label.toUpperCase() }),
+      el('span', { class: 'column-icon' }, icon(col.icon, 15)),
+      el('h2', { class: 'column-title', text: col.label.toUpperCase() }),
       el('span', { class: 'column-count', 'aria-hidden': 'true', text: String(count) }),
     ),
     list,
   );
 
   // ----- drop zone ------------------------------------------------------
-  let dragDepth = 0;
-  column.addEventListener('dragover', (e) => {
-    if (!e.dataTransfer?.types.includes('text/task-id')) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  });
-  column.addEventListener('dragenter', (e) => {
-    if (!e.dataTransfer?.types.includes('text/task-id')) return;
-    dragDepth += 1;
-    column.classList.add('is-drop-target');
-  });
-  column.addEventListener('dragleave', () => {
-    dragDepth = Math.max(0, dragDepth - 1);
-    if (dragDepth === 0) column.classList.remove('is-drop-target');
-  });
-  column.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dragDepth = 0;
-    column.classList.remove('is-drop-target');
-    const taskId = e.dataTransfer?.getData('text/task-id');
-    if (!taskId) return;
-    if (isCompletedCol) {
-      // Completing always requires initials — open the flow instead.
-      opts.onDropToComplete(taskId);
-    } else if (ACTIVE_STATUSES.includes(def.id)) {
-      store.moveTask(taskId, def.id);
-    }
-  });
+  if (col.drop) {
+    let dragDepth = 0;
+    column.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer?.types.includes('text/task-id')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    column.addEventListener('dragenter', (e) => {
+      if (!e.dataTransfer?.types.includes('text/task-id')) return;
+      dragDepth += 1;
+      column.classList.add('is-drop-target');
+    });
+    column.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) column.classList.remove('is-drop-target');
+    });
+    column.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragDepth = 0;
+      column.classList.remove('is-drop-target');
+      const taskId = e.dataTransfer?.getData('text/task-id');
+      if (!taskId) return;
+      if (col.drop === 'complete') {
+        // Completing always requires initials — open the flow instead.
+        opts.onDropToComplete(taskId);
+      } else {
+        store.moveTask(taskId, /** @type {import('../config.js').StatusId} */ (col.id));
+      }
+    });
+  }
 
   return column;
 }

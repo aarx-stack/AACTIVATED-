@@ -178,6 +178,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     title: title.slice(0, 120),
     notes: order.notes.slice(0, 2000),
     status: CATEGORY,
+    kind: "order", // renders in the board's Orders lane (the app also
+    // derives this from the sellavi- id prefix, so older deployments of
+    // this function keep working without a redeploy)
     assignedTo: ["JG", "IM", "GG"].includes(ORDER_ASSIGNEE) ? ORDER_ASSIGNEE : null,
     createdAt: new Date().toISOString(),
     completedAt: null,

@@ -23,22 +23,31 @@ export function TaskCard(task, handlers) {
   const def = statusDef(task.status);
   const locked = store.isLocked(task.id);
   const completed = task.status === 'completed';
+  const tone = task.kind === 'order' ? (completed ? 'green' : 'cyan') : def.tone;
 
   const card = el('article', {
-    class: `task-card tone-${def.tone}${completed ? ' is-completed' : ''}${locked ? ' is-shooting' : ''}`,
+    class: `task-card tone-${tone}${completed ? ' is-completed' : ''}${locked ? ' is-shooting' : ''}`,
     'aria-label': `Ticket ${task.ticketNumber}: ${task.title}`,
     dataset: { taskId: task.id },
   });
 
-  // --- header: ticket number + category chip -------------------------
-  const chip = completed
-    ? el(
-        'span',
-        { class: `status-chip tone-${def.tone}` },
-        icon(def.icon, 12),
-        el('span', { text: def.label }),
-      )
-    : categoryChipMenu(task, locked);
+  // --- header: ticket number + category/order chip --------------------
+  const chip =
+    task.kind === 'order'
+      ? el(
+          'span',
+          { class: `status-chip ${completed ? 'tone-green' : 'tone-cyan'}` },
+          icon(completed ? 'check' : 'cart', 12),
+          el('span', { text: completed ? 'Completed' : 'Order' }),
+        )
+      : completed
+        ? el(
+            'span',
+            { class: `status-chip tone-${def.tone}` },
+            icon(def.icon, 12),
+            el('span', { text: def.label }),
+          )
+        : categoryChipMenu(task, locked);
 
   card.append(
     el(
