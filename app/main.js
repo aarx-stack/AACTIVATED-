@@ -5,6 +5,7 @@
  * handles a couple of quality-of-life keyboard shortcuts.
  */
 
+import { APP_VERSION } from './config.js';
 import { store } from './store.js';
 import { el } from './dom.js';
 import { initSharedBackend } from './backend.js';
@@ -48,6 +49,7 @@ store.subscribe((event) => {
   if (event.type === 'storage-status') storageBanner.hidden = store.storageOk;
 });
 
+const footerMode = el('span', { text: 'Data is saved in this browser' });
 root.append(
   brand.el,
   scoreboard.el,
@@ -56,7 +58,9 @@ root.append(
   el('footer', { class: 'app-footer' },
     el('span', { text: 'AACTIVATED RX · Task Scoreboard' }),
     el('span', { class: 'app-footer-sep', 'aria-hidden': 'true', text: '·' }),
-    el('span', { text: 'Data is saved in this browser' }),
+    footerMode,
+    el('span', { class: 'app-footer-sep', 'aria-hidden': 'true', text: '·' }),
+    el('span', { text: APP_VERSION }),
   ),
 );
 
@@ -68,7 +72,10 @@ initNotifications();
 // charge. The banner warns if the shared connection later degrades.
 initSharedBackend(store)
   .then((backend) => {
-    if (backend) store.attachBackend(backend);
+    if (backend) {
+      store.attachBackend(backend);
+      footerMode.textContent = 'Shared live board';
+    }
   })
   .catch((err) => console.warn('[shared] backend init failed:', err));
 

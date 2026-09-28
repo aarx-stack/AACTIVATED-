@@ -37,6 +37,9 @@ export const STATUSES = [
 /** Statuses a task can be moved between without the completion flow. */
 export const ACTIVE_STATUSES = /** @type {StatusId[]} */ (['new', 'medium', 'hot']);
 
+/** Shown in the footer so it's easy to tell which build a tab is running. */
+export const APP_VERSION = 'v9';
+
 /** First ticket number ever issued. */
 export const FIRST_TICKET = 1001;
 
