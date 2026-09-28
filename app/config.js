@@ -86,6 +86,20 @@ export const EMAIL_NOTIFICATIONS = {
 };
 
 /**
+ * Slack notifications (see app/notify.js). OFF until webhookUrl is set.
+ *
+ * One-time setup: https://api.slack.com/apps → Create New App (from
+ * scratch) → pick your workspace → Incoming Webhooks → turn On →
+ * "Add New Webhook to Workspace" → choose #task_board → copy the URL
+ * (https://hooks.slack.com/services/…) here. The message posts from the
+ * device that performed the action, so shared boards never double-post.
+ */
+export const SLACK_NOTIFICATIONS = {
+  webhookUrl: '',
+  notifyOn: { completed: true, created: false, deleted: false },
+};
+
+/**
  * Normalize raw initials input ("  jg " -> "JG").
  * @param {string} raw
  */

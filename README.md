@@ -96,6 +96,13 @@ export const EMAIL_NOTIFICATIONS = {
 - Left unconfigured (the default), no network calls are made. Sending is
   fire-and-forget: a failed email can never affect tasks or scores.
 
+**Slack**: `SLACK_NOTIFICATIONS` in `app/config.js` posts task events to a
+Slack channel (e.g. `#task_board`) via an Incoming Webhook — create one at
+<https://api.slack.com/apps> (New App → Incoming Webhooks → On → Add New
+Webhook → pick the channel) and paste the `https://hooks.slack.com/…` URL.
+Same per-event toggles and fire-and-forget rules; only the device that
+performed the action posts, so shared boards never double-post.
+
 ## Project layout
 
 | Path | Purpose |

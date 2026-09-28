@@ -1,16 +1,17 @@
 // @ts-check
 
 /**
- * Automatic email notifications for task events.
+ * Automatic notifications for task events.
  *
- * Listens to store events and — when configured in config.js
- * (EMAIL_NOTIFICATIONS) — sends an email per event via FormSubmit, or
- * POSTs JSON to a custom webhook. Delivery is strictly fire-and-forget:
- * a failed or blocked send can never interfere with task state, scoring
- * or the shot animation.
+ * Listens to store events and — when configured in config.js — sends an
+ * email per event via FormSubmit (or POSTs JSON to a custom webhook,
+ * EMAIL_NOTIFICATIONS) and/or posts a message to a Slack channel via an
+ * Incoming Webhook (SLACK_NOTIFICATIONS). Delivery is strictly
+ * fire-and-forget: a failed or blocked send can never interfere with
+ * task state, scoring or the shot animation.
  */
 
-import { EMAIL_NOTIFICATIONS, PLAYERS } from './config.js';
+import { EMAIL_NOTIFICATIONS, SLACK_NOTIFICATIONS, PLAYERS } from './config.js';
 import { store } from './store.js';
 import { formatDateTime, formatDuration } from './dom.js';
 
@@ -26,15 +27,54 @@ export function initNotifications() {
     const kind = EVENT_KINDS[event.type];
     if (!kind || !event.task) return;
     // With shared storage every open device sees every change; only the
-    // device that performed the action sends the email, so nobody gets
-    // duplicate notifications.
+    // device that performed the action sends notifications, so nobody
+    // gets duplicates.
     if (event.origin === 'remote') return;
-    const cfg = EMAIL_NOTIFICATIONS;
-    if (!cfg.notifyOn[kind]) return;
-    if (!cfg.webhookUrl && cfg.recipients.length === 0) return;
-    send(kind, event.task).catch((err) => {
-      console.warn('[notify] email notification failed:', err);
-    });
+
+    const email = EMAIL_NOTIFICATIONS;
+    if (email.notifyOn[kind] && (email.webhookUrl || email.recipients.length > 0)) {
+      send(kind, event.task).catch((err) => {
+        console.warn('[notify] email notification failed:', err);
+      });
+    }
+
+    const slack = SLACK_NOTIFICATIONS;
+    if (slack.notifyOn[kind] && slack.webhookUrl) {
+      sendSlack(kind, event.task).catch((err) => {
+        console.warn('[notify] Slack notification failed:', err);
+      });
+    }
+  });
+}
+
+/**
+ * Post to a Slack Incoming Webhook. Sent as text/plain with no custom
+ * headers (mode no-cors) so the browser can deliver it cross-origin;
+ * Slack parses the JSON body regardless of content type.
+ * @param {'completed' | 'created' | 'deleted'} kind
+ * @param {import('./store.js').Task} task
+ */
+async function sendSlack(kind, task) {
+  const scores = store.scores();
+  const scoreline = PLAYERS.map((p) => `${p.initials} ${scores[p.initials] ?? 0}`).join(' · ');
+  const ref = `#${task.ticketNumber}`;
+
+  let text;
+  if (kind === 'completed') {
+    const time = task.timeSpentMinutes ? ` ⏱ ${formatDuration(task.timeSpentMinutes)}` : '';
+    text =
+      `🏀 *${ref} completed by ${task.completedBy}* — ${task.title}${time}\n` +
+      `Scoreboard: ${scoreline} · team total ${store.teamTotal()}`;
+  } else if (kind === 'created') {
+    text = `🆕 *${ref} created* — ${task.title} (${task.status})`;
+  } else {
+    text = `🗑 *${ref} deleted* — ${task.title}`;
+  }
+
+  await fetch(SLACK_NOTIFICATIONS.webhookUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: JSON.stringify({ text }),
   });
 }
 
