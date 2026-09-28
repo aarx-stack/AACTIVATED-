@@ -57,8 +57,9 @@ export const SOUND_PREF_KEY = 'aarx.task-scoreboard.sound';
  */
 export const SUPABASE = (typeof window !== 'undefined' &&
   /** @type {any} */ (window).__SUPABASE_OVERRIDE) || {
-  url: '',
-  anonKey: '',
+  url: 'https://wslpirmliuakpadeikrh.supabase.co',
+  anonKey:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzbHBpcm1saXVha3BhZGVpa3JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MDQ1NTQsImV4cCI6MjEwNjE4MDU1NH0.R7Roe17nXeGXpo-TFcJ6Q9Ru_TLw0x6LfRvs2vG4KuA',
   pollMs: 5000,
 };
 

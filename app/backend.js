@@ -217,7 +217,8 @@ async function initArtifactBackend(store) {
 async function initSupabaseBackend(store) {
   const cfg = /** @type {{url: string, anonKey: string, pollMs?: number}} */ (SUPABASE);
   if (!cfg || !cfg.url || !cfg.anonKey) return null;
-  const base = cfg.url.replace(/\/+$/, '');
+  // Accept the project URL with or without a pasted /rest/v1 suffix.
+  const base = cfg.url.replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
   const pollMs = Math.max(1500, Number(cfg.pollMs) || 5000);
 
   /**
