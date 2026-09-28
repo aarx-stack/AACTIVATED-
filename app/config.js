@@ -38,7 +38,7 @@ export const STATUSES = [
 export const ACTIVE_STATUSES = /** @type {StatusId[]} */ (['new', 'medium', 'hot']);
 
 /** Shown in the footer so it's easy to tell which build a tab is running. */
-export const APP_VERSION = 'v9';
+export const APP_VERSION = 'v10';
 
 /** First ticket number ever issued. */
 export const FIRST_TICKET = 1001;

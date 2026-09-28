@@ -35,6 +35,7 @@ import {
  * @property {string} title
  * @property {string} notes
  * @property {StatusId} status
+ * @property {string | null} assignedTo   Player initials this task is assigned to.
  * @property {string} createdAt      ISO timestamp.
  * @property {string | null} completedAt
  * @property {string | null} completedBy   Player initials.
@@ -85,6 +86,7 @@ export function sanitizeTask(t) {
     title: t.title,
     notes: typeof t.notes === 'string' ? t.notes : '',
     status: t.status,
+    assignedTo: typeof t.assignedTo === 'string' && t.assignedTo ? t.assignedTo : null,
     createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date().toISOString(),
     completedAt: completed && typeof t.completedAt === 'string' ? t.completedAt : null,
     completedBy: completed && typeof t.completedBy === 'string' ? t.completedBy : null,
@@ -310,13 +312,14 @@ class Store {
   // ----- mutations -----------------------------------------------------
 
   /**
-   * @param {{ title: string, notes?: string, status?: StatusId }} input
+   * @param {{ title: string, notes?: string, status?: StatusId, assignedTo?: string | null }} input
    * @returns {Task}
    */
-  createTask({ title, notes = '', status = 'new' }) {
+  createTask({ title, notes = '', status = 'new', assignedTo = null }) {
     const cleanTitle = title.trim();
     if (!cleanTitle) throw new Error('Task title is required.');
     if (!ACTIVE_STATUSES.includes(status)) status = 'new';
+    const assignee = normalizeInitials(assignedTo || '');
     /** @type {Task} */
     const task = {
       id: makeId(),
@@ -324,6 +327,7 @@ class Store {
       title: cleanTitle,
       notes: notes.trim(),
       status,
+      assignedTo: isValidPlayer(assignee) ? assignee : null,
       createdAt: new Date().toISOString(),
       completedAt: null,
       completedBy: null,

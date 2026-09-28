@@ -71,6 +71,7 @@ export function taskMatches(task, query) {
     task.title,
     task.notes,
     task.completedBy || '',
+    task.assignedTo || '',
   ]
     .join('\n')
     .toLowerCase();

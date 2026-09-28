@@ -53,6 +53,7 @@ const ICON_PATHS = {
     '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/>',
   soundOff: '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v4.8l3.2 1.9"/>',
+  user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.8 19.5c1.5-3.3 4.1-4.9 7.2-4.9s5.7 1.6 7.2 4.9"/>',
 };
 
 /**

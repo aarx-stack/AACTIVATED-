@@ -44,7 +44,19 @@ export function TaskCard(task, handlers) {
     el(
       'header',
       { class: 'card-head' },
-      el('span', { class: 'card-ticket', text: `#${task.ticketNumber}` }),
+      el(
+        'span',
+        { class: 'card-head-left' },
+        el('span', { class: 'card-ticket', text: `#${task.ticketNumber}` }),
+        task.assignedTo
+          ? el(
+              'span',
+              { class: 'card-assignee', title: `Assigned to ${task.assignedTo}` },
+              icon('user', 11),
+              el('span', { text: task.assignedTo }),
+            )
+          : null,
+      ),
       chip,
     ),
     el('h3', { class: 'card-title', text: task.title }),

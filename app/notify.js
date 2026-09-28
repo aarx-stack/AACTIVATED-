@@ -77,7 +77,8 @@ async function sendSlack(kind, task) {
       `Scoreboard: ${scoreline} · team total ${store.teamTotal()}`;
   } else if (kind === 'created') {
     const category = statusDef(task.status).label;
-    text = `🆕 *New task has arrived* — ${ref} ${task.title} (${category})`;
+    const assignee = task.assignedTo ? ` → assigned to *${task.assignedTo}*` : '';
+    text = `🆕 *New task has arrived* — ${ref} ${task.title} (${category})${assignee}`;
   } else {
     text = `🗑 *${ref} deleted* — ${task.title}`;
   }
@@ -108,6 +109,7 @@ async function send(kind, task) {
     `Title: ${task.title}`,
     task.notes ? `Notes: ${task.notes}` : null,
     `Status: ${task.status}`,
+    task.assignedTo ? `Assigned to: ${task.assignedTo}` : null,
     kind === 'completed' && task.completedBy ? `Completed by: ${task.completedBy}` : null,
     kind === 'completed' && task.completedAt ? `Completed at: ${formatDateTime(task.completedAt)}` : null,
     kind === 'completed' && task.timeSpentMinutes ? `Time spent: ${formatDuration(task.timeSpentMinutes)}` : null,

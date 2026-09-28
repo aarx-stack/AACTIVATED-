@@ -163,6 +163,14 @@ dialog.modal > .modal-foot {
   --tone: var(--rgb-blue);
   --tone-strong: #60a5fa;
 }
+.pill-cyan {
+  --tone: var(--rgb-cyan);
+  --tone-strong: var(--cyan-soft);
+}
+.pill-neutral {
+  --tone: 148 163 184;
+  --tone-strong: #cbd5e1;
+}
 .pill-amber {
   --tone: var(--rgb-amber);
   --tone-strong: #fbbf24;

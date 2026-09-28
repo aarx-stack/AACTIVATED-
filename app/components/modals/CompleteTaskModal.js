@@ -255,9 +255,12 @@ export function CompleteTaskModal() {
       timeError.clear();
       input.removeAttribute('aria-invalid');
       timeInput.removeAttribute('aria-invalid');
+      // Assigned tasks start with the assignee's initials filled in
+      // (still editable — anyone can complete on their behalf).
+      if (t.assignedTo && isValidPlayer(t.assignedTo)) input.value = t.assignedTo;
       syncPicks();
       syncTimePicks();
-      modal.open(input);
+      modal.open(t.assignedTo && isValidPlayer(t.assignedTo) ? timeInput : input);
     },
   };
 }

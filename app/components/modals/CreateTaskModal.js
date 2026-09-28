@@ -1,10 +1,11 @@
 // @ts-check
 
 /**
- * "Add Task" modal: title (required), notes, category (New / Medium / Hot).
+ * "Add Task" modal: title (required), notes, category (New / Medium / Hot)
+ * and an optional assignee (Anyone / JG / IM / GG).
  */
 
-import { ACTIVE_STATUSES, statusDef } from '../../config.js';
+import { ACTIVE_STATUSES, PLAYERS, statusDef } from '../../config.js';
 import { store } from '../../store.js';
 import { el, icon } from '../../dom.js';
 import { createModal, modalHeader, errorArea } from './modalBase.js';
@@ -61,6 +62,37 @@ export function CreateTaskModal() {
     );
   }
 
+  const assigneeWrap = el('div', { class: 'pill-group', role: 'radiogroup', 'aria-label': 'Assign to' });
+  /** @type {HTMLInputElement[]} */
+  const assigneeRadios = [];
+  const assigneeOptions = [
+    { value: '', label: 'Anyone', tone: 'neutral' },
+    ...PLAYERS.map((p) => ({ value: p.initials, label: p.initials, tone: 'cyan' })),
+  ];
+  for (const opt of assigneeOptions) {
+    const id = `create-assignee-${opt.value || 'any'}`;
+    const radio = /** @type {HTMLInputElement} */ (
+      el('input', {
+        class: 'pill-radio',
+        type: 'radio',
+        name: 'create-assignee',
+        id,
+        value: opt.value,
+        checked: opt.value === '',
+      })
+    );
+    assigneeRadios.push(radio);
+    assigneeWrap.append(
+      radio,
+      el(
+        'label',
+        { class: `pill pill-${opt.tone}`, for: id },
+        opt.value ? icon('user', 13) : null,
+        el('span', { text: opt.label }),
+      ),
+    );
+  }
+
   const form = el(
     'form',
     { class: 'modal-body', novalidate: true },
@@ -84,6 +116,12 @@ export function CreateTaskModal() {
       categoryWrap,
     ),
     el(
+      'div',
+      { class: 'field' },
+      el('span', { class: 'field-label' }, 'Assign to ', el('span', { class: 'field-optional', text: '(optional)' })),
+      assigneeWrap,
+    ),
+    el(
       'footer',
       { class: 'modal-foot' },
       el('button', { class: 'btn btn-ghost', type: 'button', text: 'Cancel', onclick: () => modal.close() }),
@@ -103,7 +141,8 @@ export function CreateTaskModal() {
     const status = /** @type {import('../../config.js').StatusId} */ (
       (radios.find((r) => r.checked) || radios[0]).value
     );
-    store.createTask({ title, notes: notesInput.value, status });
+    const assignedTo = (assigneeRadios.find((r) => r.checked) || assigneeRadios[0]).value || null;
+    store.createTask({ title, notes: notesInput.value, status, assignedTo });
     modal.close();
   });
 
@@ -118,6 +157,7 @@ export function CreateTaskModal() {
     open() {
       /** @type {HTMLFormElement} */ (form).reset();
       radios.forEach((r) => (r.checked = r.value === 'new'));
+      assigneeRadios.forEach((r) => (r.checked = r.value === ''));
       titleError.clear();
       titleInput.removeAttribute('aria-invalid');
       modal.open(titleInput);
