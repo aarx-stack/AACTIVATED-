@@ -22,10 +22,16 @@ the scoreboard, and the moment it drops through the net your score counts up.
   clicked into the hoop (spin, motion trail, net snap, SWISH flash, "+1" chip,
   odometer-style score roll). Shots queue safely; every code path commits the
   completion exactly once
-- **Task board** with New / Medium / Hot / Completed columns, live counts,
-  automatic permanent ticket numbers (#1001, #1002, …), search (ticket, title,
-  notes, initials), drag & drop between active columns, and an accessible
-  "move to…" menu on each card's category chip
+- **Task board** with New / Medium / Hot / Completed columns (plus Orders /
+  Completed Orders lanes for store orders), live counts, automatic permanent
+  ticket numbers (#1001, #1002, …), optional assignment to JG / IM / GG,
+  search (ticket, title, notes, initials), drag & drop between active
+  columns, and an accessible "move to…" menu on each card's category chip
+- **Edit & review**: the pencil next to each card's trash icon opens Edit
+  Task (title, notes, category, assignee). Completion details — who scored,
+  when, time spent — stay locked, so an edit can never change the
+  scoreboard. Notes keep their line breaks on the card, long ones get a
+  Show more toggle, and the completion popup shows them in full
 - **Completion flow**: click a task → enter initials (normalized, validated
   against the roster) and how long it took (quick chips or free text: `45m`,
   `1h 30m`, `1:30`, plain minutes) → green Complete Task → shot → task records
@@ -128,7 +134,7 @@ performed the action posts, so shared boards never double-post.
 | `app/sound.js` | Optional Web Audio swish/score effects |
 | `app/dom.js` | Element builder, icon set, basketball SVG |
 | `app/components/` | BrandHeader, Scoreboard, ScoreboardPlayer, HoopStage, TaskBoard, TaskColumn, TaskCard, SearchBar |
-| `app/components/modals/` | Create / Complete / Delete dialogs (native `<dialog>`) |
+| `app/components/modals/` | Create / Edit / Complete / Delete dialogs (native `<dialog>`); `taskFields.js` holds the fields Create and Edit share |
 | `styles/` | tokens · base · header · scoreboard · board · modals |
 | `assets/fonts/` | Self-hosted DSEG7 + Rajdhani (see license note there) |
 
@@ -140,6 +146,7 @@ Type checking: `npx tsc -p jsconfig.json` (JSDoc + `checkJs`, strict).
 {
   id, ticketNumber, title, notes,
   status: 'new' | 'medium' | 'hot' | 'completed',
+  kind: 'task' | 'order', assignedTo,
   createdAt, completedAt, completedBy, timeSpentMinutes, shotId
 }
 ```

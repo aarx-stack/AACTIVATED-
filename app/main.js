@@ -14,6 +14,7 @@ import { BrandHeader } from './components/BrandHeader.js';
 import { Scoreboard } from './components/Scoreboard.js';
 import { TaskBoard } from './components/TaskBoard.js';
 import { CreateTaskModal } from './components/modals/CreateTaskModal.js';
+import { EditTaskModal } from './components/modals/EditTaskModal.js';
 import { CompleteTaskModal } from './components/modals/CompleteTaskModal.js';
 import { DeleteConfirmModal } from './components/modals/DeleteConfirmModal.js';
 
@@ -21,6 +22,7 @@ const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app mount point');
 
 const createModal = CreateTaskModal();
+const editModal = EditTaskModal();
 const completeModal = CompleteTaskModal();
 const deleteModal = DeleteConfirmModal();
 
@@ -30,6 +32,7 @@ const board = new TaskBoard({
   onAddTask: () => createModal.open(),
   onComplete: (task, origin) => completeModal.open(task, origin),
   onDelete: (task) => deleteModal.open(task),
+  onEdit: (task) => editModal.open(store.getTask(task.id) || task),
   onDropToComplete: (taskId) => {
     const task = store.getTask(taskId);
     if (task && task.status !== 'completed' && !store.isLocked(taskId)) {

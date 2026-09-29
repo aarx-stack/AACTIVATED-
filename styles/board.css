@@ -318,11 +318,55 @@
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--muted);
+  white-space: pre-line; /* keep line breaks (order items, lists) */
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+
+.card-notes.is-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+/* "Show more" under clamped notes (raised above the card hit target) */
+.card-notes-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 3px;
+  padding: 1px 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blue-bright);
+  border-radius: 4px;
+}
+
+.card-notes-toggle[hidden] {
+  display: none;
+}
+
+.card-notes-toggle:hover {
+  color: var(--cyan-soft);
+}
+
+.card-notes-toggle:focus-visible {
+  outline: 2px solid var(--blue-bright);
+  outline-offset: 2px;
+}
+
+.card-notes-toggle svg {
+  transition: transform 0.15s ease;
+}
+
+.card-notes-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 
 .card-foot {
@@ -334,7 +378,8 @@
 }
 
 /* Whole-card hit target: opens the completion popup. Sits under the
-   delete button and category chip, which are raised above it. */
+   edit/delete buttons, notes toggle and category chip, which are raised
+   above it. */
 .card-hit {
   position: absolute;
   inset: 0;
@@ -354,7 +399,8 @@
 }
 
 .task-card .chip-menu-wrap,
-.task-card .card-delete {
+.task-card .card-actions,
+.task-card .card-notes-toggle {
   position: relative;
   z-index: 2;
 }
@@ -398,9 +444,22 @@
   filter: none;
 }
 
+.card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.card-edit,
 .card-delete {
   width: 30px;
   height: 30px;
+}
+
+.card-edit:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--blue-bright);
 }
 
 .card-delete:hover:not(:disabled) {
@@ -510,8 +569,15 @@
   color: var(--text);
 }
 
+/* In narrow columns the edit/delete buttons drop to their own row
+   instead of squeezing the completion details. */
 .card-foot-completed {
   align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.card-foot-completed .card-actions {
+  margin-left: auto;
 }
 
 .card-completed-info {
@@ -519,6 +585,7 @@
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  flex: 1 1 150px;
 }
 
 .card-completed-by {

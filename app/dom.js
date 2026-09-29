@@ -55,6 +55,8 @@ const ICON_PATHS = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v4.8l3.2 1.9"/>',
   user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.8 19.5c1.5-3.3 4.1-4.9 7.2-4.9s5.7 1.6 7.2 4.9"/>',
   cart: '<circle cx="9.5" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/><path d="M3 4h2.4l2.5 10.5h9.6L20 7.5H6"/>',
+  pencil: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
 };
 
 /**

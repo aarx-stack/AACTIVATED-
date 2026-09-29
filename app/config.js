@@ -93,7 +93,7 @@ export function columnIdFor(task) {
 }
 
 /** Shown in the footer so it's easy to tell which build a tab is running. */
-export const APP_VERSION = 'v11';
+export const APP_VERSION = 'v12';
 
 /** First ticket number ever issued. */
 export const FIRST_TICKET = 1001;

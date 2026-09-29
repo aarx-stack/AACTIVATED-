@@ -50,10 +50,18 @@ import {
  *
  * @typedef {{ type: string, origin?: 'local' | 'remote', [key: string]: any }} StoreEvent
  *
+ * @typedef {Object} TaskEdit  A validated edit (see Store#updateTask).
+ * @property {string} [title]
+ * @property {string} [notes]
+ * @property {StatusId} [status]
+ * @property {string | null} [assignedTo]
+ *
  * @typedef {Object} Backend
  * @property {string} kind
  * @property {(task: Task) => Promise<void>} createTask
  * @property {(task: Task) => Promise<void>} writeTask
+ * @property {(id: string, edit: TaskEdit) => Promise<void>} editTask
+ *           Applies the edit (via applyEdit) to the latest shared copy.
  * @property {(id: string) => Promise<void>} deleteTask
  */
 
@@ -100,6 +108,27 @@ export function sanitizeTask(t) {
         : null,
     shotId: completed ? (typeof t.shotId === 'string' ? t.shotId : `SHOT-${ticket}`) : null,
   };
+}
+
+/**
+ * Apply a validated edit to a task — the one place that decides what an
+ * edit may change. Completion and scoring fields are never touched, and
+ * the category only changes on active regular tasks, so an edit landing
+ * on a copy that was completed elsewhere in the meantime keeps that
+ * completion (and its point). Returns a new object.
+ * @param {Task} task
+ * @param {TaskEdit} edit
+ * @returns {Task}
+ */
+export function applyEdit(task, edit) {
+  const next = { ...task };
+  if (edit.title !== undefined) next.title = edit.title;
+  if (edit.notes !== undefined) next.notes = edit.notes;
+  if (edit.assignedTo !== undefined) next.assignedTo = edit.assignedTo;
+  if (edit.status !== undefined && task.status !== 'completed' && task.kind !== 'order') {
+    next.status = edit.status;
+  }
+  return next;
 }
 
 /**
@@ -374,6 +403,59 @@ class Store {
     this.save();
     this.emit({ type: 'task-moved', task });
     return true;
+  }
+
+  /**
+   * Edit a task's details: title, notes, category and assignee. Never
+   * touches completion or scoring fields (completedBy, completedAt, time
+   * spent, shotId) — completing still requires the initials popup, so an
+   * edit can't add or remove points. Orders keep their own lane and
+   * completed tasks stay completed; a category change only applies to
+   * active regular tasks.
+   * @param {string} id
+   * @param {{ title?: string, notes?: string, status?: StatusId, assignedTo?: string | null }} patch
+   * @returns {{ ok: true, task: Task, changed: boolean } | { ok: false, reason: 'not-found' | 'locked' | 'invalid-title' }}
+   */
+  updateTask(id, patch) {
+    const task = this.getTask(id);
+    if (!task) return { ok: false, reason: 'not-found' };
+    if (this.isLocked(id)) return { ok: false, reason: 'locked' };
+
+    /** @type {TaskEdit} */
+    const edit = {};
+    if (patch.title !== undefined) {
+      const title = patch.title.trim();
+      if (!title) return { ok: false, reason: 'invalid-title' };
+      edit.title = title;
+    }
+    if (patch.notes !== undefined) edit.notes = patch.notes.trim();
+    if (patch.assignedTo !== undefined) {
+      const assignee = normalizeInitials(patch.assignedTo || '');
+      edit.assignedTo = isValidPlayer(assignee) ? assignee : null;
+    }
+    if (patch.status !== undefined && ACTIVE_STATUSES.includes(patch.status)) {
+      edit.status = patch.status;
+    }
+
+    const next = applyEdit(task, edit);
+    const changed =
+      next.title !== task.title ||
+      next.notes !== task.notes ||
+      next.status !== task.status ||
+      next.assignedTo !== task.assignedTo;
+    if (!changed) return { ok: true, task, changed: false };
+
+    if (this.backend) {
+      // The adapter applies the edit to the latest shared copy, so a
+      // completion or delete made on another device a moment ago is kept.
+      // The snapshot echo then updates state and re-renders the board.
+      this.guardWrite(this.backend.editTask(id, edit));
+      return { ok: true, task: next, changed: true };
+    }
+    Object.assign(task, next);
+    this.save();
+    this.emit({ type: 'task-updated', task });
+    return { ok: true, task, changed: true };
   }
 
   /**

@@ -16,7 +16,9 @@ import { TaskCard } from './TaskCard.js';
 /**
  * @param {import('../config.js').ColumnDef} col
  * @param {import('../store.js').Task[]} tasks   Already filtered + sorted.
- * @param {{ onComplete: Function, onDelete: Function,
+ * @param {{ onComplete: Function, onDelete: Function, onEdit: Function,
+ *           onToggleNotes: (taskId: string, expanded: boolean) => void,
+ *           expandedNotes: Set<string>,
  *           onDropToComplete: (taskId: string) => void, searching: boolean }} opts
  */
 export function TaskColumn(col, tasks, opts) {
@@ -26,10 +28,16 @@ export function TaskColumn(col, tasks, opts) {
     'div',
     { class: 'column-list' },
     ...tasks.map((t) =>
-      TaskCard(t, {
-        onComplete: /** @type {any} */ (opts.onComplete),
-        onDelete: /** @type {any} */ (opts.onDelete),
-      }),
+      TaskCard(
+        t,
+        {
+          onComplete: /** @type {any} */ (opts.onComplete),
+          onDelete: /** @type {any} */ (opts.onDelete),
+          onEdit: /** @type {any} */ (opts.onEdit),
+          onToggleNotes: opts.onToggleNotes,
+        },
+        { notesExpanded: opts.expandedNotes.has(t.id) },
+      ),
     ),
   );
 

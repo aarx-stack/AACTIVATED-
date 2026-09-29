@@ -27,6 +27,20 @@ export function CompleteTaskModal() {
   let fallbackOrigin = null;
 
   const contextEl = el('p', { class: 'modal-context' });
+  // The task's full notes (order items, instructions…), so they can be
+  // reviewed before completing. Scrolls when long.
+  const notesText = el('div', {
+    class: 'modal-notes-text',
+    tabindex: '0',
+    role: 'region',
+    'aria-label': 'Task notes',
+  });
+  const notesBox = el(
+    'div',
+    { class: 'modal-notes', hidden: true },
+    el('span', { class: 'field-label', text: 'Notes' }),
+    notesText,
+  );
   const error = errorArea();
 
   const input = /** @type {HTMLInputElement} */ (
@@ -127,6 +141,7 @@ export function CompleteTaskModal() {
     'form',
     { class: 'modal-body', novalidate: true },
     contextEl,
+    notesBox,
     el(
       'div',
       { class: 'field' },
@@ -250,6 +265,9 @@ export function CompleteTaskModal() {
         el('span', { class: 'modal-context-ticket', text: `#${t.ticketNumber}` }),
         el('span', { class: 'modal-context-title', text: t.title }),
       );
+      notesText.textContent = t.notes;
+      notesText.scrollTop = 0;
+      notesBox.hidden = !t.notes;
       /** @type {HTMLFormElement} */ (form).reset();
       error.clear();
       timeError.clear();

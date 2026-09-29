@@ -22,7 +22,7 @@
  */
 
 import { FIRST_TICKET, SUPABASE } from './config.js';
-import { sanitizeTask } from './store.js';
+import { applyEdit, sanitizeTask } from './store.js';
 
 /** Stable per-page-load id, used as the lease holder. */
 const CLIENT_ID = `dev-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -171,6 +171,17 @@ async function initArtifactBackend(store) {
     async writeTask(task) {
       local.mark(task.id);
       await tasksCol.doc(task.id).set(taskBody(task));
+    },
+
+    async editTask(id, edit) {
+      // Edit the latest copy, not this device's snapshot of it.
+      const ref = tasksCol.doc(id);
+      const snap = await ref.get();
+      const latest = snap.exists ? sanitizeTask(snap.data()) : null;
+      if (!latest) return; // deleted on another device — nothing to edit
+      latest.id = id;
+      local.mark(id);
+      await ref.set(taskBody(applyEdit(latest, edit)));
     },
 
     async deleteTask(id) {
@@ -334,6 +345,21 @@ async function initSupabaseBackend(store) {
     async writeTask(task) {
       local.mark(task.id);
       await upsertTasks([task]);
+      fetchNow();
+    },
+
+    async editTask(id, edit) {
+      // Re-read the row so the edit lands on the latest copy: this
+      // device's view can be a poll behind, and a completion (or delete)
+      // made elsewhere in that window must not be undone.
+      const res = await api(`/rest/v1/tasks?id=eq.${encodeURIComponent(id)}&select=id,body`);
+      const [row] = /** @type {{id: string, body: any}[]} */ (await res.json());
+      const latest = row ? sanitizeTask(row.body) : null;
+      if (latest) {
+        latest.id = row.id;
+        local.mark(id);
+        await upsertTasks([applyEdit(latest, edit)]);
+      }
       fetchNow();
     },
 

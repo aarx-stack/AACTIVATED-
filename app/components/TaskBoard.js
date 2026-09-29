@@ -18,6 +18,7 @@ export class TaskBoard {
    * @param {{ onAddTask: () => void,
    *           onComplete: (task: any, origin: {x:number,y:number}) => void,
    *           onDelete: (task: any) => void,
+   *           onEdit: (task: any) => void,
    *           onDropToComplete: (taskId: string) => void }} handlers
    */
   constructor(handlers) {
@@ -25,6 +26,9 @@ export class TaskBoard {
     this.query = '';
     /** @type {string | null} */
     this.highlightId = null;
+    /** Cards whose notes the viewer expanded — kept across re-renders.
+     * @type {Set<string>} */
+    this.expandedNotes = new Set();
 
     this.search = SearchBar({
       onQuery: (q) => {
@@ -80,14 +84,33 @@ export class TaskBoard {
         this.highlightId = event.task?.id || null;
       }
       if (
-        ['task-created', 'task-moved', 'task-completed', 'task-deleted', 'task-locked', 'task-unlocked', 'sync'].includes(
-          event.type,
-        )
+        [
+          'task-created',
+          'task-moved',
+          'task-updated',
+          'task-completed',
+          'task-deleted',
+          'task-locked',
+          'task-unlocked',
+          'sync',
+        ].includes(event.type)
       ) {
         this.renderColumns();
       }
     });
     this.renderColumns();
+
+    // Column widths change with the viewport, and with them which notes
+    // are clamped — re-check (once per frame at most).
+    let measurePending = false;
+    window.addEventListener('resize', () => {
+      if (measurePending) return;
+      measurePending = true;
+      requestAnimationFrame(() => {
+        measurePending = false;
+        this.measureNotes();
+      });
+    });
   }
 
   renderColumns() {
@@ -105,11 +128,18 @@ export class TaskBoard {
       return TaskColumn(col, tasks, {
         onComplete: this.handlers.onComplete,
         onDelete: this.handlers.onDelete,
+        onEdit: this.handlers.onEdit,
+        onToggleNotes: (id, expanded) => {
+          if (expanded) this.expandedNotes.add(id);
+          else this.expandedNotes.delete(id);
+        },
+        expandedNotes: this.expandedNotes,
         onDropToComplete: this.handlers.onDropToComplete,
         searching,
       });
     });
     this.grid.replaceChildren(...columns);
+    this.measureNotes();
 
     // One-time glow on a card that just landed in a column.
     if (this.highlightId) {
@@ -128,5 +158,15 @@ export class TaskBoard {
     this.countsEl.textContent = searching
       ? `${matches} match${matches === 1 ? '' : 'es'}`
       : `${open} open · ${done} completed`;
+  }
+
+  /** Offer "Show more" only on notes that are actually cut off. */
+  measureNotes() {
+    for (const notes of this.grid.querySelectorAll('.card-notes:not(.is-expanded)')) {
+      const toggle = notes.nextElementSibling;
+      if (toggle instanceof HTMLElement && toggle.classList.contains('card-notes-toggle')) {
+        toggle.hidden = notes.scrollHeight <= notes.clientHeight + 1;
+      }
+    }
   }
 }
