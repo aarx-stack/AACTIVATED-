@@ -121,6 +121,15 @@
   }
 }
 
+/* AM/PM next to the LED digits (the 7-segment font has no letters) */
+.sb-clock-period {
+  margin-left: 5px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8em;
+  letter-spacing: 0.1em;
+}
+
 .sb-sound {
   display: inline-flex;
   align-items: center;

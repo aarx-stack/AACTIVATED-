@@ -9,7 +9,7 @@
 import { PLAYERS } from '../config.js';
 import { store } from '../store.js';
 import { sound } from '../sound.js';
-import { el, icon } from '../dom.js';
+import { el, icon, clockParts } from '../dom.js';
 import { ScoreboardPlayer } from './ScoreboardPlayer.js';
 import { HoopStage } from './HoopStage.js';
 
@@ -86,11 +86,15 @@ export class Scoreboard {
   }
 
   tickClock() {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    this.clockEl.replaceChildren(hh, el('span', { class: 'sb-colon', text: ':' }), mm);
-    this.clockEl.setAttribute('aria-label', `Current time ${hh}:${mm}`);
+    // Regular 12-hour time with AM/PM (not 24-hour).
+    const { hours, minutes, period } = clockParts(new Date());
+    this.clockEl.replaceChildren(
+      hours,
+      el('span', { class: 'sb-colon', text: ':' }),
+      minutes,
+      el('span', { class: 'sb-clock-period', text: period }),
+    );
+    this.clockEl.setAttribute('aria-label', `Current time ${hours}:${minutes} ${period}`);
   }
 
   /** @param {import('../store.js').StoreEvent} event */

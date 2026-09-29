@@ -9,7 +9,7 @@
 
 import { COLUMNS, columnIdFor } from '../config.js';
 import { store } from '../store.js';
-import { el, icon } from '../dom.js';
+import { el, icon, formatDayTime, formatTimeAgo } from '../dom.js';
 import { SearchBar, taskMatches } from './SearchBar.js';
 import { TaskColumn } from './TaskColumn.js';
 
@@ -100,6 +100,9 @@ export class TaskBoard {
     });
     this.renderColumns();
 
+    // Keep each card's "Created … · 3h 5m ago" current.
+    window.setInterval(() => this.refreshAges(), 30_000);
+
     // Column widths change with the viewport, and with them which notes
     // are clamped — re-check (once per frame at most).
     let measurePending = false;
@@ -158,6 +161,20 @@ export class TaskBoard {
     this.countsEl.textContent = searching
       ? `${matches} match${matches === 1 ? '' : 'es'}`
       : `${open} open · ${done} completed`;
+  }
+
+  /** Update every card's created/sitting text in place (no re-render,
+   * so focus, open menus and expanded notes are untouched). */
+  refreshAges() {
+    const now = new Date();
+    for (const line of this.grid.querySelectorAll('.card-age')) {
+      const when = line.querySelector('time.card-age-when');
+      const iso = when?.getAttribute('datetime');
+      if (!when || !iso) continue;
+      when.textContent = formatDayTime(iso, now);
+      const ago = line.querySelector('.card-age-ago');
+      if (ago) ago.textContent = formatTimeAgo(iso, now.getTime());
+    }
   }
 
   /** Offer "Show more" only on notes that are actually cut off. */

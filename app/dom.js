@@ -147,16 +147,74 @@ export function formatDuration(minutes) {
 }
 
 /**
+ * 12-hour clock parts in the device's time zone — never 24-hour, whatever
+ * the browser's language: 16:05 -> { hours: '4', minutes: '05', period: 'PM' }.
+ * @param {Date} d
+ */
+export function clockParts(d) {
+  const h = d.getHours();
+  return {
+    hours: String(h % 12 || 12),
+    minutes: String(d.getMinutes()).padStart(2, '0'),
+    period: h < 12 ? 'AM' : 'PM',
+  };
+}
+
+/**
+ * Format a time of day like "4:05 PM".
+ * @param {Date} d
+ */
+export function formatTime(d) {
+  const { hours, minutes, period } = clockParts(d);
+  return `${hours}:${minutes} ${period}`;
+}
+
+/**
  * Format an ISO timestamp like "Sep 22, 2026 · 3:41 PM".
  * @param {string} iso
  */
 export function formatDateTime(iso) {
-  try {
-    const d = new Date(iso);
-    const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    return `${date} · ${time}`;
-  } catch {
-    return '';
-  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${date} · ${formatTime(d)}`;
+}
+
+/**
+ * Format an ISO timestamp relative to today: "Today 2:15 PM",
+ * "Yesterday 9:04 AM", "Sep 27, 2:15 PM" (with the year when it isn't
+ * this year).
+ * @param {string} iso
+ * @param {Date} [now]
+ */
+export function formatDayTime(iso, now = new Date()) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = formatTime(d);
+  const midnight = (/** @type {Date} */ x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const daysBack = Math.round((midnight(now) - midnight(d)) / 86_400_000);
+  if (daysBack <= 0) return `Today ${time}`;
+  if (daysBack === 1) return `Yesterday ${time}`;
+  /** @type {Intl.DateTimeFormatOptions} */
+  const opts = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  return `${d.toLocaleDateString('en-US', opts)}, ${time}`;
+}
+
+/**
+ * How long ago an ISO timestamp was, compactly: "just now", "12m ago",
+ * "3h 5m ago", "2d 4h ago".
+ * @param {string} iso
+ * @param {number} [now]  Epoch ms.
+ */
+export function formatTimeAgo(iso, now = Date.now()) {
+  const ms = now - new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '';
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h${minutes % 60 ? ` ${minutes % 60}m` : ''} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d${hours % 24 ? ` ${hours % 24}h` : ''} ago`;
 }

@@ -13,7 +13,7 @@
 
 import { ACTIVE_STATUSES, statusDef } from '../config.js';
 import { store } from '../store.js';
-import { el, icon, formatDateTime, formatDuration } from '../dom.js';
+import { el, icon, formatDateTime, formatDayTime, formatDuration, formatTimeAgo } from '../dom.js';
 
 /**
  * @param {import('../store.js').Task} task
@@ -76,6 +76,7 @@ export function TaskCard(task, handlers, { notesExpanded = false } = {}) {
   );
 
   if (task.notes) card.append(...notesBlock(task, notesExpanded, handlers.onToggleNotes));
+  card.append(ageLine(task, !completed));
 
   // --- footer: edit + delete ------------------------------------------
   const actions = el(
@@ -237,6 +238,34 @@ function notesBlock(task, expanded, onToggle) {
     icon('chevronDown', 12),
   );
   return [notes, toggle];
+}
+
+/**
+ * "Created Today 2:15 PM · 3h 5m ago" — when the task was created and,
+ * while it's still open, how long it has been sitting. TaskBoard keeps
+ * the text current (refreshAges) without re-rendering the card.
+ * @param {import('../store.js').Task} task
+ * @param {boolean} open
+ */
+function ageLine(task, open) {
+  const now = new Date();
+  return el(
+    'p',
+    { class: 'card-age' },
+    icon('clock', 12),
+    ' Created ',
+    el('time', { class: 'card-age-when', datetime: task.createdAt, text: formatDayTime(task.createdAt, now) }),
+    open ? ' ' : null,
+    open
+      ? el(
+          'span',
+          { class: 'card-age-sitting' },
+          el('span', { 'aria-hidden': 'true', text: '·' }),
+          ' ',
+          el('strong', { class: 'card-age-ago', text: formatTimeAgo(task.createdAt, now.getTime()) }),
+        )
+      : null,
+  );
 }
 
 /**

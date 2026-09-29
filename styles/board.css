@@ -369,6 +369,28 @@
   transform: rotate(180deg);
 }
 
+/* When the task was created + how long it has been sitting */
+.card-age {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.card-age svg {
+  vertical-align: -2px;
+  opacity: 0.8;
+}
+
+.card-age-sitting {
+  white-space: nowrap; /* "· 3h 5m ago" wraps as one piece */
+}
+
+.card-age-ago {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 .card-foot {
   display: flex;
   align-items: center;
