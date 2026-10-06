@@ -13,7 +13,7 @@
 
 import { ACTIVE_STATUSES, statusDef } from '../config.js';
 import { store } from '../store.js';
-import { el, icon, formatDateTime, formatDayTime, formatDuration, formatTimeAgo } from '../dom.js';
+import { el, icon, formatDateTime, formatDayTime, formatDuration, formatTimeAgo, scrollIntoBox } from '../dom.js';
 
 /**
  * @param {import('../store.js').Task} task
@@ -344,6 +344,9 @@ function categoryChipMenu(task, locked) {
       }),
     );
     wrap.append(menu);
+    // In an opened (scrolling) column list, show the whole menu.
+    const scroller = wrap.closest('.column-cards.is-expanded');
+    if (scroller) scrollIntoBox(scroller, menu);
     btn.setAttribute('aria-expanded', 'true');
     const first = /** @type {HTMLElement | null} */ (menu.querySelector('button:not(.is-current)'));
     (first || menu.querySelector('button'))?.focus();

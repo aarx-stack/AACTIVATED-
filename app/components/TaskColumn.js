@@ -7,6 +7,11 @@
  * completion flow — it opens the initials popup instead. Orders can't be
  * moved into category columns; they live in their own lane until
  * completed.
+ *
+ * Long columns don't run on forever: only the first `col.preview` cards
+ * show (Completed: just the latest), and a "Show more" dropdown opens the
+ * whole list in a scroll box. Every card is rendered either way — the
+ * dropdown only flips classes, so opening it keeps focus and is instant.
  */
 
 import { store } from '../store.js';
@@ -19,16 +24,18 @@ import { TaskCard } from './TaskCard.js';
  * @param {{ onComplete: Function, onDelete: Function, onEdit: Function,
  *           onToggleNotes: (taskId: string, expanded: boolean) => void,
  *           expandedNotes: Set<string>,
+ *           expanded: boolean,
+ *           onToggleExpanded: (columnId: string, expanded: boolean) => void,
  *           onDropToComplete: (taskId: string) => void, searching: boolean }} opts
  */
 export function TaskColumn(col, tasks, opts) {
   const count = tasks.length;
 
-  const list = el(
+  const cards = el(
     'div',
-    { class: 'column-list' },
-    ...tasks.map((t) =>
-      TaskCard(
+    { class: 'column-cards', id: `column-cards-${col.id}`, dataset: { col: col.id } },
+    ...tasks.map((t, i) => {
+      const card = TaskCard(
         t,
         {
           onComplete: /** @type {any} */ (opts.onComplete),
@@ -37,12 +44,14 @@ export function TaskColumn(col, tasks, opts) {
           onToggleNotes: opts.onToggleNotes,
         },
         { notesExpanded: opts.expandedNotes.has(t.id) },
-      ),
-    ),
+      );
+      if (i >= col.preview) card.classList.add('is-extra');
+      return card;
+    }),
   );
 
   if (count === 0) {
-    list.append(
+    cards.append(
       el(
         'div',
         { class: 'column-empty' },
@@ -57,6 +66,54 @@ export function TaskColumn(col, tasks, opts) {
         }),
       ),
     );
+  }
+
+  const list = el('div', { class: 'column-list' }, cards);
+
+  // ----- "Show more" dropdown ------------------------------------------
+  // Search results always show every match (still in a scroll box).
+  const long = count > col.preview;
+  /** @param {boolean} open */
+  const setOpen = (open) => {
+    cards.classList.toggle('is-collapsed', long && !open);
+    cards.classList.toggle('is-expanded', long && open);
+  };
+  setOpen(opts.searching || opts.expanded);
+
+  if (long && !opts.searching) {
+    const hidden = count - col.preview;
+    let open = opts.expanded;
+    const label = el('span');
+    const more = el(
+      'button',
+      {
+        class: 'column-more',
+        type: 'button',
+        'aria-controls': cards.id,
+        onclick: () => {
+          open = !open;
+          render();
+          if (!open) cards.scrollTop = 0;
+          opts.onToggleExpanded(col.id, open);
+        },
+      },
+      label,
+      icon('chevronDown', 14),
+    );
+    const render = () => {
+      setOpen(open);
+      more.setAttribute('aria-expanded', String(open));
+      label.replaceChildren(
+        ...(open
+          ? ['Show less']
+          : [
+              `Show ${hidden} more`,
+              el('span', { class: 'visually-hidden', text: ` ${col.noun}${hidden === 1 ? '' : 's'}` }),
+            ]),
+      );
+    };
+    render();
+    list.append(more);
   }
 
   const column = el(

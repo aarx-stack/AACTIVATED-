@@ -29,7 +29,11 @@ the scoreboard, and the moment it drops through the net your score counts up.
   columns, and an accessible "move to…" menu on each card's category chip.
   Every card shows when it was created and, while open, how long it has
   been sitting ("Created Today 2:15 PM · 3h 5m ago", updated live). All
-  times are 12-hour regardless of the browser's language
+  times are 12-hour regardless of the browser's language. Columns stay
+  short: Completed and Completed Orders show only the most recent finish,
+  task columns their 3 newest (set per column via `preview` in
+  `app/config.js`), each with a "Show N more" dropdown that opens the whole
+  list in its own scroll box; search always shows every match
 - **Edit & review**: the pencil next to each card's trash icon opens Edit
   Task (title, notes, category, assignee). Completion details — who scored,
   when, time spent — stay locked, so an edit can never change the

@@ -80,6 +80,19 @@ export function icon(name, size = 18) {
 }
 
 /**
+ * Scroll `box` (a scrolling list) just enough to show `target`. Unlike
+ * scrollIntoView, nothing else moves — not the page, not other boxes.
+ * @param {Element} box
+ * @param {Element} target
+ */
+export function scrollIntoBox(box, target) {
+  const b = box.getBoundingClientRect();
+  const t = target.getBoundingClientRect();
+  if (t.bottom > b.bottom) box.scrollTop += t.bottom - b.bottom + 8;
+  else if (t.top < b.top) box.scrollTop -= b.top - t.top + 8;
+}
+
+/**
  * A clean SVG basketball (used by the flight animation, the hoop stage and
  * decorative glyphs). Orange ball, dark seams, subtle shading.
  * @param {number} [size]

@@ -42,6 +42,9 @@ export const ACTIVE_STATUSES = /** @type {StatusId[]} */ (['new', 'medium', 'hot
  * orders (kind 'order') have their own lane: Orders → Completed Orders.
  * `drop`: what happens when a card is dropped on the column —
  * 'move' (category move), 'complete' (opens the initials flow), or null.
+ * `preview`: how many cards show before the column's "Show more"
+ * dropdown, which opens the whole list in a scroll box. Completed
+ * columns show just the latest; task columns a short preview.
  *
  * @typedef {Object} ColumnDef
  * @property {string} id
@@ -49,6 +52,8 @@ export const ACTIVE_STATUSES = /** @type {StatusId[]} */ (['new', 'medium', 'hot
  * @property {string} icon
  * @property {string} tone
  * @property {'move' | 'complete' | null} drop
+ * @property {number} preview
+ * @property {string} noun  What the column holds, singular ("task").
  * @property {string} emptyHint
  */
 
@@ -60,17 +65,48 @@ export const COLUMNS = [
     icon: 'cart',
     tone: 'cyan',
     drop: null,
+    preview: 3,
+    noun: 'order',
     emptyHint: 'New store orders land here automatically.',
   },
-  { id: 'new', label: 'New', icon: 'spark', tone: 'blue', drop: 'move', emptyHint: 'You can add a task using the + button.' },
-  { id: 'medium', label: 'Medium', icon: 'gauge', tone: 'amber', drop: 'move', emptyHint: 'You can add a task using the + button.' },
-  { id: 'hot', label: 'Hot', icon: 'flame', tone: 'red', drop: 'move', emptyHint: 'You can add a task using the + button.' },
+  {
+    id: 'new',
+    label: 'New',
+    icon: 'spark',
+    tone: 'blue',
+    drop: 'move',
+    preview: 3,
+    noun: 'task',
+    emptyHint: 'You can add a task using the + button.',
+  },
+  {
+    id: 'medium',
+    label: 'Medium',
+    icon: 'gauge',
+    tone: 'amber',
+    drop: 'move',
+    preview: 3,
+    noun: 'task',
+    emptyHint: 'You can add a task using the + button.',
+  },
+  {
+    id: 'hot',
+    label: 'Hot',
+    icon: 'flame',
+    tone: 'red',
+    drop: 'move',
+    preview: 3,
+    noun: 'task',
+    emptyHint: 'You can add a task using the + button.',
+  },
   {
     id: 'completed',
     label: 'Completed',
     icon: 'check',
     tone: 'green',
     drop: 'complete',
+    preview: 1,
+    noun: 'completed task',
     emptyHint: 'Completed tasks land here after a made shot.',
   },
   {
@@ -79,6 +115,8 @@ export const COLUMNS = [
     icon: 'cart',
     tone: 'green',
     drop: 'complete',
+    preview: 1,
+    noun: 'completed order',
     emptyHint: 'Completed orders land here after a made shot.',
   },
 ];
@@ -93,7 +131,7 @@ export function columnIdFor(task) {
 }
 
 /** Shown in the footer so it's easy to tell which build a tab is running. */
-export const APP_VERSION = 'v13';
+export const APP_VERSION = 'v14';
 
 /** First ticket number ever issued. */
 export const FIRST_TICKET = 1001;

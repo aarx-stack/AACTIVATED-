@@ -110,6 +110,10 @@
   border-radius: 14px;
   background: #080e19;
   overflow: hidden;
+  /* clip, not hidden: a hidden-overflow box can still be scrolled by
+     focus()/scrollIntoView, which would shift the column's contents
+     (header included) with no scrollbar to bring them back. */
+  overflow: clip;
   transition:
     border-color 0.15s ease,
     background-color 0.15s ease;
@@ -177,6 +181,76 @@
   gap: 10px;
   padding: 12px;
   min-height: 132px;
+}
+
+.column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Collapsed: only the preview cards (Completed: just the latest) */
+.column-cards.is-collapsed > .task-card.is-extra {
+  display: none;
+}
+
+/* Opened with "Show more": the whole list, in its own scroll box. The
+   padding/negative margin keep focus rings and the scrollbar unclipped. */
+.column-cards.is-expanded {
+  max-height: min(68vh, 640px);
+  overflow-y: auto;
+  margin: -4px -8px -4px -4px;
+  padding: 4px 8px 4px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--tone) / 0.45) transparent;
+}
+
+.column-cards.is-expanded::-webkit-scrollbar {
+  width: 6px;
+}
+
+.column-cards.is-expanded::-webkit-scrollbar-thumb {
+  border-radius: 6px;
+  background: rgb(var(--tone) / 0.45);
+}
+
+/* The "Show N more" / "Show less" dropdown toggle */
+.column-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px dashed rgb(var(--tone) / 0.4);
+  border-radius: 10px;
+  background: rgb(var(--tone) / 0.06);
+  color: var(--tone-strong);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.column-more:hover {
+  background: rgb(var(--tone) / 0.13);
+  border-color: rgb(var(--tone) / 0.65);
+}
+
+.column-more:focus-visible {
+  outline: 2px solid var(--blue-bright);
+  outline-offset: 2px;
+}
+
+.column-more svg {
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.column-more[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 
 /* Drop target feedback */
