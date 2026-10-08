@@ -167,7 +167,9 @@
 
 .sb-players {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* one equal panel per team member, however many there are */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: clamp(10px, 1.6vw, 16px);
 }
 
@@ -680,6 +682,18 @@
 
   .sb-clock {
     font-size: 13px;
+  }
+
+  /* four panels on a phone: tighter padding and label tracking */
+  .sb-player {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .sb-player-label {
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
   }
 
   .sb-ticker {

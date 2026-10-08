@@ -2,7 +2,7 @@
 
 /**
  * "Add Task" modal: title (required), notes, category (New / Medium / Hot)
- * and an optional assignee (Anyone / JG / IM / GG).
+ * and an optional assignee (Anyone / JG / IM / GG / CG).
  */
 
 import { store } from '../../store.js';

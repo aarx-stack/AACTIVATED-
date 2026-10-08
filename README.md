@@ -16,7 +16,7 @@ the scoreboard, and the moment it drops through the net your score counts up.
   electric bolts (all disabled under reduced motion)
 
 - **Arena scoreboard** at the top: LED-style (DSEG7) score digits with ghost
-  segments for JG / IM / GG, a live 12-hour clock (AM/PM), a team-total
+  segments for JG / IM / GG / CG, a live 12-hour clock (AM/PM), a team-total
   ticker, and an integrated backboard + rim + net
 - **Basketball scoring animation** — on completion the ball arcs from where you
   clicked into the hoop (spin, motion trail, net snap, SWISH flash, "+1" chip,
@@ -24,7 +24,7 @@ the scoreboard, and the moment it drops through the net your score counts up.
   completion exactly once
 - **Task board** with New / Medium / Hot / Completed columns (plus Orders /
   Completed Orders lanes for store orders), live counts, automatic permanent
-  ticket numbers (#1001, #1002, …), optional assignment to JG / IM / GG,
+  ticket numbers (#1001, #1002, …), optional assignment to JG / IM / GG / CG,
   search (ticket, title, notes, initials), drag & drop between active
   columns, and an accessible "move to…" menu on each card's category chip.
   Every card shows when it was created and, while open, how long it has

@@ -3,7 +3,7 @@
 /**
  * The task form fields shared by the Add Task and Edit Task popups:
  * title (required), notes, category (New / Medium / Hot) and an optional
- * assignee (Anyone / JG / IM / GG). Element ids carry a prefix, so both
+ * assignee (Anyone / JG / IM / GG / CG). Element ids carry a prefix, so both
  * popups can live in the page at once.
  */
 

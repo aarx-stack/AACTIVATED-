@@ -14,6 +14,7 @@ export const PLAYERS = [
   { initials: 'JG', name: 'JG' },
   { initials: 'IM', name: 'IM' },
   { initials: 'GG', name: 'GG' },
+  { initials: 'CG', name: 'CG' },
 ];
 
 /** @typedef {'new' | 'medium' | 'hot' | 'completed'} StatusId */
@@ -131,7 +132,7 @@ export function columnIdFor(task) {
 }
 
 /** Shown in the footer so it's easy to tell which build a tab is running. */
-export const APP_VERSION = 'v14';
+export const APP_VERSION = 'v15';
 
 /** First ticket number ever issued. */
 export const FIRST_TICKET = 1001;
