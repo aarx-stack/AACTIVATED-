@@ -19,7 +19,6 @@ import { z } from "zod";
 import {
   ActivityKind,
   AgentKind,
-  ApprovalType,
   ContentChannel,
   ContentStatus,
   HandoffStatus,
@@ -30,8 +29,7 @@ import type { ModelAdapter } from "@/lib/ai/types";
 import { db, type Db } from "@/lib/db";
 import { recordAudit } from "@/server/audit/audit";
 import { authorize, type Actor } from "@/server/authz/permissions";
-import { submitApproval } from "@/server/approvals/service";
-import { runComplianceCheck } from "@/server/compliance/service";
+import { checkAndSubmitContent } from "@/server/content/review";
 import { AgentUnavailableError, runSkill, SkillOutputError, type RunnableAgent } from "./runner";
 import { brainPlanSkill, CHANNEL_LABEL, contentDraftSkill, opsDelegateSkill } from "./skills";
 
@@ -317,67 +315,16 @@ export async function runContentWorkflow(
       hashtags: draft.output.hashtags,
     };
     const result = await client.$transaction(async (tx) => {
-      const check = await runComplianceCheck(tx, {
-        text: `${payload.title}\n${payload.caption}\n${payload.hashtags.join(" ")}`,
-        channel,
+      const { approval, check } = await checkAndSubmitContent(tx, {
         contentItemId: content.id,
-      });
-      await tx.agentActivity.create({
-        data: {
-          agentId: writer.id,
-          kind: check.outcome === "PASS" ? ActivityKind.COMPLIANCE_CHECKED : ActivityKind.FLAGGED,
-          message:
-            check.outcome === "PASS"
-              ? "Compliance check passed."
-              : `Compliance check found ${check.violations.length} issue${check.violations.length === 1 ? "" : "s"} (${check.risk.toLowerCase()} risk). Sent for management review.`,
-          taskId: writerTask.id,
-        },
-      });
-      await recordAudit(tx, {
-        actor: { type: "SYSTEM" },
-        action: "compliance.checked",
-        entityType: "ContentItem",
-        entityId: content.id,
-        correlationId,
-        after: {
-          outcome: check.outcome,
-          risk: check.risk,
-          violations: check.violations.map((v) => ({ match: v.match, severity: v.severity })),
-        },
-      });
-
-      const approval = await submitApproval(tx, {
-        type: ApprovalType.SOCIAL_POST,
-        title: draft.output.title,
-        summary: `${CHANNEL_LABEL[channel]} post drafted by the Content Specialist. Compliance: ${check.outcome.toLowerCase()}.`,
         payload,
+        summary: `${CHANNEL_LABEL[channel]} post drafted by the Content Specialist.`,
         reasoning: draft.output.reasoning,
         sources: draft.output.sources,
-        risk: check.risk,
-        requestedByAgentId: writer.id,
-        contentItemId: content.id,
+        agentId: writer.id,
         correlationId,
-      });
-      await tx.complianceCheck.update({
-        where: { id: check.checkId },
-        data: { approvalRequestId: approval.id },
-      });
-      await tx.contentItem.update({
-        where: { id: content.id },
-        data: { status: ContentStatus.IN_REVIEW },
-      });
-      await tx.task.update({
-        where: { id: writerTask.id },
-        data: { status: TaskStatus.IN_REVIEW },
-      });
-      await tx.task.update({ where: { id: taskId }, data: { status: TaskStatus.IN_REVIEW } });
-      await tx.agentActivity.create({
-        data: {
-          agentId: writer.id,
-          kind: ActivityKind.SUBMITTED_FOR_APPROVAL,
-          message: `Submitted "${draft.output.title}" to the Approval Queue.`,
-          taskId: writerTask.id,
-        },
+        taskIds: [writerTask.id, taskId],
+        activityTaskId: writerTask.id,
       });
       return { approvalId: approval.id, check };
     });

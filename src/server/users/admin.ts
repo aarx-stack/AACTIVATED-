@@ -9,6 +9,7 @@ import { db, type Db } from "@/lib/db";
 import { recordAudit } from "@/server/audit/audit";
 import { authorize, ForbiddenError, type Actor } from "@/server/authz/permissions";
 import { canChangeRole, canChangeUserStatus } from "@/server/authz/policies";
+import { syncRepPod } from "@/server/reps/pods";
 
 export class NotFoundError extends Error {
   readonly status = 404;
@@ -36,6 +37,17 @@ export async function changeUserRole(
       before: { role: target.role },
       after: { role: updated.role },
     });
+    // An onboarded rep's AI pod follows their plan: upgrades add agents from the
+    // current templates, downgrades pause the extras (history is kept).
+    if (await tx.repPod.findUnique({ where: { repId: targetId } })) {
+      await syncRepPod(tx, targetId, { type: "USER", userId: actor.id });
+      if (nextRole === Role.PREMIUM_REP) {
+        await tx.repProfile.updateMany({
+          where: { userId: targetId, ghlSubAccountId: null },
+          data: { ghlSubAccountId: `mock-sub-${targetId.slice(-8)}` },
+        });
+      }
+    }
     return updated;
   });
 }

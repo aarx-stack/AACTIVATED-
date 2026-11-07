@@ -1,11 +1,7 @@
 import { HealthStatus } from "@/generated/prisma/enums";
-import type {
-  GoHighLevelAdapter,
-  HealthResult,
-  IntegrationKey,
-  QuickBooksAdapter,
-  SlackAdapter,
-} from "./types";
+import { randomUUID } from "node:crypto";
+import type { HealthResult, IntegrationKey, QuickBooksAdapter, SlackAdapter } from "./types";
+import { type GoHighLevelAdapter, IntegrationUnavailableError } from "./types";
 
 /**
  * MOCK_INTEGRATIONS_DOWN="SLACK,QUICKBOOKS" simulates an outage so graceful
@@ -29,6 +25,22 @@ export const mockGoHighLevel: GoHighLevelAdapter = {
   key: "GOHIGHLEVEL",
   mode: "mock",
   healthCheck: async () => mockHealth("GOHIGHLEVEL"),
+  schedulePost: async (input) => {
+    if (isSimulatedDown("GOHIGHLEVEL")) {
+      throw new IntegrationUnavailableError("GoHighLevel is unavailable. Nothing was scheduled.");
+    }
+    console.info(
+      `[ghl:mock] scheduled ${input.channel} post for ${input.scheduledFor.toISOString()}`,
+    );
+    return { externalId: `mock-post-${randomUUID().slice(0, 8)}` };
+  },
+  sendMessage: async (input) => {
+    if (isSimulatedDown("GOHIGHLEVEL")) {
+      throw new IntegrationUnavailableError("GoHighLevel is unavailable. Nothing was sent.");
+    }
+    console.info(`[ghl:mock] message to contact ${input.contactId} via ${input.channel}`);
+    return { externalId: `mock-msg-${randomUUID().slice(0, 8)}` };
+  },
   listSubAccounts: async () => [
     { id: "mock-sub-001", name: "Demo Rep — Jordan Ellis" },
     { id: "mock-sub-002", name: "Demo Rep — Priya Shah" },

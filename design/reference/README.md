@@ -1,7 +1,7 @@
 # Design reference
 
-Put the approved mockups here as `*.png` (one per page, e.g. `01-command-center-dark.png`).
+`AARX_GUI_Dark_Style_A_Obsidian_Glass.pdf` is the approved visual direction
+(Style A, Obsidian Glass, dark set), with one concept per app page (IDs 101-112).
+Labels and numbers in the concepts are placeholders: the app shows real data.
 
-Until they arrive, the UI follows the "Obsidian Glass" direction from the master prompt.
-All colors, radii and layout sizes are tokens in `src/styles/globals.css`, so matching the
-mockups is a token change rather than a component rewrite.
+All colors, radii, glows and layout sizes are tokens in `src/styles/globals.css`.

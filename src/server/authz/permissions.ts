@@ -60,6 +60,21 @@ export const PERMISSIONS = {
     group: "Rep tools",
     roles: [EXECUTIVE, STAFF, PREMIUM_REP],
   },
+  "content.create": {
+    label: "Draft posts and request content",
+    group: "Rep tools",
+    roles: [EXECUTIVE, STAFF, PREMIUM_REP],
+  },
+  "content.schedule": {
+    label: "Schedule approved posts",
+    group: "Rep tools",
+    roles: [EXECUTIVE, STAFF, PREMIUM_REP],
+  },
+  "leads.manage_own": {
+    label: "Consented contacts and follow-ups",
+    group: "Rep tools",
+    roles: [PREMIUM_REP],
+  },
   "approvals.view": { label: "View Approval Queue", group: "Approvals", roles: [EXECUTIVE, STAFF] },
   "approvals.decide_standard": {
     label: "Decide low/medium-risk content",

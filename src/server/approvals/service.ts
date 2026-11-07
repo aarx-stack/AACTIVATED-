@@ -233,8 +233,33 @@ export async function decideApproval(
         kind: NotificationKind.APPROVAL_DECIDED,
         title: decision === "APPROVE" ? `Approved: ${request.title}` : `Rejected: ${request.title}`,
         body: decision === "APPROVE" ? "Approved and ready to schedule." : (note ?? "Rejected."),
-        href: `/approvals/${request.id}`,
+        href: `/content/${content.id}`,
       });
+    } else if (request.correlationId) {
+      // Non-content requests (e.g. a rep's follow-up message): close the task and tell whoever asked.
+      const origin = await tx.task.findFirst({
+        where: { correlationId: request.correlationId, parentId: null },
+        select: { id: true, createdById: true },
+      });
+      if (origin) {
+        await tx.task.update({
+          where: { id: origin.id },
+          data:
+            decision === "APPROVE"
+              ? { status: TaskStatus.DONE, completedAt: new Date() }
+              : { status: TaskStatus.CANCELLED },
+        });
+        await notifyUser(tx, origin.createdById, {
+          kind: NotificationKind.APPROVAL_DECIDED,
+          title:
+            decision === "APPROVE" ? `Approved: ${request.title}` : `Rejected: ${request.title}`,
+          body:
+            decision === "APPROVE"
+              ? "Approved. You can send it from My AI Team."
+              : (note ?? "Rejected."),
+          href: "/my-team",
+        });
+      }
     }
 
     if (request.requestedByAgentId) {

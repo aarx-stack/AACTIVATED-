@@ -23,6 +23,7 @@ import type {
 } from "../src/generated/prisma/enums";
 import { requiredRoleFor } from "../src/server/approvals/policy";
 import { hashPayload } from "../src/server/approvals/payload";
+import { coachPlanSkill } from "../src/server/agents/skills";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -1451,6 +1452,243 @@ async function main() {
       },
     ],
   });
+
+  // Rep profiles, team, contacts, earnings, payouts, weekly plan (Phase 3)
+  const downline = [
+    { name: "Taylor Reed", email: "taylor@aactivated.test", sponsor: "jordan", monthsAgo: 4 },
+    { name: "Morgan Lee", email: "morgan@aactivated.test", sponsor: "jordan", monthsAgo: 2 },
+    { name: "Casey Patel", email: "casey@aactivated.test", sponsor: "jordan", monthsAgo: 1 },
+    // Not onboarded yet: signing in as Riley shows the rep onboarding flow.
+    { name: "Riley Chen", email: "riley@aactivated.test", sponsor: "priya", monthsAgo: 0 },
+  ] as const;
+  const monthsAgo = (n: number) => new Date(NOW.getFullYear(), NOW.getMonth() - n, 1);
+
+  await db.repProfile.create({
+    data: {
+      userId: users.jordan.id,
+      presenterStatus: "PRESENTER",
+      ghlSubAccountId: "mock-sub-001",
+      policiesAcceptedAt: ago(200 * DAY),
+      joinedAt: monthsAgo(9),
+    },
+  });
+  await db.repProfile.create({
+    data: {
+      userId: users.priya.id,
+      presenterStatus: "CANDIDATE",
+      sponsorId: users.jordan.id,
+      ghlSubAccountId: "mock-sub-002",
+      policiesAcceptedAt: ago(150 * DAY),
+      joinedAt: monthsAgo(5),
+    },
+  });
+  await db.repProfile.create({
+    data: {
+      userId: users.sam.id,
+      presenterStatus: "NONE",
+      sponsorId: users.jordan.id,
+      policiesAcceptedAt: ago(60 * DAY),
+      joinedAt: monthsAgo(3),
+    },
+  });
+  for (const d of downline) {
+    const u = await db.user.create({
+      data: {
+        name: d.name,
+        email: d.email,
+        role: "FREE_REP",
+        title: "Free Rep (demo team member)",
+        status: "ACTIVE",
+        onboardedAt: d.monthsAgo > 0 ? monthsAgo(d.monthsAgo) : null,
+      },
+    });
+    await db.repProfile.create({
+      data: {
+        userId: u.id,
+        sponsorId: users[d.sponsor].id,
+        joinedAt: new Date(monthsAgo(d.monthsAgo).getTime() + 5 * DAY),
+        policiesAcceptedAt: d.monthsAgo > 0 ? monthsAgo(d.monthsAgo) : null,
+      },
+    });
+    if (d.monthsAgo > 0) {
+      const pod = await db.repPod.create({ data: { repId: u.id } });
+      const v = latestVersion.BUSINESS_COACH!;
+      await db.agent.create({
+        data: {
+          slug: `pod-${u.id}-business-coach`,
+          name: "Business Coach",
+          title: "Business Coach",
+          kind: "REP_POD",
+          status: "ACTIVE",
+          repPodId: pod.id,
+          repRole: "BUSINESS_COACH",
+          ownerId: u.id,
+          templateVersionId: v.id,
+          config: agentConfig(v.role, v.context, v.dailyRoutine, v.toolsAllowed),
+        },
+      });
+    }
+  }
+
+  const earningPlan: { rep: UserKey; base: number }[] = [
+    { rep: "jordan", base: 640 },
+    { rep: "priya", base: 210 },
+    { rep: "sam", base: 35 },
+  ];
+  for (const { rep, base } of earningPlan) {
+    for (let m = 5; m >= 0; m--) {
+      const period = monthsAgo(m);
+      const growth = 1 + (5 - m) * 0.12;
+      const status = m === 0 ? "PENDING" : m === 1 ? "APPROVED" : "PAID";
+      const commission = Number((base * growth * between(0.9, 1.1)).toFixed(2));
+      await db.earning.create({
+        data: {
+          repId: users[rep].id,
+          period,
+          kind: "COMMISSION",
+          status,
+          amountUsd: usd(commission),
+          description: "Monthly commission",
+        },
+      });
+      if (rep === "jordan" && m % 2 === 0) {
+        await db.earning.create({
+          data: {
+            repId: users[rep].id,
+            period,
+            kind: "OVERRIDE",
+            status,
+            amountUsd: usd(base * 0.18),
+            description: "Team override",
+          },
+        });
+      }
+      if (status === "PAID") {
+        const paid = commission + (rep === "jordan" && m % 2 === 0 ? base * 0.18 : 0);
+        await db.payout.create({
+          data: {
+            repId: users[rep].id,
+            amountUsd: usd(paid),
+            paidAt: new Date(period.getFullYear(), period.getMonth() + 1, 15),
+            method: "Direct deposit",
+            reference: `PO-${period.getFullYear()}${String(period.getMonth() + 1).padStart(2, "0")}-${rep.toUpperCase()}`,
+          },
+        });
+      }
+    }
+  }
+
+  await db.contact.createMany({
+    data: [
+      {
+        repId: users.jordan.id,
+        name: "Alex Morgan",
+        email: "alex.morgan@example.test",
+        preferredChannel: "EMAIL",
+        consentSource: "WEB_FORM",
+        consentAt: ago(2 * DAY),
+        consentEvidence: "Requested the Recovery guide on the website form",
+        status: "NEW",
+      },
+      {
+        repId: users.jordan.id,
+        name: "Sam Rivera",
+        email: "sam.rivera@example.test",
+        preferredChannel: "INSTAGRAM",
+        consentSource: "INBOUND_MESSAGE",
+        consentAt: ago(5 * DAY),
+        consentEvidence: "Sent a DM asking about the weekly Q&A",
+        status: "NEW",
+      },
+      {
+        repId: users.jordan.id,
+        name: "Jamie Brooks",
+        email: "jamie.brooks@example.test",
+        preferredChannel: "EMAIL",
+        consentSource: "EVENT_SIGNUP",
+        consentAt: ago(20 * DAY),
+        consentEvidence: "Signed up at the October community event",
+        status: "FOLLOWING_UP",
+        lastContactedAt: ago(6 * DAY),
+      },
+      {
+        repId: users.jordan.id,
+        name: "Drew Kim",
+        email: "drew.kim@example.test",
+        preferredChannel: "EMAIL",
+        consentSource: "WEB_FORM",
+        consentAt: ago(40 * DAY),
+        consentEvidence: "Newsletter sign-up form",
+        status: "OPTED_OUT",
+      },
+      {
+        repId: users.priya.id,
+        name: "Chris Lane",
+        email: "chris.lane@example.test",
+        preferredChannel: "EMAIL",
+        consentSource: "REFERRAL_OPT_IN",
+        consentAt: ago(3 * DAY),
+        consentEvidence: "Referred by a member and opted in by email",
+        status: "NEW",
+      },
+    ],
+  });
+
+  // This week's coach plan for Jordan and Sam (same shape the Business Coach produces).
+  const weekStart = new Date(NOW);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  for (const rep of ["jordan", "sam"] as const) {
+    const premium = rep === "jordan";
+    const plan = coachPlanSkill.mock({
+      repName: USERS.find((u) => u.key === rep)!.name,
+      plan: premium ? "PREMIUM" : "FREE",
+      presenterStatus: "NONE",
+      monthEarningsUsd: 0,
+      newContacts: premium ? 2 : 0,
+    });
+    const podAgents = await db.agent.findMany({
+      where: { repPod: { repId: users[rep].id } },
+      select: { id: true, repRole: true },
+    });
+    const coachId = podAgents.find((a) => a.repRole === "BUSINESS_COACH")!.id;
+    const parent = await db.task.create({
+      data: {
+        title: `Weekly plan: week of ${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+        description: plan.focus,
+        status: "IN_PROGRESS",
+        agentId: coachId,
+        createdById: users[rep].id,
+        dueAt: new Date(weekStart.getTime() + 4 * DAY + 17 * HOUR),
+      },
+    });
+    for (const [i, day] of plan.days.entries()) {
+      const due = new Date(weekStart.getTime() + i * DAY + 17 * HOUR);
+      for (const action of day.actions) {
+        const isPast = due.getTime() < NOW.getTime() - 12 * HOUR;
+        await db.task.create({
+          data: {
+            title: action.title,
+            parentId: parent.id,
+            createdById: users[rep].id,
+            dueAt: due,
+            status: isPast ? "DONE" : "TODO",
+            completedAt: isPast ? due : null,
+            agentId: podAgents.find((a) => a.repRole === action.owner)?.id ?? coachId,
+          },
+        });
+      }
+    }
+    await db.report.create({
+      data: {
+        agentId: coachId,
+        period: "WEEKLY",
+        title: "This week",
+        body: `${plan.focus}\n\n${plan.encouragement}`,
+        createdAt: weekStart,
+      },
+    });
+  }
 
   // Notifications
   await db.notification.createMany({

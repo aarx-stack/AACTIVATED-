@@ -239,6 +239,38 @@ enum NotificationKind {
   MENTION
 }
 
+enum PresenterStatus {
+  NONE
+  CANDIDATE
+  PRESENTER
+}
+
+enum ConsentSource {
+  WEB_FORM
+  INBOUND_MESSAGE
+  EVENT_SIGNUP
+  REFERRAL_OPT_IN
+}
+
+enum ContactStatus {
+  NEW
+  FOLLOWING_UP
+  CONVERTED
+  OPTED_OUT
+}
+
+enum EarningKind {
+  COMMISSION
+  BONUS
+  OVERRIDE
+}
+
+enum EarningStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
 // ---------------------------------------------------------------------------
 // Identity & auth (Auth.js tables + our user fields)
 // ---------------------------------------------------------------------------
@@ -277,6 +309,12 @@ model User {
   notifications      Notification[]
   auditEntries       AuditLog[]
   contentItems       ContentItem[]
+  repProfile         RepProfile?             @relation("RepProfileUser")
+  sponsoredReps      RepProfile[]            @relation("RepSponsor")
+  contacts           Contact[]
+  earnings           Earning[]
+  payouts            Payout[]
+  scheduledContent   ContentItem[]           @relation("ContentScheduler")
 
   @@index([role])
 }
@@ -494,22 +532,26 @@ model Report {
 }
 
 model ContentItem {
-  id            String         @id @default(cuid())
-  title         String
-  body          String
-  channel       ContentChannel
-  status        ContentStatus  @default(DRAFT)
-  scheduledFor  DateTime?
-  authorAgentId String?
-  authorAgent   Agent?         @relation(fields: [authorAgentId], references: [id], onDelete: SetNull)
+  id             String         @id @default(cuid())
+  title          String
+  body           String
+  channel        ContentChannel
+  status         ContentStatus  @default(DRAFT)
+  scheduledFor   DateTime?
+  authorAgentId  String?
+  authorAgent    Agent?         @relation(fields: [authorAgentId], references: [id], onDelete: SetNull)
   /// The rep this content belongs to, when produced by a rep pod.
-  repId         String?
-  rep           User?          @relation(fields: [repId], references: [id], onDelete: SetNull)
+  repId          String?
+  rep            User?          @relation(fields: [repId], references: [id], onDelete: SetNull)
   /// The workflow task that produced this item.
-  taskId        String?
-  task          Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  taskId         String?
+  task           Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  /// Set when the approved post is handed to the social scheduler (GoHighLevel).
+  externalPostId String?
+  scheduledById  String?
+  scheduledBy    User?          @relation("ContentScheduler", fields: [scheduledById], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   approvalRequests ApprovalRequest[]
   complianceChecks ComplianceCheck[]
@@ -552,6 +594,11 @@ model ApprovalRequest {
   editedBy           User?          @relation("ApprovalEditor", fields: [editedById], references: [id])
   editedAt           DateTime?
   correlationId      String?
+  /// For follow-up messages: the consented contact it is addressed to.
+  /// Set once the approved item has been handed to the outside system. Prevents double sends.
+  dispatchedAt       DateTime?
+  contactId          String?
+  contact            Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
   contentItemId      String?
   contentItem        ContentItem?   @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
   budgetId           String?
@@ -796,4 +843,79 @@ model Notification {
   createdAt DateTime         @default(now())
 
   @@index([userId, readAt])
+}
+
+// ---------------------------------------------------------------------------
+// Reps: profile, consented contacts, earnings
+// ---------------------------------------------------------------------------
+
+model RepProfile {
+  id                 String          @id @default(cuid())
+  userId             String          @unique
+  user               User            @relation("RepProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+  presenterStatus    PresenterStatus @default(NONE)
+  /// The rep who brought this rep in (team growth).
+  sponsorId          String?
+  sponsor            User?           @relation("RepSponsor", fields: [sponsorId], references: [id])
+  /// One GoHighLevel sub-account per Premium rep.
+  ghlSubAccountId    String?
+  policiesAcceptedAt DateTime?
+  joinedAt           DateTime        @default(now())
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([sponsorId])
+}
+
+/// Lead generation is consent-only: every contact records where and when consent was given.
+model Contact {
+  id               String         @id @default(cuid())
+  repId            String
+  rep              User           @relation(fields: [repId], references: [id], onDelete: Cascade)
+  name             String
+  email            String?
+  phone            String?
+  preferredChannel ContentChannel @default(EMAIL)
+  consentSource    ConsentSource
+  consentAt        DateTime
+  /// What the person did to opt in (e.g. "Submitted the Recovery guide form").
+  consentEvidence  String
+  status           ContactStatus  @default(NEW)
+  notes            String?
+  lastContactedAt  DateTime?
+  ghlContactId     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  approvalRequests ApprovalRequest[]
+
+  @@index([repId, status])
+}
+
+model Earning {
+  id          String        @id @default(cuid())
+  repId       String
+  rep         User          @relation(fields: [repId], references: [id], onDelete: Cascade)
+  /// First day of the month the earning belongs to.
+  period      DateTime
+  kind        EarningKind
+  status      EarningStatus @default(PENDING)
+  amountUsd   Decimal       @db.Decimal(12, 2)
+  description String
+  createdAt   DateTime      @default(now())
+
+  @@index([repId, period])
+}
+
+model Payout {
+  id        String   @id @default(cuid())
+  repId     String
+  rep       User     @relation(fields: [repId], references: [id], onDelete: Cascade)
+  amountUsd Decimal  @db.Decimal(12, 2)
+  paidAt    DateTime
+  method    String
+  reference String
+  createdAt DateTime @default(now())
+
+  @@index([repId, paidAt])
 }

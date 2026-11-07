@@ -26,6 +26,29 @@ export interface GoHighLevelAdapter extends IntegrationAdapter {
   key: "GOHIGHLEVEL";
   /** One sub-account per Premium rep. */
   listSubAccounts(): Promise<{ id: string; name: string }[]>;
+  /**
+   * Outbound. Only ever called after assertDispatchable() has verified the
+   * approval and the exact payload (see src/server/content/studio.ts).
+   */
+  schedulePost(input: {
+    subAccountId: string;
+    channel: string;
+    caption: string;
+    hashtags: string[];
+    scheduledFor: Date;
+  }): Promise<{ externalId: string }>;
+  /** Outbound message to a consented contact. Same rule: approval first. */
+  sendMessage(input: {
+    subAccountId: string;
+    contactId: string;
+    channel: string;
+    subject?: string;
+    message: string;
+  }): Promise<{ externalId: string }>;
+}
+
+export class IntegrationUnavailableError extends Error {
+  readonly status = 503;
 }
 
 export interface QuickBooksAdapter extends IntegrationAdapter {

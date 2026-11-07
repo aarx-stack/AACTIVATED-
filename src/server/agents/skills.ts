@@ -99,7 +99,7 @@ export const delegateOutput = z.object({
   assignment: z.string().min(10).max(800),
   checklist: z.array(z.string().min(3).max(160)).min(2).max(6),
   dueInHours: z.number().int().min(1).max(168),
-  assignee: z.literal("Content Specialist"),
+  assignee: z.string().min(2).max(60),
 });
 export type DelegateOutput = z.infer<typeof delegateOutput>;
 
@@ -200,4 +200,224 @@ export const contentDraftSkill = defineSkill<DraftInput, DraftOutput>({
   },
 });
 
-export const SKILLS = [brainPlanSkill, opsDelegateSkill, contentDraftSkill] as const;
+// ----------------------------------------------------- Business Coach: plan --
+
+export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as const;
+export const POD_OWNERS = [
+  "BUSINESS_COACH",
+  "CONTENT_CREATOR",
+  "SOCIAL_MEDIA_MANAGER",
+  "LEAD_FOLLOWUP",
+] as const;
+
+export interface CoachInput {
+  repName: string;
+  plan: "PREMIUM" | "FREE";
+  presenterStatus: string;
+  monthEarningsUsd: number;
+  newContacts: number;
+  goal?: string;
+}
+
+export const coachPlanOutput = z.object({
+  focus: z.string().min(5).max(200),
+  days: z
+    .array(
+      z.object({
+        day: z.enum(WEEKDAYS),
+        actions: z
+          .array(z.object({ title: z.string().min(3).max(120), owner: z.enum(POD_OWNERS) }))
+          .min(1)
+          .max(3),
+      }),
+    )
+    .length(5),
+  encouragement: z.string().min(5).max(300),
+});
+export type CoachPlanOutput = z.infer<typeof coachPlanOutput>;
+
+export const coachPlanSkill = defineSkill<CoachInput, CoachPlanOutput>({
+  name: "coach.weekly_plan",
+  tier: "agent",
+  requiresTool: "report.write",
+  output: coachPlanOutput,
+  prompt: (i) =>
+    [
+      `Plan ${i.repName}'s week (${i.plan === "PREMIUM" ? "Premium: full AI team" : "Free: coaching only"}).`,
+      `Presenter status: ${i.presenterStatus}. Earnings this month: $${i.monthEarningsUsd.toFixed(2)}. New consented contacts: ${i.newContacts}.`,
+      i.goal ? `Their goal this week: """${i.goal}"""` : "",
+      "Give a one-line focus, 1-3 actions for each weekday with an owner from the pod, and a short encouragement.",
+      i.plan === "FREE"
+        ? "Free reps only have the Business Coach: every owner must be BUSINESS_COACH."
+        : "",
+      "Never promise income. Lead generation is consented inbound contacts only.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  mock: (i) => {
+    const premium = i.plan === "PREMIUM";
+    const own = (title: string, owner: (typeof POD_OWNERS)[number]) => ({
+      title,
+      owner: premium ? owner : ("BUSINESS_COACH" as const),
+    });
+    return {
+      focus: i.goal
+        ? `This week: ${i.goal.slice(0, 120)}`
+        : i.newContacts > 0
+          ? "Follow up with new consented contacts and keep posting consistently."
+          : "Show up consistently: one educational post and one learning block a day.",
+      days: [
+        {
+          day: "Monday",
+          actions: [
+            own("Review the weekly plan and set one goal", "BUSINESS_COACH"),
+            own("Draft an educational post for the week", "CONTENT_CREATOR"),
+          ],
+        },
+        {
+          day: "Tuesday",
+          actions: [
+            own("Reply to new consented contacts", "LEAD_FOLLOWUP"),
+            own("Complete one training module", "BUSINESS_COACH"),
+          ],
+        },
+        {
+          day: "Wednesday",
+          actions: [
+            own("Schedule approved posts for the rest of the week", "SOCIAL_MEDIA_MANAGER"),
+          ],
+        },
+        {
+          day: "Thursday",
+          actions: [
+            own("Check in with contacts who asked questions", "LEAD_FOLLOWUP"),
+            own("Share a community story (education only)", "CONTENT_CREATOR"),
+          ],
+        },
+        {
+          day: "Friday",
+          actions: [own("Weekly reflection: what worked, what to change", "BUSINESS_COACH")],
+        },
+      ],
+      encouragement: `Small, consistent steps compound, ${i.repName.split(" ")[0]}. Focus on helping people learn.`,
+    };
+  },
+});
+
+// ----------------------------------------------------- Lead follow-up draft --
+
+export interface FollowUpInput {
+  repName: string;
+  contact: { name: string; consentEvidence: string; channel: ContentChannel; status: string };
+  note?: string;
+}
+
+export const followUpOutput = z.object({
+  subject: z.string().max(120).optional(),
+  message: z.string().min(20).max(1200),
+  reasoning: z.string().min(20).max(800),
+  sources: z
+    .array(z.object({ title: z.string().min(2).max(160), note: z.string().max(300).optional() }))
+    .min(1)
+    .max(4),
+});
+export type FollowUpOutput = z.infer<typeof followUpOutput>;
+
+export const followUpSkill = defineSkill<FollowUpInput, FollowUpOutput>({
+  name: "leads.follow_up",
+  tier: "agent",
+  requiresTool: "ghl.contacts.read",
+  output: followUpOutput,
+  prompt: (i) =>
+    [
+      `Draft a follow-up from ${i.repName} to ${i.contact.name} via ${CHANNEL_LABEL[i.contact.channel]}.`,
+      `They opted in: ${i.contact.consentEvidence}. Current status: ${i.contact.status}.`,
+      i.note ? `Rep's note: """${i.note}"""` : "",
+      "Be warm and brief, offer help, no medical claims, no pressure, and include a clear way to opt out.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  mock: (i) => {
+    const first = i.contact.name.split(" ")[0] ?? i.contact.name;
+    const repFirst = i.repName.split(" ")[0] ?? i.repName;
+    return {
+      subject: i.contact.channel === "EMAIL" ? `Following up, ${first}` : undefined,
+      message: [
+        `Hi ${first}, thanks for reaching out (${i.contact.consentEvidence.replace(/\.$/, "").toLowerCase()}).`,
+        i.note
+          ? `You mentioned: ${i.note}`
+          : "I'm happy to share our educational resources and answer any questions.",
+        "Would a short call this week be helpful?",
+        repFirst,
+        "",
+        "Reply STOP and I won't message you again.",
+      ].join("\n"),
+      reasoning: `${first} opted in with a recorded consent (${i.contact.consentEvidence}). This is a single, helpful follow-up with an opt-out, sent only after approval.`,
+      sources: [
+        { title: "Consent record", note: i.contact.consentEvidence },
+        { title: "Lead generation policy" },
+      ],
+    };
+  },
+});
+
+// ------------------------------------------------------------ Caption rewrite --
+
+export interface RewriteInput {
+  title: string;
+  caption: string;
+  channel: ContentChannel;
+  instruction?: string;
+}
+
+export const rewriteOutput = z.object({
+  variants: z
+    .array(z.object({ label: z.string().min(2).max(40), caption: z.string().min(10).max(2200) }))
+    .min(2)
+    .max(3),
+});
+export type RewriteOutput = z.infer<typeof rewriteOutput>;
+
+export const rewriteSkill = defineSkill<RewriteInput, RewriteOutput>({
+  name: "content.rewrite",
+  tier: "agent",
+  requiresTool: "content.draft",
+  output: rewriteOutput,
+  prompt: (i) =>
+    [
+      `Suggest 2-3 alternative ${CHANNEL_LABEL[i.channel]} captions for "${i.title}".`,
+      `Current caption: """${i.caption}"""`,
+      i.instruction ? `Direction: """${i.instruction}"""` : "",
+      "Keep it educational, no health claims, branded stack names only.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  mock: (i) => {
+    const sentences = i.caption.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const short = sentences.slice(0, 2).join(" ");
+    return {
+      variants: [
+        { label: "Shorter", caption: short.length >= 10 ? short : i.caption },
+        {
+          label: "Question hook",
+          caption: `What does consistency look like for you?\n\n${i.caption}`,
+        },
+        {
+          label: i.instruction ? "Your direction" : "Warmer",
+          caption: i.instruction
+            ? `${i.caption}\n\n${i.instruction.slice(0, 160)}`
+            : `${i.caption}\n\nWe're glad you're here. Learn with us.`,
+        },
+      ],
+    };
+  },
+});
+
+export const SKILLS = [
+  brainPlanSkill,
+  opsDelegateSkill,
+  contentDraftSkill,
+  coachPlanSkill,
+  followUpSkill,
+  rewriteSkill,
+] as const;
