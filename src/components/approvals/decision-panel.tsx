@@ -69,7 +69,13 @@ export function DecisionPanel({
             }
           />
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" name="decision" value="APPROVE" disabled={deciding}>
+            <Button
+              type="submit"
+              name="decision"
+              value="APPROVE"
+              disabled={deciding}
+              className="min-w-28 rounded-pill"
+            >
               <Check aria-hidden /> Approve
             </Button>
             {canEdit && draft && (
@@ -86,7 +92,7 @@ export function DecisionPanel({
               type="submit"
               name="decision"
               value="REJECT"
-              variant="danger"
+              variant="outline"
               disabled={deciding}
             >
               <X aria-hidden /> Reject

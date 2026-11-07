@@ -9,7 +9,7 @@ export function Table({ className, ...props }: React.ComponentProps<"table">) {
   );
 }
 export function TableHeader(props: React.ComponentProps<"thead">) {
-  return <thead {...props} />;
+  return <thead className="bg-surface-muted [&_tr]:border-0" {...props} />;
 }
 export function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return <tbody className={cn("[&_tr:last-child]:border-0", className)} {...props} />;
@@ -26,7 +26,7 @@ export function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-10 px-3 text-left align-middle text-xs font-medium tracking-wide text-muted-foreground uppercase",
+        "h-10 px-3 text-left align-middle text-xs font-semibold tracking-wide text-muted-foreground uppercase first:rounded-l-[10px] last:rounded-r-[10px]",
         className,
       )}
       {...props}

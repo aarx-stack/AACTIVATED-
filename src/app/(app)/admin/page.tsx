@@ -1,24 +1,24 @@
-import { Check, Minus } from "lucide-react";
+import {
+  ChevronRight,
+  CircleCheck,
+  FileClock,
+  Search,
+  ShieldAlert,
+  SlidersHorizontal,
+  UserCog,
+} from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { HealthCheckButton } from "@/components/admin/health-check-button";
 import { InviteForm } from "@/components/admin/invite-form";
 import { UsersTable, type AdminUserRow } from "@/components/admin/users-table";
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusDot } from "@/components/ui/status-dot";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
+import { SwitchIndicator } from "@/components/ui/switch-indicator";
 import { Role } from "@/generated/prisma/enums";
 import { HEALTH_STATUS } from "@/lib/status";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import { requirePagePermission } from "@/server/auth/session";
 import {
   ALL_PERMISSIONS,
@@ -34,14 +34,25 @@ import { getAdminData } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: "Admin & Access Control" };
 
-export default async function AdminPage() {
+const INTEGRATION_MARK: Record<string, string> = {
+  GOHIGHLEVEL: "bg-[linear-gradient(135deg,#f59e0b,#22c55e_50%,#3b82f6)]",
+  QUICKBOOKS: "bg-[#2ca01c]",
+  SLACK: "bg-[linear-gradient(135deg,#e01e5a,#36c5f0_50%,#2eb67d)]",
+  ANTHROPIC: "bg-[linear-gradient(135deg,#d97757,#f0c8a8)]",
+};
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const actor = await requirePagePermission("admin.view");
-  const [{ users, integrations, audit }, health] = await Promise.all([
-    getAdminData(),
+  const { q = "" } = await searchParams;
+  const [{ users, totalUsers, integrations, uptime }, health] = await Promise.all([
+    getAdminData(q),
     getSystemHealth(),
   ]);
   const canManage = can(actor.role, "users.manage");
-  const canSeeAudit = can(actor.role, "audit_log.view");
 
   const rows: AdminUserRow[] = users.map((u) => ({
     id: u.id,
@@ -62,250 +73,249 @@ export default async function AdminPage() {
   const groups = [
     ...new Set(ALL_PERMISSIONS.map((p) => PERMISSIONS[p].group)),
   ] as PermissionGroup[];
-  const healthTone = HEALTH_STATUS[health.status];
+  const allUp = health.status === "OPERATIONAL";
+  const uptimeText = uptime.ratio === null ? "—" : `${(uptime.ratio * 100).toFixed(2)}%`;
 
   return (
     <>
       <PageHeader
-        eyebrow="System"
         title="Admin & Access Control"
-        description="Users and roles, the permission matrix, integrations and system status. Every change is audited."
-        actions={
-          <Badge tone={healthTone.tone}>
-            <StatusDot tone={healthTone.tone} live={health.status === "OPERATIONAL"} /> System{" "}
-            {healthTone.label.toLowerCase()}
-          </Badge>
-        }
+        description="Manage users, roles, permissions, system access and integrations. Every change is audited."
       />
 
-      <Tabs defaultValue="users">
-        <TabsList aria-label="Admin sections">
-          <TabsTrigger value="users">Users & roles</TabsTrigger>
-          <TabsTrigger value="matrix">Permission matrix</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="status">System status</TabsTrigger>
-          {canSeeAudit && <TabsTrigger value="audit">Audit log</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="users" className="flex flex-col gap-4">
-          {canManage && (
-            <Card>
-              <CardHeader className="flex-col items-stretch">
-                <CardTitle>Invite a user</CardTitle>
-                <CardDescription>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <Card className="p-5" id="users">
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <h2 className="text-xl font-semibold">Users</h2>
+              <Badge tone="info" className="px-3">
+                {totalUsers} Users
+              </Badge>
+              <form
+                action="/admin"
+                role="search"
+                className="ml-auto flex items-center gap-2 tile rounded-pill px-3"
+              >
+                <Search className="size-4 text-muted-foreground" aria-hidden />
+                <label htmlFor="user-search" className="sr-only">
+                  Search users by name or email
+                </label>
+                <input
+                  id="user-search"
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Search users by name or email…"
+                  className="h-9 w-56 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                />
+              </form>
+            </div>
+            {canManage && (
+              <details className="mb-4 tile p-4 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="inline-flex cursor-pointer items-center gap-2 rounded-control fill-primary px-4 py-2 text-sm font-semibold">
+                  Add User
+                </summary>
+                <p className="mt-3 mb-3 text-xs text-muted-foreground">
                   Accounts are invite-only. Only an executive can invite or promote an executive.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </p>
                 <InviteForm roles={invitableRoles} roleLabels={ROLE_LABELS} />
-              </CardContent>
-            </Card>
-          )}
-          <Card>
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Users</CardTitle>
-              <CardDescription>
-                {users.length} accounts. Nobody can change their own role.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UsersTable rows={rows} roleLabels={ROLE_LABELS} />
-            </CardContent>
+              </details>
+            )}
+            <UsersTable rows={rows} roleLabels={ROLE_LABELS} />
           </Card>
-        </TabsContent>
 
-        <TabsContent value="matrix">
-          <Card>
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Permission matrix</CardTitle>
-              <CardDescription>
-                Generated from the same code the server enforces (src/server/authz/permissions.ts).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table data-testid="permission-matrix">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-56">Permission</TableHead>
+          <Card className="p-5" id="matrix">
+            <h2 className="text-xl font-semibold">Permission Matrix</h2>
+            <p className="text-xs text-muted-foreground">
+              What each role can access and do. Defined in code (src/server/authz/permissions.ts)
+              and enforced on the server for every request.
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm" data-testid="permission-matrix">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+                      Permission
+                    </th>
                     {ROLE_ORDER.map((r) => (
-                      <TableHead key={r} className="text-center">
-                        {ROLE_LABELS[r]}
-                      </TableHead>
+                      <th key={r} className="px-2 py-2 text-center">
+                        <span className="inline-block rounded-pill fill-primary px-3 py-1 text-xs font-semibold whitespace-nowrap">
+                          {ROLE_LABELS[r]}
+                        </span>
+                      </th>
                     ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                  </tr>
+                </thead>
+                <tbody>
                   {groups.flatMap((group) => [
-                    <TableRow key={group} className="hover:bg-transparent">
-                      <TableCell
+                    <tr key={group}>
+                      <td
                         colSpan={ROLE_ORDER.length + 1}
-                        className="pt-5 pb-2 text-xs font-semibold tracking-wide text-primary uppercase"
+                        className="px-3 pt-4 pb-1 text-xs font-semibold tracking-wide text-cyan uppercase"
                       >
                         {group}
-                      </TableCell>
-                    </TableRow>,
+                      </td>
+                    </tr>,
                     ...ALL_PERMISSIONS.filter((p) => PERMISSIONS[p].group === group).map((p) => (
-                      <TableRow key={p}>
-                        <TableCell>
-                          <p className="text-sm">{PERMISSIONS[p].label}</p>
-                          <p className="font-mono text-xs text-subtle-foreground">{p}</p>
-                        </TableCell>
+                      <tr
+                        key={p}
+                        className="border-b border-border last:border-0 hover:bg-surface-hover"
+                      >
+                        <td className="px-3 py-2">
+                          <p>{PERMISSIONS[p].label}</p>
+                          <p className="font-mono text-[11px] text-subtle-foreground">{p}</p>
+                        </td>
                         {ROLE_ORDER.map((r) => (
-                          <TableCell key={r} className="text-center">
-                            {can(r, p) ? (
-                              <Check className="mx-auto size-4 text-success" aria-label="Allowed" />
-                            ) : (
-                              <Minus
-                                className="mx-auto size-4 text-subtle-foreground"
-                                aria-label="Not allowed"
-                              />
-                            )}
-                          </TableCell>
+                          <td key={r} className="px-2 py-2 text-center">
+                            <SwitchIndicator
+                              on={can(r, p)}
+                              label={`${ROLE_LABELS[r]}, ${PERMISSIONS[p].label}`}
+                            />
+                          </td>
                         ))}
-                      </TableRow>
+                      </tr>
                     )),
                   ])}
-                </TableBody>
-              </Table>
-            </CardContent>
+                </tbody>
+              </table>
+            </div>
           </Card>
-        </TabsContent>
+        </div>
 
-        <TabsContent value="integrations">
-          <div className="grid gap-4 md:grid-cols-2">
-            {integrations.map((i) => {
-              const tone = HEALTH_STATUS[i.status];
-              return (
-                <Card key={i.id} className="p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold">{i.name}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{i.description}</p>
+        <div className="flex flex-col gap-5">
+          <Card className="p-5" data-testid="system-status">
+            <h2 className="text-xl font-semibold">System Status</h2>
+            <div className="mt-4 flex items-start gap-3">
+              {allUp ? (
+                <CircleCheck
+                  className="size-12 shrink-0 text-success drop-shadow-[0_0_10px_var(--success)]"
+                  aria-hidden
+                />
+              ) : (
+                <ShieldAlert className="size-12 shrink-0 text-warning" aria-hidden />
+              )}
+              <div>
+                <p className="text-lg font-bold">
+                  Always On{uptime.ratio !== null ? ` · ${uptimeText} uptime` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {allUp
+                    ? "All systems operational."
+                    : "Some services are degraded. The portal stays available."}
+                </p>
+              </div>
+            </div>
+            <dl className="mt-4 grid grid-cols-3 divide-x divide-border tile text-xs">
+              <div className="p-3">
+                <dt className="text-muted-foreground">Uptime (30 days)</dt>
+                <dd className="mt-1 text-base font-bold tabular-nums">{uptimeText}</dd>
+              </div>
+              <div className="p-3">
+                <dt className="text-muted-foreground">Avg. response</dt>
+                <dd className="mt-1 text-base font-bold tabular-nums">
+                  {uptime.avgLatencyMs === null ? "—" : `${uptime.avgLatencyMs} ms`}
+                </dd>
+              </div>
+              <div className="p-3">
+                <dt className="text-muted-foreground">System health</dt>
+                <dd className="mt-1">
+                  <Badge tone={HEALTH_STATUS[health.status].tone}>
+                    {HEALTH_STATUS[health.status].label}
+                  </Badge>
+                </dd>
+              </div>
+            </dl>
+            <ul className="mt-4 flex flex-col gap-1.5 text-sm">
+              {health.components.map((c) => (
+                <li
+                  key={c.component}
+                  className="flex items-center justify-between gap-2"
+                  title={c.message}
+                >
+                  <span>{c.label}</span>
+                  <span className="flex items-center gap-2">
+                    {c.latencyMs !== null && (
+                      <span className="text-xs text-subtle-foreground tabular-nums">
+                        {c.latencyMs} ms
+                      </span>
+                    )}
+                    <Badge tone={HEALTH_STATUS[c.status].tone}>
+                      {HEALTH_STATUS[c.status].label}
+                    </Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4">
+              <HealthCheckButton />
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-xl font-semibold">Integrations</h2>
+              <Badge tone="info">Mock mode</Badge>
+            </div>
+            <ul className="mt-3 flex flex-col divide-y divide-border">
+              {integrations.map((i) => {
+                const tone = HEALTH_STATUS[i.status];
+                return (
+                  <li
+                    key={i.id}
+                    className="flex items-center gap-3 py-3"
+                    title={i.lastError ?? undefined}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "size-9 shrink-0 rounded-[10px]",
+                        INTEGRATION_MARK[i.provider] ?? "bg-primary",
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{i.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{i.description}</p>
                     </div>
                     <Badge tone={tone.tone}>
-                      <StatusDot tone={tone.tone} /> {tone.label}
+                      {i.mode === "MOCK" ? "Mock" : "Live"} · {tone.label}
                     </Badge>
-                  </div>
-                  <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <dt className="text-muted-foreground">Mode</dt>
-                      <dd>
-                        <Badge tone={i.mode === "MOCK" ? "neutral" : "info"}>
-                          {i.mode === "MOCK" ? "Mock" : "Live"}
-                        </Badge>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Last checked</dt>
-                      <dd>{i.lastCheckedAt ? formatRelativeTime(i.lastCheckedAt) : "Never"}</dd>
-                    </div>
-                  </dl>
-                  {i.lastError && <p className="mt-3 text-xs text-danger">{i.lastError}</p>}
-                  <p className="mt-3 text-xs text-subtle-foreground">
-                    Live mode is switched by environment flag and requires executive approval (Phase
-                    5). No real credentials are stored in the app.
-                  </p>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="status">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>System status</CardTitle>
-                <CardDescription className="mt-1">
-                  Checked {formatRelativeTime(new Date(health.checkedAt))}. Integrations degrade the
-                  system; they never take it down.
-                </CardDescription>
-              </div>
-              <HealthCheckButton />
-            </CardHeader>
-            <CardContent className="p-0">
-              <ul className="divide-y divide-border">
-                {health.components.map((c) => {
-                  const tone = HEALTH_STATUS[c.status];
-                  return (
-                    <li
-                      key={c.component}
-                      className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{c.label}</p>
-                        <p className="text-xs text-muted-foreground">{c.message}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {c.latencyMs !== null && (
-                          <span className="text-xs text-subtle-foreground tabular-nums">
-                            {c.latencyMs} ms
-                          </span>
-                        )}
-                        <Badge tone={tone.tone}>
-                          <StatusDot tone={tone.tone} /> {tone.label}
-                        </Badge>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </CardContent>
+                    <ChevronRight className="size-4 text-subtle-foreground" aria-hidden />
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Live connections are switched on per integration and need executive approval. No real
+              credentials are stored in the app.
+            </p>
           </Card>
-        </TabsContent>
 
-        {canSeeAudit && (
-          <TabsContent value="audit">
-            <Card>
-              <CardHeader className="flex-col items-stretch">
-                <CardTitle>Audit log</CardTitle>
-                <CardDescription>
-                  Append-only. The database rejects any edit or deletion of these records.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>When</TableHead>
-                      <TableHead>Who</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead className="hidden md:table-cell">Record</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {audit.map((a) => (
-                      <TableRow key={a.id}>
-                        <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
-                          <time dateTime={a.createdAt.toISOString()}>
-                            {formatRelativeTime(a.createdAt)}
-                          </time>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {a.actorType === "USER"
-                            ? (a.actorUser?.name ?? a.actorUser?.email)
-                            : a.actorType === "AGENT"
-                              ? "Agent"
-                              : "System"}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{a.action}</TableCell>
-                        <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                          {a.entityType}
-                          {a.before !== null && a.after !== null && (
-                            <span className="ml-2 font-mono">
-                              {JSON.stringify(a.before)} → {JSON.stringify(a.after)}
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-      </Tabs>
+          <Card className="p-5">
+            <h2 className="text-xl font-semibold">Admin Quick Actions</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href="#users"
+                className="inline-flex items-center gap-2 tile rounded-pill px-3 py-2 text-sm font-medium hover:border-[var(--border-strong)]"
+              >
+                <UserCog className="size-4" aria-hidden /> Assign Role
+              </a>
+              <a
+                href="#matrix"
+                className="inline-flex items-center gap-2 tile rounded-pill px-3 py-2 text-sm font-medium hover:border-[var(--border-strong)]"
+              >
+                <SlidersHorizontal className="size-4" aria-hidden /> Permissions
+              </a>
+              {can(actor.role, "audit_log.view") && (
+                <Link
+                  href="/admin/audit"
+                  className="inline-flex items-center gap-2 tile rounded-pill px-3 py-2 text-sm font-medium hover:border-[var(--border-strong)]"
+                >
+                  <FileClock className="size-4" aria-hidden /> Audit Log
+                </Link>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
     </>
   );
 }

@@ -1,17 +1,16 @@
 "use client";
 
 import {
-  Bar,
+  Area,
+  AreaChart,
   CartesianGrid,
-  ComposedChart,
-  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { formatUsd } from "@/lib/utils";
 
+/** Team size over time as a glowing area line (Obsidian Glass "Team Growth"). */
 export function GrowthChart({
   data,
 }: {
@@ -20,11 +19,17 @@ export function GrowthChart({
   const last = data[data.length - 1];
   return (
     <figure
-      className="h-56 w-full"
-      aria-label={`Last 6 months. Team now ${last?.team ?? 0}. Earnings this month ${formatUsd(last?.earnings ?? 0)}.`}
+      className="h-52 w-full"
+      aria-label={`Team size over the last ${data.length} months, now ${last?.team ?? 0}.`}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: -16 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
+          <defs>
+            <linearGradient id="teamFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.7} />
+              <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis
             dataKey="month"
@@ -33,21 +38,10 @@ export function GrowthChart({
             tickLine={false}
           />
           <YAxis
-            yAxisId="earnings"
-            tickFormatter={(v: number) => `$${v}`}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            width={52}
-          />
-          <YAxis
-            yAxisId="team"
-            orientation="right"
             allowDecimals={false}
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            width={32}
           />
           <Tooltip
             contentStyle={{
@@ -57,25 +51,17 @@ export function GrowthChart({
               color: "var(--foreground)",
               fontSize: 12,
             }}
-            formatter={(value, name) =>
-              name === "earnings" ? [formatUsd(Number(value)), "Earnings"] : [value, "Team size"]
-            }
+            formatter={(value) => [value, "Team members"]}
           />
-          <Bar
-            yAxisId="earnings"
-            dataKey="earnings"
-            fill="var(--chart-2)"
-            radius={[4, 4, 0, 0]}
-            maxBarSize={28}
-          />
-          <Line
-            yAxisId="team"
+          <Area
+            type="monotone"
             dataKey="team"
             stroke="var(--chart-1)"
-            strokeWidth={2}
-            type="monotone"
+            strokeWidth={2.5}
+            fill="url(#teamFill)"
+            dot={{ r: 3.5, fill: "#ffffff", stroke: "var(--chart-1)", strokeWidth: 2 }}
           />
-        </ComposedChart>
+        </AreaChart>
       </ResponsiveContainer>
     </figure>
   );

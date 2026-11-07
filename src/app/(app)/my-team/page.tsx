@@ -2,6 +2,9 @@ import {
   Award,
   Bot,
   CalendarCheck2,
+  CalendarDays,
+  Circle,
+  CircleCheck,
   GraduationCap,
   MessagesSquare,
   Send,
@@ -22,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Meter } from "@/components/ui/meter";
+import { ProgressRing } from "@/components/ui/progress-ring";
 import { StatusDot } from "@/components/ui/status-dot";
 import {
   Table,
@@ -34,11 +37,11 @@ import {
 } from "@/components/ui/table";
 import { APPROVAL_STATUS, CHANNEL, CONTENT_STATUS } from "@/lib/labels";
 import { AGENT_STATUS } from "@/lib/status";
-import { formatRelativeTime, humanize } from "@/lib/utils";
+import { cn, formatRelativeTime, humanize } from "@/lib/utils";
 import { requireUser } from "@/server/auth/session";
 import { can } from "@/server/authz/permissions";
 import { getMyTeam } from "@/server/queries/reps";
-import { WEEKDAYS } from "@/server/agents/skills";
+import { startOfWeek } from "@/server/reps/service";
 import {
   addContactAction,
   draftFollowUpAction,
@@ -57,6 +60,23 @@ const AGENT_ICON = {
   BUSINESS_COACH: GraduationCap,
 } as const;
 
+const AGENT_BLURB = {
+  CONTENT_CREATOR: "Creates on-brand, compliant educational content for your audience.",
+  SOCIAL_MEDIA_MANAGER: "Plans your posting calendar and schedules approved posts.",
+  LEAD_FOLLOWUP: "Follows up with consented contacts and drafts replies for approval.",
+  BUSINESS_COACH: "Daily guidance, a weekly plan and accountability to grow your business.",
+} as const;
+
+const WEEK = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
 const PRESENTER = {
   PRESENTER: { label: "Presenter", tone: "success" },
   CANDIDATE: { label: "Presenter candidate", tone: "info" },
@@ -72,180 +92,192 @@ export default async function MyTeamPage() {
   const premium = can(user.role, "rep_pod.full");
   const presenter = PRESENTER[data.user.repProfile?.presenterStatus ?? "NONE"];
   const now = new Date();
+  const weekStart = startOfWeek(now);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow={premium ? "Premium" : "Free"}
         title="My AI Team"
+        badge={
+          <Badge tone="info" className="px-3 py-1 text-sm">
+            {premium ? "Premium Rep" : "Free Rep"}
+          </Badge>
+        }
         description={
           premium
-            ? "Your private team drafts, plans and follows up. The company approves anything that goes out."
-            : "Your Business Coach plans your week. Upgrade to Premium for the full four-agent team."
+            ? "Your always-on AI agents working together to create content, grow your presence, follow up with consented leads and coach you. The company approves anything that goes out."
+            : "Your Business Coach plans your week and keeps you on track. Upgrade to Premium for the full four-agent team."
         }
         actions={
-          <Badge tone={presenter.tone} data-testid="presenter-badge">
-            <Award className="size-3" aria-hidden /> {presenter.label}
+          <Badge tone={presenter.tone} data-testid="presenter-badge" className="px-3 py-1 text-sm">
+            <Award className="size-3.5" aria-hidden /> {presenter.label}
           </Badge>
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2" data-testid="today">
-          <CardHeader className="flex-col items-stretch">
-            <CardTitle>Today&apos;s actions</CardTitle>
-            <CardDescription>
-              {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.today.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nothing scheduled for today. Ask your coach to plan the week.
-              </p>
-            ) : (
-              <ul className="flex flex-col">
-                {data.today.map((t) => (
-                  <li key={t.id}>
-                    <TaskCheck
-                      id={t.id}
-                      title={t.title}
-                      done={t.status === "DONE"}
-                      meta={t.agent?.title ?? "You"}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="week-progress">
-          <CardHeader className="flex-col items-stretch">
-            <CardTitle>This week</CardTitle>
-            <CardDescription>
-              {data.plan ? data.plan.body.split("\n")[0] : "No plan yet."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div>
-              <div className="mb-1.5 flex justify-between text-sm">
-                <span>Progress</span>
-                <span className="tabular-nums">
-                  {data.progress.done} / {data.progress.total}
-                </span>
-              </div>
-              <Meter
-                value={data.progress.done}
-                max={Math.max(1, data.progress.total)}
-                label="Weekly progress"
-                tone="primary"
-              />
-            </div>
-            <ActionForm
-              action={planWeekAction}
-              submitLabel={
-                <>
-                  <Sparkles aria-hidden /> Plan my week
-                </>
-              }
-              pendingLabel="Your coach is planning…"
-              testId="plan-week"
-            >
-              <Label htmlFor="goal">Goal for this week (optional)</Label>
-              <Input
-                id="goal"
-                name="goal"
-                maxLength={300}
-                placeholder="e.g. Finish onboarding training"
-              />
-            </ActionForm>
-          </CardContent>
-        </Card>
-      </div>
-
-      <section
-        aria-label="Agents"
-        className={
-          premium ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-4" : "grid gap-4 sm:grid-cols-2"
-        }
-      >
+      <section aria-label="Agents" className="grid gap-4 lg:grid-cols-2" data-testid="today">
         {data.agents.map((a) => {
           const Icon = a.role ? AGENT_ICON[a.role] : Bot;
           const status = AGENT_STATUS[a.status];
+          const todays = data.today.filter((t) => t.agent?.repRole === a.role);
+          const done = todays.filter((t) => t.status === "DONE").length;
           return (
-            <Card key={a.id} className="flex flex-col gap-3 p-5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex size-10 items-center justify-center rounded-control bg-info-soft text-primary">
-                  <Icon className="size-5" aria-hidden />
+            <Card key={a.id} className="flex flex-col gap-4 p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-control border border-[var(--border-strong)] bg-info-soft shadow-glow-soft">
+                  <Icon className="size-6" aria-hidden />
                 </span>
-                <Badge tone={status.tone}>
-                  <StatusDot tone={status.tone} live={a.status === "ACTIVE"} /> {status.label}
-                </Badge>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">{a.title}</h2>
+                    <Badge tone={status.tone}>
+                      <StatusDot tone={status.tone} live={a.status === "ACTIVE"} /> {status.label}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {AGENT_BLURB[a.role ?? "BUSINESS_COACH"]}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">{a.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {a.openTasks} open · template v{a.templateVersion ?? "?"}
-                </p>
+              <div className="flex items-center gap-4 border-t border-border pt-4">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">Today&apos;s Actions</h3>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {done} of {todays.length} complete
+                    </span>
+                  </div>
+                  {todays.length === 0 ? (
+                    <p className="py-2 text-sm text-muted-foreground">Nothing scheduled today.</p>
+                  ) : (
+                    <ul className="flex flex-col">
+                      {todays.map((t) => (
+                        <li key={t.id}>
+                          <TaskCheck id={t.id} title={t.title} done={t.status === "DONE"} meta="" />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <ProgressRing
+                  value={todays.length ? done / todays.length : 0}
+                  label={`${a.title} today`}
+                />
               </div>
-              <p className="text-sm text-muted-foreground">{a.routine}</p>
+              <p className="text-xs text-subtle-foreground">
+                {a.openTasks} open · template v{a.templateVersion ?? "?"}
+              </p>
             </Card>
           );
         })}
         {!premium && (
           <Card className="flex flex-col justify-center gap-2 p-5">
-            <p className="font-medium">Want the full team?</p>
+            <p className="text-lg font-semibold">Want the full team?</p>
             <p className="text-sm text-muted-foreground">
               Premium adds a Content Creator, Social Media Manager and Lead Follow-up Specialist.
               Ask your sponsor or the company to upgrade your plan.
             </p>
-            <Link href="/back-office" className="text-sm font-medium text-primary hover:underline">
+            <Link href="/back-office" className="text-sm font-semibold text-cyan hover:underline">
               View my earnings
             </Link>
           </Card>
         )}
       </section>
 
-      <Card>
-        <CardHeader className="flex-col items-stretch">
-          <CardTitle>Weekly plan</CardTitle>
-          <CardDescription>From your Business Coach. Tick actions off as you go.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-5" data-testid="weekly-plan">
-            {WEEKDAYS.map((day, i) => {
-              const tasks = data.week.filter((t) => t.dueAt && (t.dueAt.getDay() + 6) % 7 === i);
-              return (
-                <section
-                  key={day}
-                  aria-label={day}
-                  className="rounded-card border border-border bg-surface-muted p-3"
-                >
-                  <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    {day}
-                  </h3>
-                  {tasks.length === 0 ? (
-                    <p className="text-xs text-subtle-foreground">Rest</p>
-                  ) : (
-                    <ul className="flex flex-col">
-                      {tasks.map((t) => (
-                        <li key={t.id}>
-                          <TaskCheck
-                            id={t.id}
-                            title={t.title}
-                            done={t.status === "DONE"}
-                            meta={t.agent?.title ?? ""}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
+      <Card
+        className="flex flex-col gap-4 p-5 xl:flex-row xl:items-stretch"
+        data-testid="weekly-plan"
+      >
+        <div className="flex shrink-0 items-start gap-3 xl:w-60">
+          <span className="flex size-10 items-center justify-center rounded-control border border-[var(--border-strong)] bg-info-soft">
+            <CalendarDays className="size-5" aria-hidden />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold">This Week&apos;s Plan</h2>
+            <p className="text-xs text-muted-foreground">
+              Your AI team&apos;s key focus and targets for the week.
+            </p>
+            <p
+              className="mt-2 text-xs text-muted-foreground tabular-nums"
+              data-testid="week-progress"
+            >
+              {data.progress.done} / {data.progress.total} done
+              {data.plan ? ` · Focus: ${data.plan.body.split("\n")[0]}` : ""}
+            </p>
           </div>
-        </CardContent>
+        </div>
+        <ol className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+          {WEEK.map((day, i) => {
+            const date = new Date(weekStart.getTime() + i * 86_400_000);
+            const tasks = data.week.filter((t) => t.dueAt && (t.dueAt.getDay() + 6) % 7 === i);
+            const complete = tasks.length > 0 && tasks.every((t) => t.status === "DONE");
+            const isToday = date.toDateString() === now.toDateString();
+            return (
+              <li
+                key={day}
+                aria-label={day}
+                className={cn(
+                  "flex flex-col gap-2 tile p-2.5",
+                  (complete || isToday) && "border-[var(--border-strong)] shadow-glow-soft",
+                )}
+              >
+                <p className="text-sm font-bold">
+                  {day.slice(0, 3)}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </p>
+                {tasks.length === 0 ? (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Circle className="size-4 shrink-0" aria-hidden /> Rest, reflect &amp; reset
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {tasks.map((t) => (
+                      <li key={t.id} className="flex items-start gap-1.5 text-xs leading-snug">
+                        {t.status === "DONE" ? (
+                          <CircleCheck className="size-4 shrink-0 text-success" aria-label="Done" />
+                        ) : (
+                          <Circle
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-label="Open"
+                          />
+                        )}
+                        <span className={t.status === "DONE" ? "text-muted-foreground" : undefined}>
+                          {t.title}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
+
+      <Card className="p-5">
+        <ActionForm
+          action={planWeekAction}
+          submitLabel={
+            <>
+              <Sparkles aria-hidden /> Plan my week
+            </>
+          }
+          pendingLabel="Your coach is planning…"
+          testId="plan-week"
+          className="sm:flex-row sm:items-end"
+        >
+          <div className="grid flex-1 gap-1.5">
+            <Label htmlFor="goal">Ask your Business Coach to plan the week (optional goal)</Label>
+            <Input
+              id="goal"
+              name="goal"
+              maxLength={300}
+              placeholder="e.g. Finish the presenter training"
+            />
+          </div>
+        </ActionForm>
       </Card>
 
       {premium && (

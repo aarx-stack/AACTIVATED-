@@ -2,64 +2,66 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_GROUPS } from "@/lib/navigation";
+import { NAV_ITEMS } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function SidebarNav({
   allowedHrefs,
+  badges = {},
   onNavigate,
 }: {
   allowedHrefs: string[];
+  badges?: Record<string, number>;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const allowed = new Set(allowedHrefs);
+  const items = NAV_ITEMS.filter((i) => allowed.has(i.href));
 
   return (
-    <nav aria-label="Main" className="flex flex-col gap-6">
-      {NAV_GROUPS.map((group) => {
-        const items = group.items.filter((i) => allowed.has(i.href));
-        if (items.length === 0) return null;
-        return (
-          <div key={group.label}>
-            <p className="mb-2 px-3 text-[11px] font-semibold tracking-[0.14em] text-subtle-foreground uppercase">
-              {group.label}
-            </p>
-            <ul className="flex flex-col gap-0.5">
-              {items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                const Icon = item.icon;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={onNavigate}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "group flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium transition-colors",
-                        active
-                          ? "bg-info-soft text-foreground shadow-glow"
-                          : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-                      )}
-                    >
-                      <Icon
-                        className={cn(
-                          "size-4 shrink-0",
-                          active
-                            ? "text-primary"
-                            : "text-subtle-foreground group-hover:text-foreground",
-                        )}
-                        aria-hidden
-                      />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        );
-      })}
+    <nav aria-label="Main">
+      <ul className="flex flex-col gap-1.5">
+        {items.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const Icon = item.icon;
+          const count = badges[item.href] ?? 0;
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "group flex items-center gap-3 rounded-control border px-3 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "border-[rgba(140,200,255,0.75)] fill-primary"
+                    : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground",
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "size-[18px] shrink-0",
+                    active ? "text-white" : "text-muted-foreground group-hover:text-foreground",
+                  )}
+                  aria-hidden
+                />
+                <span className="flex-1 truncate">{item.label}</span>
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "flex min-w-6 items-center justify-center rounded-pill px-1.5 text-xs leading-6 font-semibold tabular-nums",
+                      active ? "bg-white/25 text-white" : "fill-primary",
+                    )}
+                    aria-label={`${count} pending`}
+                  >
+                    {count > 99 ? "99+" : count}
+                  </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

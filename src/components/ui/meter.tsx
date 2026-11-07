@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const FILL = {
-  primary: "bg-primary",
+  primary: "bar-fill",
   success: "bg-success",
   warning: "bg-warning",
   danger: "bg-danger",
@@ -33,7 +33,7 @@ export function Meter({
       ? "bg-danger"
       : ratio >= warnAt
         ? "bg-warning"
-        : "bg-primary";
+        : "bar-fill";
   return (
     <div
       role="meter"

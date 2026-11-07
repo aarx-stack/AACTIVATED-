@@ -6,7 +6,13 @@ const DEVON = "devon@aactivated.test";
 async function approveInQueue(page: Page, title: string | RegExp) {
   await signInAs(page, DEVON);
   await page.goto("/approvals");
-  await page.getByTestId("approval-list").getByRole("link", { name: title }).first().click();
+  const href = await page
+    .getByTestId("approval-list")
+    .getByRole("link", { name: title })
+    .first()
+    .getAttribute("href");
+  const id = new URL(href!, "http://localhost").searchParams.get("selected");
+  await page.goto(`/approvals/${id}`);
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByTestId("approval-status")).toHaveText("Approved");
 }
@@ -16,8 +22,9 @@ test.describe("rep onboarding", () => {
     const email = `newrep${Date.now()}@aactivated.test`;
     await signInAs(page, USERS.isaac);
     await page.goto("/admin");
-    await page.getByLabel("Name").fill("New Demo Rep");
-    await page.getByLabel("Email").fill(email);
+    await page.getByText("Add User", { exact: true }).click();
+    await page.getByLabel("Name", { exact: true }).fill("New Demo Rep");
+    await page.getByLabel("Email", { exact: true }).fill(email);
     await page.getByRole("button", { name: "Invite" }).click();
     await expect(page.getByText(`Invited ${email}`)).toBeVisible();
 
@@ -50,7 +57,7 @@ test.describe("premium rep: My AI Team", () => {
     }
     await page
       .getByTestId("plan-week")
-      .getByLabel(/Goal for this week/)
+      .getByLabel(/plan the week/)
       .fill("Finish the presenter training");
     await page.getByRole("button", { name: "Plan my week" }).click();
     await expect(page.getByTestId("plan-week")).toContainText("Your week is planned");
@@ -141,7 +148,7 @@ test.describe("Content Studio", () => {
     await page.goto("/content");
     await page
       .getByRole("navigation", { name: "Filter by channel" })
-      .getByRole("link", { name: "TikTok", exact: true })
+      .getByRole("link", { name: /^TikTok/ })
       .click();
     await expect(page).toHaveURL(/channel=TIKTOK/);
     await page.getByRole("link", { name: "Next month" }).click();
@@ -154,7 +161,7 @@ test.describe("Back Office and access", () => {
     await signInAs(page, USERS.jordan);
     await page.goto("/back-office");
     const earnings = page.getByRole("region", { name: "Earnings" });
-    for (const label of ["This month", "Pending", "Lifetime"]) {
+    for (const label of ["This Month", "Pending", "Lifetime"]) {
       await expect(earnings.getByText(label, { exact: true })).toBeVisible();
     }
     await expect(page.getByTestId("presenter-status")).toHaveText(/Presenter/);

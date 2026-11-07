@@ -156,6 +156,29 @@ export async function getAgentWorkspace(id: string, now = new Date()) {
     activity,
     performance: [...series.values()].map((p) => ({ ...p, spend: Number(p.spend.toFixed(2)) })),
     spendThisMonth: spendMonth._sum.amountUsd?.toNumber() ?? 0,
+    week: await (async () => {
+      const weekAgo = new Date(now.getTime() - 7 * DAY);
+      const [done, contentCreated, spend] = await Promise.all([
+        db.task.findMany({
+          where: { agentId: id, status: TaskStatus.DONE, completedAt: { gte: weekAgo } },
+          select: { completedAt: true, dueAt: true },
+        }),
+        db.contentItem.count({ where: { authorAgentId: id, createdAt: { gte: weekAgo } } }),
+        db.spendEvent.aggregate({
+          where: { agentId: id, occurredAt: { gte: weekAgo } },
+          _sum: { amountUsd: true },
+        }),
+      ]);
+      const withDue = done.filter((t) => t.dueAt);
+      const onTime = withDue.filter((t) => t.completedAt! <= t.dueAt!).length;
+      return {
+        tasksCompleted: done.length,
+        contentCreated,
+        onTimeRate: withDue.length ? onTime / withDue.length : null,
+        spendUsd: spend._sum.amountUsd?.toNumber() ?? 0,
+      };
+    })(),
+    since: agent.createdAt,
   };
 }
 

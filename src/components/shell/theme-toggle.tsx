@@ -21,7 +21,7 @@ export function ThemeToggle({ persist = true }: { persist?: boolean }) {
 
   return (
     <Button
-      variant="ghost"
+      variant="secondary"
       size="icon"
       onClick={toggle}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}

@@ -1,43 +1,271 @@
-import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
+import { Check, ChevronRight, FileText, Lock } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PauseButton } from "@/components/agents/pause-button";
 import { PerformanceChart } from "@/components/agents/performance-chart";
-import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusDot } from "@/components/ui/status-dot";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { TaskStatus } from "@/generated/prisma/enums";
+import type { TaskPriority, TaskStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { APPROVAL_STATUS, CONTENT_STATUS, TASK_STATUS } from "@/lib/labels";
+import { CHANNEL, CONTENT_STATUS } from "@/lib/labels";
 import { AGENT_STATUS } from "@/lib/status";
-import { formatRelativeTime, formatUsd, humanize } from "@/lib/utils";
+import { cn, formatPercent, formatRelativeTime, formatUsd, humanize } from "@/lib/utils";
 import { requirePagePermission } from "@/server/auth/session";
 import { can } from "@/server/authz/permissions";
 import { canOpenAgentWorkspace } from "@/server/authz/policies";
-import { getAgentWorkspace } from "@/server/queries/agents";
+import { getAgentWorkspace, type AgentWorkspace } from "@/server/queries/agents";
 
 export const metadata: Metadata = { title: "Agent Workspace" };
 
-const COLUMNS: { title: string; statuses: TaskStatus[] }[] = [
-  { title: "To do", statuses: ["BACKLOG", "TODO"] },
-  { title: "In progress", statuses: ["IN_PROGRESS"] },
-  { title: "Blocked", statuses: ["BLOCKED"] },
-  { title: "In review", statuses: ["IN_REVIEW"] },
-  { title: "Done (14 days)", statuses: ["DONE"] },
+const COLUMNS: { title: string; statuses: TaskStatus[]; band: string }[] = [
+  {
+    title: "To Do",
+    statuses: ["BACKLOG", "TODO", "BLOCKED"],
+    band: "bg-[linear-gradient(180deg,rgba(150,170,205,0.35),rgba(150,170,205,0.12))]",
+  },
+  {
+    title: "In Progress",
+    statuses: ["IN_PROGRESS"],
+    band: "bg-[linear-gradient(180deg,rgba(40,130,255,0.6),rgba(20,90,220,0.25))]",
+  },
+  {
+    title: "In Review",
+    statuses: ["IN_REVIEW"],
+    band: "bg-[linear-gradient(180deg,rgba(124,92,255,0.6),rgba(100,70,230,0.25))]",
+  },
+  {
+    title: "Done",
+    statuses: ["DONE"],
+    band: "bg-[linear-gradient(180deg,rgba(30,200,100,0.5),rgba(20,150,80,0.2))]",
+  },
 ];
 
-function TextBlock({ title, text }: { title: string; text: string }) {
+const PRIORITY: Record<
+  TaskPriority,
+  { label: string; tone: "danger" | "info" | "neutral" | "warning" }
+> = {
+  URGENT: { label: "P1", tone: "danger" },
+  HIGH: { label: "P1", tone: "danger" },
+  MEDIUM: { label: "P2", tone: "info" },
+  LOW: { label: "P3", tone: "neutral" },
+};
+
+function TextPanel({ title, text }: { title: string; text: string }) {
   return (
-    <Card>
-      <CardHeader className="flex-col items-stretch">
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="max-w-3xl text-sm whitespace-pre-line">{text}</p>
-      </CardContent>
+    <Card className="p-5">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-relaxed whitespace-pre-line">{text}</p>
+    </Card>
+  );
+}
+
+function TaskBoard({ tasks }: { tasks: AgentWorkspace["tasks"] }) {
+  const now = new Date();
+  return (
+    <Card className="p-5">
+      <h2 className="text-lg font-semibold">Task Board</h2>
+      <p className="text-xs text-muted-foreground">
+        Work assigned to this agent, from intake to done (last 14 days).
+      </p>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="kanban">
+        {COLUMNS.map((col) => {
+          const items = tasks.filter((t) => col.statuses.includes(t.status));
+          return (
+            <section
+              key={col.title}
+              aria-label={col.title}
+              className="flex flex-col overflow-hidden tile"
+            >
+              <h3
+                className={cn(
+                  "flex items-center justify-between px-3 py-2 text-sm font-semibold",
+                  col.band,
+                )}
+              >
+                {col.title}
+                <span className="rounded-pill bg-black/25 px-2 text-xs tabular-nums">
+                  {items.length}
+                </span>
+              </h3>
+              <ul className="flex flex-col gap-2 p-2">
+                {items.map((t) => {
+                  const p = PRIORITY[t.priority];
+                  const done = t.status === "DONE";
+                  return (
+                    <li
+                      key={t.id}
+                      className="glass flex items-start gap-2.5 rounded-[12px] p-2.5 text-sm"
+                    >
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px]",
+                          done ? "border-success bg-success text-black" : "border-border-strong",
+                        )}
+                      >
+                        {done && <Check className="size-3" strokeWidth={3} />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={cn(
+                            "leading-snug font-medium",
+                            done && "text-muted-foreground",
+                          )}
+                        >
+                          {t.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {t.status === "BLOCKED" && (
+                            <span className="text-danger">Blocked · </span>
+                          )}
+                          {done && t.completedAt
+                            ? `Completed ${t.completedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                            : t.dueAt
+                              ? `Due ${t.dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                              : "No due date"}
+                          {!done && t.dueAt && t.dueAt < now && (
+                            <span className="text-danger"> · overdue</span>
+                          )}
+                        </p>
+                      </div>
+                      <Badge tone={done ? "success" : p.tone} className="shrink-0 px-2">
+                        {done ? "Done" : p.label}
+                      </Badge>
+                    </li>
+                  );
+                })}
+                {items.length === 0 && (
+                  <li className="px-1 py-2 text-xs text-subtle-foreground">Nothing here.</li>
+                )}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function HandoffTimeline({
+  handoffs,
+  limit,
+}: {
+  handoffs: AgentWorkspace["handoffs"];
+  limit?: number;
+}) {
+  const items = limit ? handoffs.slice(0, limit) : handoffs;
+  return (
+    <Card className="p-5">
+      <h2 className="text-lg font-semibold">Handoff Timeline</h2>
+      <p className="text-xs text-muted-foreground">Task flow and handoffs with other agents.</p>
+      {items.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No handoffs yet.</p>
+      ) : (
+        <ol className="relative mt-4 flex flex-col gap-4 pl-7">
+          <span
+            aria-hidden
+            className="absolute top-2 bottom-2 left-[9px] w-px bg-[var(--border-strong)]"
+          />
+          {items.map((h) => (
+            <li key={h.id} className="relative">
+              <span
+                aria-hidden
+                className="absolute top-0.5 -left-7 size-[18px] rounded-pill border-2 border-[var(--accent-cyan)] bg-background shadow-[0_0_10px_var(--accent-cyan)]"
+              />
+              <p className="text-xs text-muted-foreground">
+                {h.createdAt.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </p>
+              <p className="text-sm font-semibold">
+                {h.fromAgent.title} → {h.toAgent.title}
+              </p>
+              <p className="line-clamp-2 text-xs text-muted-foreground">{h.note}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Card>
+  );
+}
+
+function Outputs({ outputs }: { outputs: AgentWorkspace["outputs"] }) {
+  return (
+    <Card className="p-5">
+      <h2 className="text-lg font-semibold">Outputs</h2>
+      <p className="text-xs text-muted-foreground">Content and assets generated by this agent.</p>
+      {outputs.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No outputs yet.</p>
+      ) : (
+        <table className="mt-3 w-full text-sm">
+          <thead className="bg-surface-muted text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="w-1/2 rounded-l-[10px] px-2 py-2 font-semibold">Title</th>
+              <th className="px-2 py-2 font-semibold">Channel</th>
+              <th className="rounded-r-[10px] px-2 py-2 font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {outputs.slice(0, 6).map((o) => (
+              <tr key={o.id} className="border-b border-border last:border-0">
+                <td className="max-w-0 px-2 py-2">
+                  <Link
+                    href={`/content/${o.id}`}
+                    className="flex items-center gap-2 truncate hover:underline"
+                  >
+                    <FileText className="size-4 shrink-0 text-cyan" aria-hidden />
+                    <span className="truncate">{o.title}</span>
+                  </Link>
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  <Badge tone="info">{CHANNEL[o.channel]}</Badge>
+                </td>
+                <td className="px-2 py-2 text-xs whitespace-nowrap">
+                  <Badge tone={CONTENT_STATUS[o.status].tone}>
+                    {CONTENT_STATUS[o.status].label.replace(" · ready to schedule", "")}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  );
+}
+
+function WeeklyPerformance({ ws }: { ws: AgentWorkspace }) {
+  const stats = [
+    { label: "Content Created", value: String(ws.week.contentCreated) },
+    { label: "Tasks Completed", value: String(ws.week.tasksCompleted) },
+    {
+      label: "On-Time Rate",
+      value: ws.week.onTimeRate === null ? "—" : formatPercent(ws.week.onTimeRate),
+    },
+    { label: "AI Spend", value: formatUsd(ws.week.spendUsd) },
+  ];
+  return (
+    <Card className="p-5">
+      <h2 className="text-lg font-semibold">Weekly Performance</h2>
+      <p className="text-xs text-muted-foreground">
+        Key output metrics for this agent (last 7 days).
+      </p>
+      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="tile px-2.5 py-2">
+            <dt className="text-[11px] text-muted-foreground">{s.label}</dt>
+            <dd className="text-lg font-bold tabular-nums">{s.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-3">
+        <PerformanceChart data={ws.performance.slice(-7)} />
+      </div>
     </Card>
   );
 }
@@ -59,55 +287,63 @@ export default async function AgentWorkspacePage({ params }: { params: Promise<{
   const status = AGENT_STATUS[agent.status];
 
   return (
-    <>
-      <Link
-        href="/agents"
-        className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+    <div className="flex flex-col gap-5">
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground"
       >
-        <ArrowLeft className="size-4" aria-hidden /> All agents
-      </Link>
-      <PageHeader
-        eyebrow={agent.department?.name ?? "Executive"}
-        title={`${agent.title}: ${agent.name}`}
-        description={agent.currentFocus ?? undefined}
-        actions={
-          <>
-            <Badge tone={status.tone} data-testid="agent-status">
-              <StatusDot tone={status.tone} live={agent.status === "ACTIVE"} /> {status.label}
-            </Badge>
-            {agent.department?.isConfidential && (
-              <Badge tone="warning">
-                <Lock className="size-3" aria-hidden /> Executive only
-              </Badge>
-            )}
-            {can(user.role, "agent.manage") && (
-              <PauseButton agentId={agent.id} paused={agent.status === "PAUSED"} />
-            )}
-          </>
-        }
-      />
+        <Link href="/agents" className="hover:text-foreground">
+          Agents
+        </Link>
+        <ChevronRight className="size-4" aria-hidden />
+        <span className="text-foreground">{agent.title}</span>
+      </nav>
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Human owner", value: agent.owner.name ?? "Unassigned" },
-          {
-            label: "Last active",
-            value: agent.lastActiveAt ? formatRelativeTime(agent.lastActiveAt) : "Never",
-          },
-          {
-            label: "AI spend this month",
-            value: `${formatUsd(ws.spendThisMonth)}${agent.budgetUsd ? ` of ${formatUsd(agent.budgetUsd)}` : ""}`,
-          },
-          { label: "Template", value: agent.template ?? "Company agent" },
-        ].map((s) => (
-          <Card key={s.label} className="p-4">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {s.label}
-            </p>
-            <p className="mt-1 font-medium tabular-nums">{s.value}</p>
-          </Card>
-        ))}
-      </div>
+      <Card className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">
+            {agent.title}{" "}
+            <span className="font-semibold text-muted-foreground">· {agent.name}</span>
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {agent.currentFocus ?? agent.config.role}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Badge tone={status.tone} data-testid="agent-status">
+            <span
+              className={cn(
+                "size-1.5 rounded-pill bg-current",
+                agent.status === "ACTIVE" && "live-dot",
+              )}
+              aria-hidden
+            />
+            {status.label}
+          </Badge>
+          {agent.department?.isConfidential && (
+            <Badge tone="warning">
+              <Lock className="size-3" aria-hidden /> Executive only
+            </Badge>
+          )}
+          <span className="tile rounded-pill px-3 py-1">
+            Role: {agent.department?.name ?? "Executive"}
+          </span>
+          <span className="tile rounded-pill px-3 py-1">
+            Owner: {agent.owner.name ?? "Unassigned"}
+          </span>
+          <span className="tile rounded-pill px-3 py-1">
+            Since:{" "}
+            {ws.since.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+          {can(user.role, "agent.manage") && (
+            <PauseButton agentId={agent.id} paused={agent.status === "PAUSED"} />
+          )}
+        </div>
+      </Card>
 
       <Tabs defaultValue="tasks">
         <TabsList aria-label="Agent sections">
@@ -120,212 +356,85 @@ export default async function AgentWorkspacePage({ params }: { params: Promise<{
         </TabsList>
 
         <TabsContent value="role" className="flex flex-col gap-4">
-          <TextBlock title="Role" text={agent.config.role} />
-          <Card>
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Tools allowed</CardTitle>
-              <CardDescription>
-                The agent cannot use any tool that is not listed. Outbound actions still need a
-                human approval.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
+          <TextPanel title="Role" text={agent.config.role} />
+          <Card className="p-5">
+            <h2 className="text-lg font-semibold">Tools allowed</h2>
+            <p className="text-xs text-muted-foreground">
+              The agent cannot use any tool that is not listed. Outbound actions still need a human
+              approval.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {agent.config.toolsAllowed.map((t) => (
-                <Badge key={t} tone="outline" className="font-mono">
+                <Badge key={t} tone="info" className="font-mono">
                   {t}
                 </Badge>
               ))}
               {agent.config.toolsAllowed.length === 0 && (
                 <p className="text-sm text-muted-foreground">No tools.</p>
               )}
-            </CardContent>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Template: {agent.template ?? "Company agent"} · AI spend this month{" "}
+              {formatUsd(ws.spendThisMonth)}
+              {agent.budgetUsd ? ` of ${formatUsd(agent.budgetUsd)}` : ""} · Last active{" "}
+              {agent.lastActiveAt ? formatRelativeTime(agent.lastActiveAt) : "never"}
+            </p>
           </Card>
         </TabsContent>
-
         <TabsContent value="context">
-          <TextBlock title="Context" text={agent.config.context} />
+          <TextPanel title="Context" text={agent.config.context} />
         </TabsContent>
-
         <TabsContent value="routine">
-          <TextBlock title="Daily routine" text={agent.config.dailyRoutine} />
+          <TextPanel title="Daily routine" text={agent.config.dailyRoutine} />
         </TabsContent>
-
         <TabsContent value="tasks">
-          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5" data-testid="kanban">
-            {COLUMNS.map((col) => {
-              const items = ws.tasks.filter((t) => col.statuses.includes(t.status));
-              return (
-                <section
-                  key={col.title}
-                  aria-label={col.title}
-                  className="flex flex-col gap-2 rounded-card border border-border bg-surface-muted p-3"
-                >
-                  <h3 className="flex items-center justify-between text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    {col.title} <span className="tabular-nums">{items.length}</span>
-                  </h3>
-                  {items.map((t) => (
-                    <article
-                      key={t.id}
-                      className="rounded-control border border-border bg-surface-solid p-3 text-sm"
-                    >
-                      <p className="font-medium">{t.title}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <Badge
-                          tone={
-                            t.priority === "URGENT" || t.priority === "HIGH" ? "warning" : "neutral"
-                          }
-                        >
-                          {humanize(t.priority)}
-                        </Badge>
-                        {t.status === "BLOCKED" && (
-                          <Badge tone={TASK_STATUS.BLOCKED.tone}>Blocked</Badge>
-                        )}
-                        {t.dueAt && t.status !== "DONE" && (
-                          <span
-                            className={`text-xs ${t.dueAt < new Date() ? "text-danger" : "text-muted-foreground"}`}
-                          >
-                            due {formatRelativeTime(t.dueAt)}
-                          </span>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                  {items.length === 0 && (
-                    <p className="text-xs text-subtle-foreground">Nothing here.</p>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+          <TaskBoard tasks={ws.tasks} />
         </TabsContent>
-
         <TabsContent value="handoff">
-          <Card>
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Handoff timeline</CardTitle>
-              <CardDescription>Work passed between agents.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {ws.handoffs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No handoffs yet.</p>
-              ) : (
-                <ol className="relative flex flex-col gap-5 border-l border-border pl-5">
-                  {ws.handoffs.map((h) => (
-                    <li key={h.id} className="relative">
-                      <span
-                        aria-hidden
-                        className="absolute top-1.5 -left-[25px] size-2.5 rounded-pill border-2 border-background bg-primary"
-                      />
-                      <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-                        {h.fromAgent.title}{" "}
-                        <ArrowRight className="size-3.5 text-subtle-foreground" aria-label="to" />{" "}
-                        {h.toAgent.title}
-                        <Badge
-                          tone={
-                            h.status === "COMPLETED" || h.status === "ACCEPTED"
-                              ? "success"
-                              : h.status === "REJECTED"
-                                ? "danger"
-                                : "info"
-                          }
-                        >
-                          {humanize(h.status)}
-                        </Badge>
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">{h.note}</p>
-                      <p className="text-xs text-subtle-foreground">
-                        {formatRelativeTime(h.createdAt)}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </CardContent>
-          </Card>
+          <HandoffTimeline handoffs={ws.handoffs} />
         </TabsContent>
-
         <TabsContent value="report" className="grid gap-4 lg:grid-cols-2">
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Performance, last 14 days</CardTitle>
-              <CardDescription>Bars: tasks completed. Line: AI spend.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <PerformanceChart data={ws.performance} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Outputs</CardTitle>
-              <CardDescription>Content this agent produced and where it stands.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {ws.outputs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No outputs yet.</p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-border">
-                  {ws.outputs.map((o) => {
-                    const approval = o.approvalRequests[0];
-                    return (
-                      <li
-                        key={o.id}
-                        className="flex items-center justify-between gap-2 py-2 text-sm"
-                      >
-                        <span className="min-w-0 truncate">
-                          {approval ? (
-                            <Link href={`/approvals/${approval.id}`} className="hover:underline">
-                              {o.title}
-                            </Link>
-                          ) : (
-                            o.title
-                          )}
-                        </span>
-                        <Badge
-                          tone={
-                            approval
-                              ? APPROVAL_STATUS[approval.status].tone
-                              : CONTENT_STATUS[o.status].tone
-                          }
-                        >
-                          {CONTENT_STATUS[o.status].label}
-                        </Badge>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex-col items-stretch">
-              <CardTitle>Reports and recent activity</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+          <Card className="p-5">
+            <h2 className="text-lg font-semibold">Reports</h2>
+            <div className="mt-3 flex flex-col gap-3">
               {ws.reports.map((r) => (
-                <article key={r.id} className="rounded-control border border-border p-3 text-sm">
-                  <p className="font-medium">
+                <article key={r.id} className="tile p-3 text-sm">
+                  <p className="font-semibold">
                     {r.title}{" "}
                     <span className="font-normal text-muted-foreground">
                       · {humanize(r.period)} · {formatRelativeTime(r.createdAt)}
                     </span>
                   </p>
-                  <p className="mt-1 text-muted-foreground">{r.body}</p>
+                  <p className="mt-1 whitespace-pre-line text-muted-foreground">{r.body}</p>
                 </article>
               ))}
-              <ul className="flex flex-col gap-1.5 text-sm">
-                {ws.activity.map((a) => (
-                  <li key={a.id} className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">{a.message}</span>
-                    <span className="shrink-0 text-xs text-subtle-foreground">
-                      {formatRelativeTime(a.createdAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
+              {ws.reports.length === 0 && (
+                <p className="text-sm text-muted-foreground">No reports yet.</p>
+              )}
+            </div>
+          </Card>
+          <Card className="p-5">
+            <h2 className="text-lg font-semibold">Performance, last 14 days</h2>
+            <PerformanceChart data={ws.performance} />
+            <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+              {ws.activity.map((a) => (
+                <li key={a.id} className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">{a.message}</span>
+                  <span className="shrink-0 text-xs text-subtle-foreground">
+                    {formatRelativeTime(a.createdAt)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </Card>
         </TabsContent>
       </Tabs>
-    </>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <HandoffTimeline handoffs={ws.handoffs} limit={4} />
+        <Outputs outputs={ws.outputs} />
+        <WeeklyPerformance ws={ws} />
+      </div>
+    </div>
   );
 }

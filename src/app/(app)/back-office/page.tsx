@@ -1,10 +1,17 @@
-import { Award, CheckCircle2, Circle, Clock, Wallet } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarDays,
+  Clock3,
+  Database,
+  Download,
+} from "lucide-react";
 import type { Metadata } from "next";
-import { KpiCard } from "@/components/command-center/kpi-card";
-import { GrowthChart } from "@/components/reps/growth-chart";
 import { PageHeader } from "@/components/shell/page-header";
+import { GrowthChart } from "@/components/reps/growth-chart";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Meter } from "@/components/ui/meter";
 import {
   Table,
@@ -14,216 +21,249 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatPercent, formatUsd, humanize } from "@/lib/utils";
+import { cn, formatPercent, formatUsd } from "@/lib/utils";
 import { requirePagePermission } from "@/server/auth/session";
 import { getBackOffice } from "@/server/queries/reps";
 
 export const metadata: Metadata = { title: "Back Office" };
 
-const PRESENTER = {
-  PRESENTER: { label: "Presenter", tone: "success" },
-  CANDIDATE: { label: "Presenter candidate", tone: "info" },
-  NONE: { label: "Not yet a Presenter", tone: "neutral" },
+const STATUS = {
+  PRESENTER: { label: "Presenter", detail: "Qualified · Active · Earning commissions" },
+  CANDIDATE: { label: "Presenter Candidate", detail: "Working toward Presenter certification" },
+  NONE: { label: "Representative", detail: "Active · Building your business" },
 } as const;
+
+function Tile({
+  icon: Icon,
+  label,
+  value,
+  note,
+}: {
+  icon: typeof CalendarDays;
+  label: string;
+  value: string;
+  note: React.ReactNode;
+}) {
+  return (
+    <Card className="flex items-start gap-4 p-5">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-control border border-[var(--border-strong)] bg-info-soft shadow-glow-soft">
+        <Icon className="size-6" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-[28px] leading-tight font-bold tabular-nums">{value}</p>
+        <div className="mt-1 text-xs text-muted-foreground">{note}</div>
+      </div>
+    </Card>
+  );
+}
 
 export default async function BackOfficePage() {
   const user = await requirePagePermission("back_office.view_own");
   const data = await getBackOffice(user.id);
-  const presenter = PRESENTER[data.profile?.presenterStatus ?? "NONE"];
-  const { progress } = data;
+  const status = STATUS[data.profile?.presenterStatus ?? "NONE"];
+  const { progress, totals } = data;
+  const change =
+    totals.lastMonth > 0 ? (totals.thisMonth - totals.lastMonth) / totals.lastMonth : null;
+  const earningsReq = progress.requirements.find((r) => r.label.includes("Earnings"));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Rep"
-        title="Back Office"
-        description="Your earnings, plan progress, team and payouts. Earnings shown are records, not promises of future income."
-        actions={
-          <Badge tone={presenter.tone} data-testid="presenter-status">
-            <Award className="size-3" aria-hidden /> {presenter.label}
-          </Badge>
-        }
+        title="Back Office — Earnings"
+        description="Your representative back office to track earnings, team growth and payouts. Figures are records, not promises of future income."
       />
 
-      <section aria-label="Earnings" className="grid gap-4 sm:grid-cols-3">
-        <KpiCard
-          label="This month"
-          icon={Wallet}
-          value={formatUsd(data.totals.thisMonth)}
-          hint="All earnings recorded for this month"
+      <section aria-label="Earnings" className="grid gap-4 md:grid-cols-3">
+        <Tile
+          icon={CalendarDays}
+          label="This Month"
+          value={formatUsd(totals.thisMonth)}
+          note={
+            change === null ? (
+              "First month on record"
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 font-medium",
+                  change >= 0 ? "text-success" : "text-warning",
+                )}
+              >
+                {change >= 0 ? (
+                  <ArrowUpRight className="size-3.5" aria-hidden />
+                ) : (
+                  <ArrowDownRight className="size-3.5" aria-hidden />
+                )}
+                {change >= 0 ? "+" : ""}
+                {formatPercent(change, 1)} vs. last month
+              </span>
+            )
+          }
         />
-        <KpiCard
+        <Tile
+          icon={Clock3}
           label="Pending"
-          icon={Clock}
-          value={formatUsd(data.totals.pending)}
-          hint="Recorded, not yet paid out"
+          value={formatUsd(totals.pending)}
+          note="Awaiting payout (current cycle)"
         />
-        <KpiCard
+        <Tile
+          icon={Database}
           label="Lifetime"
-          icon={Award}
-          value={formatUsd(data.totals.lifetime)}
-          hint="Everything recorded since you joined"
+          value={formatUsd(totals.lifetime)}
+          note="Everything recorded since you joined"
         />
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card data-testid="plan-progress">
-          <CardHeader className="flex-col items-stretch">
-            <CardTitle>Commission plan</CardTitle>
-            <CardDescription>
-              Current rank <strong className="text-foreground">{progress.current.name}</strong>
-              {progress.next ? ` · next: ${progress.next.name}` : " · top rank"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {progress.next ? (
-              <>
-                <div>
-                  <div className="mb-1.5 flex justify-between text-sm">
-                    <span>Progress to {progress.next.name}</span>
-                    <span className="tabular-nums">{formatPercent(progress.overall)}</span>
-                  </div>
-                  <Meter
-                    value={progress.overall}
-                    max={1}
-                    label={`Progress to ${progress.next.name}`}
-                    tone="primary"
-                  />
-                </div>
-                <ul className="flex flex-col gap-2 text-sm">
-                  {progress.requirements.map((r) => (
-                    <li key={r.label} className="flex items-center gap-2">
-                      {r.met ? (
-                        <CheckCircle2 className="size-4 text-success" aria-label="Met" />
-                      ) : (
-                        <Circle
-                          className="size-4 text-subtle-foreground"
-                          aria-label="Not met yet"
-                        />
-                      )}
-                      <span className="flex-1">{r.label}</span>
-                      <span className="text-muted-foreground tabular-nums">
-                        {r.label.includes("Earnings")
-                          ? `${formatUsd(r.current)} / ${formatUsd(r.target)}`
-                          : r.label.includes("certification")
-                            ? r.met
-                              ? "Done"
-                              : "Not yet"
-                            : `${r.current} / ${r.target}`}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                You have reached the top rank in the plan.
-              </p>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+        <Card className="p-5" data-testid="plan-progress">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold">Commission Plan Progress</h2>
+            <span className="text-xs text-muted-foreground">
+              Placeholder plan until the official plan is loaded
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Current rank:{" "}
+            <span className="font-semibold text-foreground">{progress.current.name}</span>
+            {progress.next ? ` · next: ${progress.next.name}` : " · top rank reached"}
+          </p>
+          <div className="mt-4 flex items-center gap-4">
+            <Meter
+              value={progress.overall}
+              max={1}
+              label="Progress to the next rank"
+              tone="primary"
+              className="h-3.5 flex-1"
+            />
+            <span className="text-xl font-bold tabular-nums">
+              {formatPercent(progress.overall)}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm">
+            {earningsReq && (
+              <span>
+                <span className="font-semibold">{formatUsd(earningsReq.current)}</span> of{" "}
+                {formatUsd(earningsReq.target)} this month
+              </span>
             )}
-            <p className="text-xs text-subtle-foreground">
-              Plan thresholds are placeholders until the official plan is loaded.
-            </p>
-          </CardContent>
+            {progress.next && (
+              <span className="text-muted-foreground">
+                {progress.requirements.filter((r) => !r.met).length} requirement(s) left for{" "}
+                {progress.next.name}
+              </span>
+            )}
+          </div>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {progress.requirements.map((r) => (
+              <li key={r.label}>
+                <Badge tone={r.met ? "success" : "neutral"}>
+                  {r.label}:{" "}
+                  {r.label.includes("Earnings")
+                    ? formatUsd(r.current)
+                    : r.label.includes("certification")
+                      ? r.met
+                        ? "done"
+                        : "not yet"
+                      : `${r.current}/${r.target}`}
+                </Badge>
+              </li>
+            ))}
+          </ul>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-col items-stretch">
-            <CardTitle>Team growth and earnings</CardTitle>
-            <CardDescription>
-              {data.teamSize} active team member{data.teamSize === 1 ? "" : "s"}. Bars: earnings per
-              month. Line: team size.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <GrowthChart data={data.growth} />
-          </CardContent>
+        <Card className="flex flex-col items-center justify-center gap-3 p-5 text-center">
+          <h2 className="self-start text-lg font-semibold">Representative Status</h2>
+          <span
+            className="rounded-pill fill-primary px-10 py-3 text-xl font-bold tracking-wide"
+            data-testid="presenter-status"
+          >
+            {status.label}
+          </span>
+          <p className="text-xs text-muted-foreground">{status.detail}</p>
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex-col items-stretch">
-            <CardTitle>Payout history</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.payouts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No payouts yet.</p>
-            ) : (
-              <Table data-testid="payouts">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+      <Card className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_200px]">
+        <div>
+          <h2 className="text-lg font-semibold">Team Growth</h2>
+          <p className="text-xs text-muted-foreground">Total active team members over time.</p>
+          <GrowthChart data={data.growth} />
+        </div>
+        <dl className="flex flex-col justify-center gap-4 border-border lg:border-l lg:pl-5">
+          <div>
+            <dt className="text-sm">Total Team Members</dt>
+            <dd className="text-[28px] leading-tight font-bold tabular-nums">{data.teamSize}</dd>
+          </div>
+          <div>
+            <dt className="text-sm">New Members (30D)</dt>
+            <dd className="text-[28px] leading-tight font-bold tabular-nums">
+              {data.newMembers30d}
+            </dd>
+          </div>
+          {data.team.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {data.team.map((t, i) => (
+                <li key={i}>
+                  <Badge tone="outline">{t.name}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </dl>
+      </Card>
+
+      <Card className="p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">Payout History</h2>
+            <p className="text-xs text-muted-foreground">Your commission payout records.</p>
+          </div>
+          <Button asChild variant="secondary" size="sm">
+            <a href="/back-office/payouts.csv" download>
+              <Download aria-hidden /> Export CSV
+            </a>
+          </Button>
+        </div>
+        {data.payouts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No payouts yet.</p>
+        ) : (
+          <Table data-testid="payouts">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Payout date</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Reference</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.payouts.map((p) => {
+                const period = new Date(p.paidAt.getFullYear(), p.paidAt.getMonth() - 1, 1);
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-semibold">
+                      {p.paidAt.toLocaleDateString("en-US", { dateStyle: "medium" })}
+                    </TableCell>
+                    <TableCell>
+                      {period.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </TableCell>
+                    <TableCell className="font-semibold tabular-nums">
+                      {formatUsd(p.amountUsd.toNumber())}
+                    </TableCell>
+                    <TableCell>
+                      <Badge tone="success">Paid</Badge>
+                    </TableCell>
+                    <TableCell>{p.method}</TableCell>
+                    <TableCell className="font-mono text-xs">{p.reference}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.payouts.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-sm">
-                        {p.paidAt.toLocaleDateString("en-US", { dateStyle: "medium" })}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {p.method} · <span className="font-mono text-xs">{p.reference}</span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {formatUsd(p.amountUsd.toNumber())}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-col items-stretch">
-            <CardTitle>Recent earnings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.recentEarnings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No earnings recorded yet.</p>
-            ) : (
-              <ul className="flex flex-col divide-y divide-border text-sm">
-                {data.recentEarnings.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-3 py-2">
-                    <span className="min-w-0">
-                      <span className="block truncate">{e.description}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {e.period.toLocaleDateString("en-US", { month: "long", year: "numeric" })} ·{" "}
-                        {humanize(e.kind)}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Badge tone={e.status === "PAID" ? "success" : "info"}>
-                        {humanize(e.status)}
-                      </Badge>
-                      <span className="font-medium tabular-nums">
-                        {formatUsd(e.amountUsd.toNumber())}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {data.team.length > 0 && (
-              <div className="mt-5">
-                <h3 className="mb-2 text-sm font-semibold">Your team</h3>
-                <ul className="flex flex-wrap gap-2">
-                  {data.team.map((t, i) => (
-                    <li key={i}>
-                      <Badge tone="outline">
-                        {t.name} · {t.role === "PREMIUM_REP" ? "Premium" : "Free"}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

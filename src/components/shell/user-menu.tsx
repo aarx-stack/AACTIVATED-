@@ -23,7 +23,7 @@ export function UserMenu({ user }: { user: ShellUser }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="ml-1 flex items-center gap-2 rounded-pill p-1 pr-2 hover:bg-surface-hover"
+        className="glass flex items-center gap-2 rounded-pill p-1 pr-3 hover:bg-surface-hover"
         aria-label={`Account menu for ${user.name ?? user.email}`}
         data-testid="user-menu"
       >

@@ -4,10 +4,11 @@ The internal operating system for AACTIVATED RX. An AI CEO ("the Brain") runs a 
 AI agents across departments and gives every Premium rep a private AI team. **Humans approve
 anything that leaves the building.**
 
-> Status: **Phase 2 complete.** Phase 1 delivered setup, design tokens, auth and roles, demo data,
-> and pages 1 (Command Center), 2 (Company Team) and 12 (Admin). Phase 2 adds the first end-to-end
-> agent workflow, page 3 (Agent Workspace) and page 5 (Approval & Compliance Queue). Other pages are
-> permission-guarded placeholders labelled with the phase that delivers them.
+> Status: **Phase 3 complete.** Phase 1 delivered setup, design tokens, auth and roles, demo data,
+> and pages 1 (Command Center), 2 (Company Team) and 12 (Admin). Phase 2 added the first end-to-end
+> agent workflow, page 3 (Agent Workspace) and page 5 (Approval & Compliance Queue). Phase 3 added
+> rep onboarding, page 4 (My AI Team), page 6 (Content Studio) and page 8 (Back Office). Pages 7, 9,
+> 10 and 11 are permission-guarded placeholders until Phases 4 and 5.
 
 ## The Phase 2 workflow
 
@@ -161,7 +162,10 @@ tests/unit, tests/integration, e2e/
 
 ## Design
 
-The "Obsidian Glass" direction: deep navy base `#0A0E1C` with a grid, glow and noise overlay;
-frosted-glass cards with thin electric-blue gradient borders; and a white and silver light
-theme. Every color, radius and layout size is a CSS variable in `src/styles/globals.css`. Each
-user's theme is saved to their account. Mockups go in `design/reference/`.
+The UI follows `design/reference/AARX_GUI_Dark_Style_A_Obsidian_Glass.pdf` (Style A, "Obsidian
+Glass"): a deep navy base (`#000b1d`) with light streaks and a noise overlay, a floating glass
+sidebar, glass cards with thin electric-blue borders and soft glow, cyan-to-blue gradient fills for
+primary actions and progress, and bordered tinted status pills. Labels and numbers in the PDF are
+placeholders; the app shows live data in the same layout. A white and silver light theme is kept.
+Every color, radius and layout size is a CSS variable in `src/styles/globals.css`, and each user's
+theme is saved to their account.

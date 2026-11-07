@@ -5,35 +5,51 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type * as React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Clock } from "./clock";
 import { SidebarNav } from "./sidebar";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu, type ShellUser } from "./user-menu";
 
 function Brand() {
   return (
-    <Link href="/" className="block rounded-control px-3 py-1">
-      <span className="block text-[13px] leading-tight font-semibold tracking-[0.18em] text-foreground">
-        AACTIVATED
-      </span>
-      <span className="block text-[11px] leading-tight font-medium tracking-[0.24em] text-primary">
-        AI BRAIN
-      </span>
-    </Link>
+    <div className="px-2 pt-1">
+      <Link
+        href="/"
+        className="block rounded-control py-1 text-[17px] leading-tight font-extrabold tracking-[0.02em] text-foreground"
+      >
+        AACTIVATED AI BRAIN
+      </Link>
+      <div
+        aria-hidden
+        className="mt-4 h-px bg-gradient-to-r from-transparent via-[var(--border-strong)] to-transparent"
+      />
+    </div>
   );
+}
+
+export interface BrainStatus {
+  online: boolean;
+  label: string;
 }
 
 export function AppFrame({
   user,
   allowedHrefs,
+  badges,
   unreadCount,
+  brain,
   children,
 }: {
   user: ShellUser;
   allowedHrefs: string[];
+  badges: Record<string, number>;
   unreadCount: number;
+  brain: BrainStatus;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+
   useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMobileOpen(false);
@@ -50,13 +66,15 @@ export function AppFrame({
         Skip to content
       </a>
 
-      {/* Desktop sidebar */}
+      {/* Desktop: floating glass sidebar */}
       <aside
-        className="sticky top-0 hidden h-dvh w-[var(--sidebar-width)] shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-sidebar px-3 py-5 backdrop-blur-xl lg:flex"
         aria-label="Sidebar"
+        className="sticky top-0 hidden h-dvh w-[var(--sidebar-width)] shrink-0 p-3 lg:block"
       >
-        <Brand />
-        <SidebarNav allowedHrefs={allowedHrefs} />
+        <div className="glass flex h-full flex-col gap-5 overflow-y-auto rounded-[22px] bg-sidebar p-4">
+          <Brand />
+          <SidebarNav allowedHrefs={allowedHrefs} badges={badges} />
+        </div>
       </aside>
 
       {/* Mobile drawer */}
@@ -70,11 +88,11 @@ export function AppFrame({
           <button
             type="button"
             aria-label="Close navigation"
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/60"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative flex h-full w-[min(85vw,var(--sidebar-width))] flex-col gap-6 overflow-y-auto border-r border-border bg-surface-solid px-3 py-5">
-            <div className="flex items-center justify-between">
+          <div className="glass relative m-3 flex h-[calc(100%-1.5rem)] w-[min(85vw,var(--sidebar-width))] flex-col gap-5 overflow-y-auto rounded-[22px] bg-surface-solid p-4">
+            <div className="flex items-start justify-between">
               <Brand />
               <Button
                 variant="ghost"
@@ -85,13 +103,17 @@ export function AppFrame({
                 <X aria-hidden />
               </Button>
             </div>
-            <SidebarNav allowedHrefs={allowedHrefs} onNavigate={() => setMobileOpen(false)} />
+            <SidebarNav
+              allowedHrefs={allowedHrefs}
+              badges={badges}
+              onNavigate={() => setMobileOpen(false)}
+            />
           </div>
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] items-center gap-2 border-b border-border bg-background/70 px-[var(--page-gutter)] backdrop-blur-xl sm:px-6">
+        <header className="flex items-center gap-2 px-[var(--page-gutter)] pt-4 sm:px-6 lg:px-8">
           <Button
             variant="ghost"
             size="icon"
@@ -102,19 +124,33 @@ export function AppFrame({
           >
             <Menu aria-hidden />
           </Button>
-          <span className="text-[11px] font-semibold tracking-[0.14em] whitespace-nowrap text-foreground lg:hidden">
+          <span className="text-[13px] font-extrabold tracking-[0.02em] whitespace-nowrap lg:hidden">
             AACTIVATED AI BRAIN
           </span>
-          <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="icon" asChild>
+          <div className="ml-auto flex items-center gap-2">
+            <Link
+              href="/status"
+              className="glass hidden items-center gap-2 rounded-pill px-4 py-2 text-xs font-medium md:flex"
+              data-testid="brain-online"
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-pill",
+                  brain.online ? "live-dot bg-success text-success" : "bg-warning",
+                )}
+                aria-hidden
+              />
+              <span className="font-semibold">{brain.label}</span>
+              <Clock />
+            </Link>
+            <Button variant="secondary" size="icon" asChild className="relative rounded-control">
               <Link
                 href="/notifications"
                 aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}
-                className="relative"
               >
                 <Bell aria-hidden />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 flex min-w-4 items-center justify-center rounded-pill bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground tabular-nums">
+                  <span className="absolute -top-1 -right-1 flex min-w-5 items-center justify-center rounded-pill fill-primary px-1 text-[10px] leading-5 font-bold tabular-nums">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -127,7 +163,7 @@ export function AppFrame({
         <main
           id="main"
           tabIndex={-1}
-          className="flex-1 px-[var(--page-gutter)] py-6 outline-none sm:px-6 lg:px-8"
+          className="flex-1 px-[var(--page-gutter)] pt-2 pb-8 outline-none sm:px-6 lg:px-8"
         >
           {children}
         </main>

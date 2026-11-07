@@ -12,12 +12,7 @@ export function CardHeader({ className, ...props }: React.ComponentProps<"div">)
 }
 
 export function CardTitle({ className, ...props }: React.ComponentProps<"h2">) {
-  return (
-    <h2
-      className={cn("text-sm font-semibold tracking-wide text-foreground", className)}
-      {...props}
-    />
-  );
+  return <h2 className={cn("text-base font-semibold text-foreground", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: React.ComponentProps<"p">) {

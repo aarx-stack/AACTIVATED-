@@ -31,6 +31,11 @@ export async function getCommandCenterData(role: Role, now = new Date()) {
     spendEvents,
     activities,
     departments,
+    tasksDoneYesterday,
+    doneLast7,
+    overdueOpen,
+    openInitiatives,
+    lockedBudgets,
   ] = await Promise.all([
     db.agent.findFirst({
       where: { kind: AgentKind.BRAIN },
@@ -64,7 +69,7 @@ export async function getCommandCenterData(role: Role, now = new Date()) {
     }),
     db.agentActivity.findMany({
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 8,
       include: {
         agent: {
           select: {
@@ -85,6 +90,33 @@ export async function getCommandCenterData(role: Role, now = new Date()) {
           select: { status: true, dueAt: true },
         },
       },
+    }),
+    db.task.count({
+      where: {
+        status: TaskStatus.DONE,
+        completedAt: { gte: new Date(today.getTime() - DAY), lt: today },
+      },
+    }),
+    db.task.count({
+      where: { status: TaskStatus.DONE, completedAt: { gte: new Date(now.getTime() - 7 * DAY) } },
+    }),
+    db.task.count({
+      where: {
+        status: { in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED] },
+        dueAt: { lt: now },
+      },
+    }),
+    db.task.count({
+      where: {
+        parentId: null,
+        status: {
+          in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW, TaskStatus.BLOCKED],
+        },
+        agent: { kind: { not: AgentKind.REP_POD } },
+      },
+    }),
+    db.budget.count({
+      where: { status: "LOCKED", periodStart: { lte: now }, periodEnd: { gte: now } },
     }),
   ]);
 
@@ -115,10 +147,20 @@ export async function getCommandCenterData(role: Role, now = new Date()) {
       activeAgents,
       totalAgents,
       tasksDoneToday,
+      tasksDoneYesterday,
       pendingApprovals,
       restrictedPending,
       aiSpendUsd: aiSpend._sum.amountUsd?.toNumber() ?? 0,
       aiBudgetUsd: aiBudgets._sum.limitUsd?.toNumber() ?? 0,
+    },
+    execution: {
+      /** Share of recent work finished rather than overdue (last 7 days). */
+      rate: doneLast7 + overdueOpen > 0 ? doneLast7 / (doneLast7 + overdueOpen) : 1,
+      openInitiatives,
+      overdueOpen,
+      utilization: totalAgents > 0 ? activeAgents / totalAgents : 0,
+      errorAgents: agentCounts.find((g) => g.status === AgentStatus.ERROR)?._count._all ?? 0,
+      lockedBudgets,
     },
     spendSeries: [...spendByDay.entries()].map(([date, usd]) => ({
       date,

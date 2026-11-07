@@ -105,26 +105,29 @@ export type MyTeam = Awaited<ReturnType<typeof getMyTeam>>;
 export async function getBackOffice(repId: string, now = new Date()) {
   const month = startOfMonth(now);
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-  const [profile, thisMonth, pending, lifetime, history, payouts, team, size] = await Promise.all([
-    db.repProfile.findUnique({ where: { userId: repId } }),
-    db.earning.aggregate({ where: { repId, period: month }, _sum: { amountUsd: true } }),
-    db.earning.aggregate({
-      where: { repId, status: { in: [EarningStatus.PENDING, EarningStatus.APPROVED] } },
-      _sum: { amountUsd: true },
-    }),
-    db.earning.aggregate({ where: { repId }, _sum: { amountUsd: true } }),
-    db.earning.findMany({
-      where: { repId, period: { gte: sixMonthsAgo } },
-      orderBy: { period: "asc" },
-    }),
-    db.payout.findMany({ where: { repId }, orderBy: { paidAt: "desc" }, take: 12 }),
-    db.repProfile.findMany({
-      where: { sponsorId: repId },
-      orderBy: { joinedAt: "asc" },
-      include: { user: { select: { name: true, role: true, status: true } } },
-    }),
-    teamSize(repId),
-  ]);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const [profile, thisMonth, pending, lifetime, history, payouts, team, size, lastMonth] =
+    await Promise.all([
+      db.repProfile.findUnique({ where: { userId: repId } }),
+      db.earning.aggregate({ where: { repId, period: month }, _sum: { amountUsd: true } }),
+      db.earning.aggregate({
+        where: { repId, status: { in: [EarningStatus.PENDING, EarningStatus.APPROVED] } },
+        _sum: { amountUsd: true },
+      }),
+      db.earning.aggregate({ where: { repId }, _sum: { amountUsd: true } }),
+      db.earning.findMany({
+        where: { repId, period: { gte: sixMonthsAgo } },
+        orderBy: { period: "asc" },
+      }),
+      db.payout.findMany({ where: { repId }, orderBy: { paidAt: "desc" }, take: 12 }),
+      db.repProfile.findMany({
+        where: { sponsorId: repId },
+        orderBy: { joinedAt: "asc" },
+        include: { user: { select: { name: true, role: true, status: true } } },
+      }),
+      teamSize(repId),
+      db.earning.aggregate({ where: { repId, period: lastMonthStart }, _sum: { amountUsd: true } }),
+    ]);
 
   const monthEarningsUsd = thisMonth._sum.amountUsd?.toNumber() ?? 0;
   const progress = commissionProgress({
@@ -155,6 +158,7 @@ export async function getBackOffice(repId: string, now = new Date()) {
   return {
     profile,
     totals: {
+      lastMonth: lastMonth._sum.amountUsd?.toNumber() ?? 0,
       thisMonth: monthEarningsUsd,
       pending: pending._sum.amountUsd?.toNumber() ?? 0,
       lifetime: lifetime._sum.amountUsd?.toNumber() ?? 0,
@@ -168,6 +172,7 @@ export async function getBackOffice(repId: string, now = new Date()) {
       joinedAt: t.joinedAt,
     })),
     teamSize: size,
+    newMembers30d: team.filter((t) => t.joinedAt.getTime() >= now.getTime() - 30 * DAY).length,
     payouts,
     recentEarnings: [...history].reverse().slice(0, 8),
   };

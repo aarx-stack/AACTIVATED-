@@ -21,12 +21,12 @@ test.describe("executive", () => {
 
   test("sees the Command Center with live data", async ({ page }) => {
     await expect(page).toHaveURL(/\/command-center$/);
-    await expect(page.getByText("AACTIVATED", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "AACTIVATED AI BRAIN" }).first()).toBeVisible();
     for (const label of [
-      "Active agents",
-      "Tasks completed today",
-      "Pending approvals",
-      "AI spend vs budget",
+      "Active Agents",
+      "Tasks Completed Today",
+      "Pending Approvals",
+      "AI Spend vs. Budget",
     ]) {
       await expect(page.getByText(label, { exact: true })).toBeVisible();
     }
@@ -51,7 +51,7 @@ test.describe("executive", () => {
   test("sees the full org chart with confidential agents", async ({ page }) => {
     await page.goto("/team");
     await expect(page.getByTestId("org-ceo")).toContainText("The Brain");
-    await expect(page.getByTestId("dept-Legal & Compliance").getByRole("link")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Legal & Compliance/ })).toBeVisible();
   });
 
   test("theme choice is saved to the account", async ({ page, context }) => {
@@ -80,8 +80,9 @@ test.describe("staff", () => {
     await expectForbidden(page, "/finance");
     await page.goto("/team");
     const legal = page.getByTestId("dept-Legal & Compliance");
-    await expect(legal).toContainText("Executive only");
-    await expect(legal.getByRole("link")).toHaveCount(0);
+    await expect(legal).toBeVisible();
+    await expect(legal.getByLabel("Executive only")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Legal & Compliance/ })).toHaveCount(0);
   });
 
   test("sees confidential activity redacted", async ({ page }) => {
@@ -116,10 +117,10 @@ test.describe("system admin", () => {
 
   test("sees the permission matrix and system status", async ({ page }) => {
     await page.goto("/admin");
-    await page.getByRole("tab", { name: "Permission matrix" }).click();
     await expect(page.getByTestId("permission-matrix")).toContainText("confidential.legal");
-    await page.getByRole("tab", { name: "System status" }).click();
-    await expect(page.getByText("Database", { exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId("system-status").getByText("Database", { exact: true }),
+    ).toBeVisible();
   });
 });
 

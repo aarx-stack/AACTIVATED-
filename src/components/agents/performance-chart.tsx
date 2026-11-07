@@ -1,16 +1,14 @@
 "use client";
 
 import {
-  Bar,
+  Area,
+  AreaChart,
   CartesianGrid,
-  ComposedChart,
-  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { formatUsd } from "@/lib/utils";
 
 interface Point {
   date: string;
@@ -18,44 +16,38 @@ interface Point {
   spend: number;
 }
 
-const shortDate = (iso: string) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const weekday = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 
+/** Tasks completed per day as a glowing area chart (Obsidian Glass "Weekly Performance"). */
 export function PerformanceChart({ data }: { data: Point[] }) {
-  const tasks = data.reduce((n, p) => n + p.tasks, 0);
-  const spend = data.reduce((n, p) => n + p.spend, 0);
+  const total = data.reduce((n, p) => n + p.tasks, 0);
   return (
     <figure
-      className="h-56 w-full"
-      aria-label={`Last 14 days: ${tasks} tasks completed, ${formatUsd(spend)} AI spend`}
+      className="h-48 w-full"
+      aria-label={`${total} tasks completed over the last ${data.length} days`}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: -16 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
+          <defs>
+            <linearGradient id="perfFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.65} />
+              <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis
             dataKey="date"
-            tickFormatter={shortDate}
+            tickFormatter={weekday}
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            minTickGap={24}
           />
           <YAxis
-            yAxisId="tasks"
             allowDecimals={false}
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            width={40}
-          />
-          <YAxis
-            yAxisId="spend"
-            orientation="right"
-            tickFormatter={(v: number) => `$${v}`}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            width={44}
           />
           <Tooltip
             contentStyle={{
@@ -65,27 +57,18 @@ export function PerformanceChart({ data }: { data: Point[] }) {
               color: "var(--foreground)",
               fontSize: 12,
             }}
-            labelFormatter={(label) => shortDate(String(label))}
-            formatter={(value, name) =>
-              name === "spend" ? [formatUsd(Number(value)), "AI spend"] : [value, "Tasks done"]
-            }
+            labelFormatter={(label) => weekday(String(label))}
+            formatter={(value) => [value, "Tasks completed"]}
           />
-          <Bar
-            yAxisId="tasks"
-            dataKey="tasks"
-            fill="var(--chart-2)"
-            radius={[4, 4, 0, 0]}
-            maxBarSize={18}
-          />
-          <Line
-            yAxisId="spend"
-            dataKey="spend"
-            stroke="var(--chart-1)"
-            strokeWidth={2}
-            dot={false}
+          <Area
             type="monotone"
+            dataKey="tasks"
+            stroke="var(--chart-1)"
+            strokeWidth={2.5}
+            fill="url(#perfFill)"
+            dot={{ r: 3.5, fill: "#ffffff", stroke: "var(--chart-1)", strokeWidth: 2 }}
           />
-        </ComposedChart>
+        </AreaChart>
       </ResponsiveContainer>
     </figure>
   );

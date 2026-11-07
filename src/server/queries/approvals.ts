@@ -1,6 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
-import { ApprovalStatus, ApprovalType, Role } from "@/generated/prisma/enums";
+import { ApprovalStatus, ApprovalType, type RiskLevel, Role } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 
 export type ApprovalTab = "pending" | "approved" | "rejected" | "all";
@@ -28,29 +28,72 @@ const TAB_STATUS: Record<Exclude<ApprovalTab, "all">, ApprovalStatus[]> = {
   rejected: [ApprovalStatus.REJECTED, ApprovalStatus.WITHDRAWN, ApprovalStatus.CHANGES_REQUESTED],
 };
 
-export async function listApprovals(role: Role, tab: ApprovalTab) {
-  const visible = approvalVisibilityWhere(role);
-  const where: Prisma.ApprovalRequestWhereInput =
-    tab === "all" ? visible : { AND: [visible, { status: { in: TAB_STATUS[tab] } }] };
+export interface ApprovalFilters {
+  tab: ApprovalTab;
+  q?: string;
+  type?: ApprovalType;
+  risk?: RiskLevel;
+}
 
-  const [items, counts] = await Promise.all([
+const DAY = 86_400_000;
+
+export async function listApprovals(role: Role, filters: ApprovalFilters, now = new Date()) {
+  const visible = approvalVisibilityWhere(role);
+  const conditions: Prisma.ApprovalRequestWhereInput[] = [visible];
+  if (filters.tab !== "all") conditions.push({ status: { in: TAB_STATUS[filters.tab] } });
+  if (filters.type) conditions.push({ type: filters.type });
+  if (filters.risk) conditions.push({ risk: filters.risk });
+  if (filters.q?.trim()) {
+    const q = filters.q.trim();
+    conditions.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { summary: { contains: q, mode: "insensitive" } },
+        { requestedByAgent: { title: { contains: q, mode: "insensitive" } } },
+      ],
+    });
+  }
+  const weekAgo = new Date(now.getTime() - 7 * DAY);
+
+  const [items, counts, approved7d, rejected7d, decided7d] = await Promise.all([
     db.approvalRequest.findMany({
-      where,
+      where: { AND: conditions },
       orderBy:
-        tab === "pending" ? [{ createdAt: "asc" }] : [{ decidedAt: "desc" }, { createdAt: "desc" }],
+        filters.tab === "pending"
+          ? [{ createdAt: "asc" }]
+          : [{ decidedAt: "desc" }, { createdAt: "desc" }],
       take: 100,
       include: {
-        requestedByAgent: { select: { name: true, title: true } },
+        requestedByAgent: {
+          select: { name: true, title: true, department: { select: { name: true } } },
+        },
+        requestedByUser: { select: { name: true } },
         decidedBy: { select: { name: true } },
         contentItem: { select: { channel: true, status: true } },
         complianceChecks: { orderBy: { checkedAt: "desc" }, take: 1, select: { outcome: true } },
       },
     }),
     db.approvalRequest.groupBy({ by: ["status"], where: visible, _count: { _all: true } }),
+    db.approvalRequest.count({
+      where: { AND: [visible, { status: ApprovalStatus.APPROVED, decidedAt: { gte: weekAgo } }] },
+    }),
+    db.approvalRequest.count({
+      where: { AND: [visible, { status: ApprovalStatus.REJECTED, decidedAt: { gte: weekAgo } }] },
+    }),
+    db.approvalRequest.findMany({
+      where: { AND: [visible, { decidedAt: { gte: weekAgo } }] },
+      select: { createdAt: true, decidedAt: true },
+    }),
   ]);
 
   const count = (statuses: ApprovalStatus[]) =>
     counts.filter((c) => statuses.includes(c.status)).reduce((n, c) => n + c._count._all, 0);
+  const reviewMinutes = decided7d.map(
+    (d) => (d.decidedAt!.getTime() - d.createdAt.getTime()) / 60_000,
+  );
+  const avgReviewMinutes = reviewMinutes.length
+    ? reviewMinutes.reduce((n, m) => n + m, 0) / reviewMinutes.length
+    : null;
 
   return {
     items,
@@ -60,8 +103,11 @@ export async function listApprovals(role: Role, tab: ApprovalTab) {
       rejected: count(TAB_STATUS.rejected),
       all: count(Object.values(ApprovalStatus)),
     },
+    stats: { approved7d, rejected7d, avgReviewMinutes },
   };
 }
+
+export type ApprovalListItem = Awaited<ReturnType<typeof listApprovals>>["items"][number];
 
 export async function getApprovalDetail(role: Role, id: string) {
   const request = await db.approvalRequest.findFirst({

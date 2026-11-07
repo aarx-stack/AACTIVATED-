@@ -1126,8 +1126,10 @@ async function main() {
       content: "What is a recovery routine?",
       payload: {
         channel: "INSTAGRAM",
+        title: "What is a recovery routine?",
         caption:
           "Recovery is a routine, not a moment. Here are three habits our community swears by. Which one is yours?",
+        hashtags: ["#AACTIVATED", "#Routine"],
       },
       reasoning:
         "Part of the approved November content sprint. Uses the branded stack name only and makes no outcome claims. Compliance check passed with no findings.",
@@ -1145,7 +1147,8 @@ async function main() {
       payload: {
         channel: "YOUTUBE",
         title: "Recovery Stack explained",
-        description: "An educational overview of how our community thinks about recovery routines.",
+        caption: "An educational overview of how our community thinks about recovery routines.",
+        hashtags: ["#AACTIVATED", "#RecoveryStack", "#Education"],
       },
       reasoning:
         "Long-form education drives the most saves. Medium risk because the topic sits close to health claims; wording reviewed against the compliance rules and kept educational.",
@@ -1159,7 +1162,12 @@ async function main() {
       risk: "HIGH",
       agent: "content-specialist",
       content: "Morning routine reel",
-      payload: { channel: "TIKTOK", caption: "My morning routine that changed everything" },
+      payload: {
+        channel: "TIKTOK",
+        title: "Morning routine reel",
+        caption: "My morning routine that changed everything",
+        hashtags: ["#AACTIVATED", "#Routine"],
+      },
       reasoning:
         'Rep requested a personal-story reel. Flagged HIGH: the phrase "changed everything" may read as an outcome claim on TikTok. Suggest softer wording before approval.',
       sources: [{ title: "TikTok health content policy (summary)" }],
@@ -1232,25 +1240,55 @@ async function main() {
         createdAt: ago(a.createdHoursAgo * HOUR),
       },
     });
-    await db.complianceCheck.create({
+    // Only outbound content gets an automated compliance check.
+    if (a.type === "SOCIAL_POST" || a.type === "EMAIL") {
+      const flagged = a.risk === "HIGH" || a.risk === "CRITICAL";
+      await db.complianceCheck.create({
+        data: {
+          approvalRequestId: created.id,
+          contentItemId: a.content ? content[a.content] : null,
+          outcome: flagged ? "FAIL" : "PASS",
+          risk: a.risk,
+          violations: (flagged
+            ? [
+                {
+                  type: "MEDICAL_CLAIM",
+                  match: "changed everything",
+                  message: "May read as an outcome claim.",
+                  severity: "HIGH",
+                },
+              ]
+            : []) as Prisma.InputJsonValue,
+          checkedAt: ago(a.createdHoursAgo * HOUR),
+        },
+      });
+    }
+    // Audit trail for the seeded history.
+    await db.auditLog.create({
       data: {
-        approvalRequestId: created.id,
-        contentItemId: a.content ? content[a.content] : null,
-        outcome: a.risk === "HIGH" || a.risk === "CRITICAL" ? "WARN" : "PASS",
-        risk: a.risk,
-        violations: (a.risk === "HIGH"
-          ? [
-              {
-                type: "MEDICAL_CLAIM",
-                match: "changed everything",
-                message: "May read as an outcome claim.",
-                severity: "HIGH",
-              },
-            ]
-          : []) as Prisma.InputJsonValue,
-        checkedAt: ago(a.createdHoursAgo * HOUR),
+        actorType: "AGENT",
+        actorAgentId: agents[a.agent]!.id,
+        action: "approval.requested",
+        entityType: "ApprovalRequest",
+        entityId: created.id,
+        after: { type: a.type, risk: a.risk, requiredRole: created.requiredRole },
+        createdAt: ago(a.createdHoursAgo * HOUR),
       },
     });
+    if (a.decided) {
+      await db.auditLog.create({
+        data: {
+          actorType: "USER",
+          actorUserId: users.devon.id,
+          action: a.decided === "APPROVED" ? "approval.approved" : "approval.rejected",
+          entityType: "ApprovalRequest",
+          entityId: created.id,
+          before: { status: "PENDING" },
+          after: { status: a.decided },
+          createdAt: ago((a.createdHoursAgo - 4) * HOUR),
+        },
+      });
+    }
   }
 
   // Knowledge documents
@@ -1735,6 +1773,20 @@ async function main() {
       },
     ],
   });
+
+  // 30 days of health-check history (every 6 hours) so uptime figures are meaningful.
+  const checks: Prisma.HealthCheckCreateManyInput[] = [];
+  for (let h = 30 * 24; h > 0; h -= 6) {
+    const down = h === 300; // one recorded blip
+    checks.push({
+      component: "database",
+      status: down ? "DOWN" : "OPERATIONAL",
+      latencyMs: down ? null : Math.round(between(4, 18)),
+      message: down ? "Connection timeout (seeded example)." : "Connected.",
+      checkedAt: ago(h * HOUR),
+    });
+  }
+  await db.healthCheck.createMany({ data: checks });
 
   await db.auditLog.create({
     data: {
