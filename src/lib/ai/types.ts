@@ -13,6 +13,13 @@ export interface CompletionRequest {
   messages: ChatTurn[];
   maxTokens?: number;
   effort?: Effort;
+  /** Constrain the reply to this JSON schema (structured output). */
+  jsonSchema?: Record<string, unknown>;
+  /**
+   * What the mock adapter returns for this request (serialized as JSON).
+   * Lets each agent skill define a deterministic offline answer. Ignored by real providers.
+   */
+  mockOutput?: unknown;
 }
 
 export interface CompletionResult {

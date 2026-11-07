@@ -59,6 +59,13 @@ describe("confidential departments", () => {
   });
 });
 
+describe("rep pod privacy", () => {
+  it("keeps reps' private agents out of staff workspaces", () => {
+    expect(canOpenAgentWorkspace(Role.STAFF, { department: null, kind: "REP_POD" })).toBe(false);
+    expect(canOpenAgentWorkspace(Role.EXECUTIVE, { department: null, kind: "REP_POD" })).toBe(true);
+  });
+});
+
 describe("role changes", () => {
   it("lets an executive change any other user's role", () => {
     expect(canChangeRole(exec, rep, Role.STAFF)).toEqual({ ok: true });

@@ -2,4 +2,5 @@
 export const QUEUES = {
   healthCheck: "system.health-check",
   heartbeat: "system.worker-heartbeat",
+  contentWorkflow: "agents.content-workflow",
 } as const;

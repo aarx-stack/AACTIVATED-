@@ -4,10 +4,34 @@ The internal operating system for AACTIVATED RX. An AI CEO ("the Brain") runs a 
 AI agents across departments and gives every Premium rep a private AI team. **Humans approve
 anything that leaves the building.**
 
-> Status: **Phase 1 complete.** That covers setup, design tokens, layout shell, auth and roles,
-> seeded demo data, and pages 1 (Command Center), 2 (Company Team) and 12 (Admin), all in dark
-> and light themes. The other pages are permission-guarded placeholders labelled with the phase
-> that delivers them.
+> Status: **Phase 2 complete.** Phase 1 delivered setup, design tokens, auth and roles, demo data,
+> and pages 1 (Command Center), 2 (Company Team) and 12 (Admin). Phase 2 adds the first end-to-end
+> agent workflow, page 3 (Agent Workspace) and page 5 (Approval & Compliance Queue). Other pages are
+> permission-guarded placeholders labelled with the phase that delivers them.
+
+## The Phase 2 workflow
+
+On the Command Center, **Give the Brain a task** (executives and staff):
+
+1. **The Brain** plans the request and delegates it to the **Operations Manager**.
+2. The Operations Manager writes an assignment and hands it to the **Content Specialist**.
+3. The Content Specialist drafts the post: title, caption, hashtags, reasoning and sources.
+4. The **compliance engine** checks it against the executive-managed rules
+   (`/approvals/rules`). High or critical findings make it an executive decision.
+5. The draft enters the **Approval Queue**. A reviewer sees the content with flagged phrases
+   highlighted, the compliance findings, and the agent's reasoning and sources, all above the
+   **Approve / Edit / Reject** controls. Editing creates a new revision and re-runs compliance.
+   Approving a failed check needs a written acknowledgement. Rejecting needs a note.
+6. Once approved, the content is **ready to schedule** (scheduling arrives with the Content
+   Studio in Phase 3).
+
+Every step writes an AuditLog entry with a shared correlation ID, shown as the audit trail on the
+request page. Paused or misconfigured agents stop the workflow safely: the task is marked
+blocked, the stop is audited, and nothing is sent.
+
+`AGENT_EXECUTION=inline` (the default) runs the agents during the request.
+`AGENT_EXECUTION=queue` hands them to the background worker (`npm run worker`), which is
+recommended in production.
 
 ## Stack
 
@@ -95,8 +119,9 @@ refuse to touch any database whose name doesn't end in `_test`.
 | Every model call is costed                | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                         |
 | Always-on                                 | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                           |
 
-Phase 2 builds the approval queue and the outbound dispatch gate. Phase 4 adds the 75% budget
-lock. The data model and policies they rely on are already in place.
+The outbound gate, `assertDispatchable()` in `src/server/approvals/service.ts`, is the only path
+out of the building. It refuses anything that isn't approved, or whose content fingerprint
+changed after approval. Phase 4 adds the 75% budget lock.
 
 ## AI
 

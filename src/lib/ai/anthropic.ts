@@ -27,7 +27,12 @@ export class AnthropicModelAdapter implements ModelAdapter {
       max_tokens: request.maxTokens ?? 16000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: request.effort ?? (request.tier === "brain" ? "high" : "medium") },
+      output_config: {
+        effort: request.effort ?? (request.tier === "brain" ? "high" : "medium"),
+        ...(request.jsonSchema
+          ? { format: { type: "json_schema", schema: request.jsonSchema } }
+          : {}),
+      },
       system: request.system,
       messages: request.messages,
     });

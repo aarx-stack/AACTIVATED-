@@ -32,6 +32,11 @@ interface PermissionDef {
 export const PERMISSIONS = {
   "command_center.view": { label: "View Brain Command Center", group: "Brain", roles: COMPANY },
   "brain.ask": { label: "Ask the Brain", group: "Brain", roles: [EXECUTIVE, STAFF] },
+  "workflow.request": {
+    label: "Give the Brain work (start workflows)",
+    group: "Brain",
+    roles: [EXECUTIVE, STAFF],
+  },
   "company_team.view": { label: "View Company Team", group: "Agents", roles: COMPANY },
   "agent.view": { label: "Open agent workspaces", group: "Agents", roles: [EXECUTIVE, STAFF] },
   "agent.manage": {

@@ -17,6 +17,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AskBrain } from "@/components/command-center/ask-brain";
+import { ContentRequest } from "@/components/command-center/content-request";
 import { KpiCard } from "@/components/command-center/kpi-card";
 import { SpendChart } from "@/components/command-center/spend-chart";
 import { PageHeader } from "@/components/shell/page-header";
@@ -80,6 +81,8 @@ export default async function CommandCenterPage() {
       />
 
       <AskBrain enabled={can(user.role, "brain.ask")} />
+
+      {can(user.role, "workflow.request") && <ContentRequest />}
 
       <section aria-label="Key metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard

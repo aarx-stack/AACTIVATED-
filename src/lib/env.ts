@@ -15,6 +15,8 @@ const schema = z
     EMAIL_FROM: z.string().default("AACTIVATED AI Brain <no-reply@aactivated.test>"),
     DEMO_LOGIN_ENABLED: boolish,
     AI_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
+    /** "inline" runs agent workflows in the request; "queue" hands them to the worker. */
+    AGENT_EXECUTION: z.enum(["inline", "queue"]).default("inline"),
     ANTHROPIC_API_KEY: z.string().optional(),
     ANTHROPIC_MODEL_BRAIN: z.string().default("claude-opus-5-5"),
     ANTHROPIC_MODEL_AGENT: z.string().default("claude-sonnet-5-5"),

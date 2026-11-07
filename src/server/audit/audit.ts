@@ -13,6 +13,8 @@ export interface AuditEntry {
   before?: unknown;
   after?: unknown;
   metadata?: unknown;
+  /** Groups all steps of one workflow run. */
+  correlationId?: string | null;
 }
 
 /** Converts Dates/Decimals/undefined into plain JSON for storage. */
@@ -37,6 +39,7 @@ export async function recordAudit(client: DbClient, entry: AuditEntry) {
       before: toJson(entry.before),
       after: toJson(entry.after),
       metadata: toJson(entry.metadata),
+      correlationId: entry.correlationId ?? null,
     },
   });
 }

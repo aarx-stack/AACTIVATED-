@@ -39,11 +39,16 @@ export function canViewDepartmentDetail(
   return department.isConfidential ? role === Role.EXECUTIVE : true;
 }
 
+/**
+ * Company agent workspaces. Confidential departments (Legal, Finance, HR) and
+ * reps' private pod agents open for executives only.
+ */
 export function canOpenAgentWorkspace(
   role: Role | null | undefined,
-  agent: { department: { isConfidential: boolean } | null },
+  agent: { department: { isConfidential: boolean } | null; kind?: string },
 ): boolean {
   if (!can(role, "agent.view")) return false;
+  if (agent.kind === "REP_POD") return role === Role.EXECUTIVE;
   if (agent.department?.isConfidential) return role === Role.EXECUTIVE;
   return true;
 }

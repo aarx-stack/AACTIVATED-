@@ -22,7 +22,7 @@ import type {
   TaskStatus,
 } from "../src/generated/prisma/enums";
 import { requiredRoleFor } from "../src/server/approvals/policy";
-import { createHash } from "node:crypto";
+import { hashPayload } from "../src/server/approvals/payload";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -48,8 +48,6 @@ const ahead = (ms: number) => new Date(NOW.getTime() + ms);
 const monthStart = new Date(NOW.getFullYear(), NOW.getMonth(), 1);
 const monthEnd = new Date(NOW.getFullYear(), NOW.getMonth() + 1, 0, 23, 59, 59);
 const usd = (n: number, dp = 2) => new Prisma.Decimal(n.toFixed(dp));
-const hashPayload = (payload: unknown) =>
-  createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 
 function agentConfig(role: string, context: string, dailyRoutine: string, toolsAllowed: string[]) {
   return { role, context, dailyRoutine, toolsAllowed };

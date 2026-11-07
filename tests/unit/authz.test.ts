@@ -20,6 +20,7 @@ const ROLES = [E, S, P, F, A];
 const EXPECTED: Record<Permission, Role[]> = {
   "command_center.view": [E, S, A],
   "brain.ask": [E, S],
+  "workflow.request": [E, S],
   "company_team.view": [E, S, A],
   "agent.view": [E, S],
   "agent.manage": [E],

@@ -13,6 +13,19 @@ export class MockModelAdapter implements ModelAdapter {
   readonly provider = "mock" as const;
 
   async complete(request: CompletionRequest): Promise<CompletionResult> {
+    if (request.mockOutput !== undefined) {
+      const text = JSON.stringify(request.mockOutput);
+      const input = request.system + request.messages.map((m) => m.content).join("\n");
+      return {
+        text,
+        provider: "mock",
+        model: "mock",
+        inputTokens: estimateTokens(input),
+        outputTokens: estimateTokens(text),
+        refused: false,
+        stopReason: "end_turn",
+      };
+    }
     const question = [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
     const facts = request.system
       .split("\n")

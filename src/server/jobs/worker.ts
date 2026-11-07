@@ -6,6 +6,8 @@ import "dotenv/config";
 import { PgBoss } from "pg-boss";
 import { db } from "@/lib/db";
 import { getEnv } from "@/lib/env";
+import type { ContentChannel } from "@/generated/prisma/enums";
+import { runContentWorkflow } from "@/server/agents/content-workflow";
 import { getSystemHealth } from "@/server/health/health";
 import { QUEUES } from "./queues";
 
@@ -27,6 +29,16 @@ async function main() {
     const health = await getSystemHealth({ persist: true });
     console.info(`[worker] health: ${health.status}`);
   });
+
+  await boss.work<{ taskId: string; channel: ContentChannel }>(
+    QUEUES.contentWorkflow,
+    async (jobs) => {
+      for (const job of jobs) {
+        const result = await runContentWorkflow(job.data.taskId, job.data.channel);
+        console.info(`[worker] content workflow ${job.data.taskId}: ${result.status}`);
+      }
+    },
+  );
 
   await boss.schedule(QUEUES.heartbeat, "* * * * *");
   await boss.schedule(QUEUES.healthCheck, "*/5 * * * *");

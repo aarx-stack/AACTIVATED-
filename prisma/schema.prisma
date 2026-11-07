@@ -268,6 +268,7 @@ model User {
   tasksCreated       Task[]                  @relation("TaskCreator")
   approvalsRequested ApprovalRequest[]       @relation("ApprovalRequester")
   approvalsDecided   ApprovalRequest[]       @relation("ApprovalDecider")
+  approvalsEdited    ApprovalRequest[]       @relation("ApprovalEditor")
   complianceRules    ComplianceRule[]
   documents          Document[]
   promptVersions     PromptTemplateVersion[]
@@ -458,8 +459,11 @@ model Task {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  handoffs   Handoff[]
-  activities AgentActivity[]
+  handoffs      Handoff[]
+  activities    AgentActivity[]
+  contentItems  ContentItem[]
+  /// Groups every record created by one workflow run.
+  correlationId String?
 
   @@index([status, completedAt])
   @@index([agentId])
@@ -501,6 +505,9 @@ model ContentItem {
   /// The rep this content belongs to, when produced by a rep pod.
   repId         String?
   rep           User?          @relation(fields: [repId], references: [id], onDelete: SetNull)
+  /// The workflow task that produced this item.
+  taskId        String?
+  task          Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -541,6 +548,10 @@ model ApprovalRequest {
   decidedBy          User?          @relation("ApprovalDecider", fields: [decidedById], references: [id])
   decidedAt          DateTime?
   decisionNote       String?
+  editedById         String?
+  editedBy           User?          @relation("ApprovalEditor", fields: [editedById], references: [id])
+  editedAt           DateTime?
+  correlationId      String?
   contentItemId      String?
   contentItem        ContentItem?   @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
   budgetId           String?
@@ -753,21 +764,24 @@ model HealthCheck {
 
 /// Append-only. Enforced by a database trigger; never update or delete rows.
 model AuditLog {
-  id           String    @id @default(cuid())
-  actorType    ActorType
-  actorUserId  String?
-  actorUser    User?     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
-  actorAgentId String?
-  action       String
-  entityType   String
-  entityId     String?
-  before       Json?
-  after        Json?
-  metadata     Json?
-  createdAt    DateTime  @default(now())
+  id            String    @id @default(cuid())
+  actorType     ActorType
+  actorUserId   String?
+  actorUser     User?     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorAgentId  String?
+  action        String
+  entityType    String
+  entityId      String?
+  before        Json?
+  after         Json?
+  metadata      Json?
+  /// Shared by every step of one workflow run, so the full trail can be shown together.
+  correlationId String?
+  createdAt     DateTime  @default(now())
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([correlationId])
 }
 
 model Notification {
