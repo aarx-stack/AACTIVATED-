@@ -1,0 +1,27 @@
+# deps
+node_modules/
+
+# next
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# prisma generated client
+src/generated/
+
+# env — never commit secrets
+.env
+.env.*
+!.env.example
+
+# tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# misc
+.DS_Store
+*.log

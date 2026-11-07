@@ -1,0 +1,785 @@
+// AACTIVATED AI Brain — data model
+// Conventions:
+//  - Money is stored as Decimal (USD). Never floats.
+//  - AuditLog is append-only; a database trigger (see migrations) rejects UPDATE/DELETE/TRUNCATE.
+//  - Roles are an enum; the permission matrix lives in code (src/server/authz/permissions.ts).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  EXECUTIVE
+  STAFF
+  PREMIUM_REP
+  FREE_REP
+  SYSTEM_ADMIN
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum ThemePreference {
+  DARK
+  LIGHT
+  SYSTEM
+}
+
+enum AgentKind {
+  BRAIN
+  DEPARTMENT
+  REP_POD
+}
+
+enum AgentStatus {
+  ACTIVE
+  IDLE
+  PAUSED
+  ERROR
+  OFFLINE
+}
+
+enum RepAgentRole {
+  CONTENT_CREATOR
+  SOCIAL_MEDIA_MANAGER
+  LEAD_FOLLOWUP
+  BUSINESS_COACH
+}
+
+enum ActivityKind {
+  PLANNED
+  DELEGATED
+  STARTED
+  DRAFTED
+  COMPLIANCE_CHECKED
+  SUBMITTED_FOR_APPROVAL
+  COMPLETED
+  HANDOFF
+  REPORTED
+  FLAGGED
+  ERROR
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum HandoffStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  REJECTED
+}
+
+enum ReportPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ContentChannel {
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  EMAIL
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  REJECTED
+}
+
+enum ApprovalType {
+  SOCIAL_POST
+  EMAIL
+  DIRECT_MESSAGE
+  SPEND
+  PAYMENT
+  SITE_CHANGE
+  LEGAL
+  OUTSIDE_WORK
+  PROJECT_LAUNCH
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  WITHDRAWN
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplianceOutcome {
+  PASS
+  WARN
+  FAIL
+}
+
+enum ComplianceRuleType {
+  BLOCKLIST_TERM
+  PEPTIDE_NAME
+  MEDICAL_CLAIM
+  PLATFORM_RULE
+}
+
+enum BudgetStatus {
+  OK
+  WARNING
+  LOCKED
+}
+
+enum SpendKind {
+  AI_MODEL
+  ADVERTISING
+  SOFTWARE
+  CONTRACTOR
+  OTHER
+}
+
+enum TransactionType {
+  REVENUE
+  EXPENSE
+  REFUND
+}
+
+enum TransactionSource {
+  QUICKBOOKS
+  MANUAL
+}
+
+enum DocumentCategory {
+  POLICIES
+  TRAINING
+  LEGAL_RESEARCH
+  BRAND
+  PRODUCT_EDUCATION
+}
+
+enum AccessLevel {
+  EXECUTIVE_ONLY
+  ALL_STAFF
+  ALL_USERS
+}
+
+enum ProjectPhase {
+  IDEA
+  BUILD
+  REVIEW
+  LAUNCH
+}
+
+enum IntegrationProvider {
+  GOHIGHLEVEL
+  QUICKBOOKS
+  SLACK
+  ANTHROPIC
+}
+
+enum IntegrationMode {
+  MOCK
+  LIVE
+}
+
+enum HealthStatus {
+  OPERATIONAL
+  DEGRADED
+  DOWN
+  UNKNOWN
+}
+
+enum ActorType {
+  USER
+  AGENT
+  SYSTEM
+}
+
+enum NotificationKind {
+  APPROVAL_REQUESTED
+  APPROVAL_DECIDED
+  BUDGET_ALERT
+  COMPLIANCE_FLAG
+  SYSTEM
+  MENTION
+}
+
+// ---------------------------------------------------------------------------
+// Identity & auth (Auth.js tables + our user fields)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String          @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role            @default(FREE_REP)
+  status        UserStatus      @default(INVITED)
+  theme         ThemePreference @default(DARK)
+  title         String?
+  departmentId  String?
+  department    Department?     @relation("DepartmentMembers", fields: [departmentId], references: [id])
+  onboardedAt   DateTime?
+  lastActiveAt  DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  ownedDepartments   Department[]            @relation("DepartmentOwner")
+  ownedAgents        Agent[]                 @relation("AgentOwner")
+  repPod             RepPod?
+  tasksCreated       Task[]                  @relation("TaskCreator")
+  approvalsRequested ApprovalRequest[]       @relation("ApprovalRequester")
+  approvalsDecided   ApprovalRequest[]       @relation("ApprovalDecider")
+  complianceRules    ComplianceRule[]
+  documents          Document[]
+  promptVersions     PromptTemplateVersion[]
+  templateVersions   AgentTemplateVersion[]
+  projects           Project[]
+  notifications      Notification[]
+  auditEntries       AuditLog[]
+  contentItems       ContentItem[]
+
+  @@index([role])
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Organisation & agents
+// ---------------------------------------------------------------------------
+
+model Department {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  description    String
+  sortOrder      Int      @default(0)
+  /// Legal, Finance and HR are company-confidential (EXECUTIVE-only detail views).
+  isConfidential Boolean  @default(false)
+  ownerId        String?
+  owner          User?    @relation("DepartmentOwner", fields: [ownerId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  members      User[]           @relation("DepartmentMembers")
+  agents       Agent[]
+  tasks        Task[]
+  budgets      Budget[]
+  spendEvents  SpendEvent[]
+  transactions Transaction[]
+  prompts      PromptTemplate[]
+}
+
+model Agent {
+  id                String                @id @default(cuid())
+  slug              String                @unique
+  name              String
+  /// The agent's job title, e.g. "Operations Manager".
+  title             String
+  kind              AgentKind
+  status            AgentStatus           @default(IDLE)
+  departmentId      String?
+  department        Department?           @relation(fields: [departmentId], references: [id])
+  /// Human owner accountable for this agent.
+  ownerId           String
+  owner             User                  @relation("AgentOwner", fields: [ownerId], references: [id])
+  repPodId          String?
+  repPod            RepPod?               @relation(fields: [repPodId], references: [id], onDelete: Cascade)
+  repRole           RepAgentRole?
+  /// ROLE / CONTEXT / DAILY_ROUTINE prompt blocks + allowed tools. Validated by zod in code.
+  config            Json
+  templateVersionId String?
+  templateVersion   AgentTemplateVersion? @relation(fields: [templateVersionId], references: [id])
+  monthlyBudgetUsd  Decimal?              @db.Decimal(12, 2)
+  currentFocus      String?
+  lastActiveAt      DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  tasks            Task[]
+  activities       AgentActivity[]
+  handoffsOut      Handoff[]         @relation("HandoffFrom")
+  handoffsIn       Handoff[]         @relation("HandoffTo")
+  reports          Report[]
+  contentItems     ContentItem[]
+  approvalRequests ApprovalRequest[]
+  spendEvents      SpendEvent[]
+
+  @@index([departmentId])
+  @@index([repPodId])
+}
+
+/// Versioned agent blueprints. New rep pods copy the current best version ("carry forward what was learned").
+model AgentTemplate {
+  id             String                 @id @default(cuid())
+  key            String                 @unique
+  name           String
+  repRole        RepAgentRole?
+  currentVersion Int                    @default(1)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  versions       AgentTemplateVersion[]
+}
+
+model AgentTemplateVersion {
+  id           String        @id @default(cuid())
+  templateId   String
+  template     AgentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version      Int
+  role         String
+  context      String
+  dailyRoutine String
+  toolsAllowed String[]
+  changeNote   String?
+  createdById  String?
+  createdBy    User?         @relation(fields: [createdById], references: [id])
+  createdAt    DateTime      @default(now())
+  agents       Agent[]
+
+  @@unique([templateId, version])
+}
+
+model RepPod {
+  id        String   @id @default(cuid())
+  repId     String   @unique
+  rep       User     @relation(fields: [repId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agents    Agent[]
+}
+
+model AgentActivity {
+  id        String       @id @default(cuid())
+  agentId   String
+  agent     Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  kind      ActivityKind
+  message   String
+  taskId    String?
+  task      Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
+
+  @@index([createdAt])
+  @@index([agentId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Work
+// ---------------------------------------------------------------------------
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  agentId      String?
+  agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  departmentId String?
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  createdById  String?
+  createdBy    User?        @relation("TaskCreator", fields: [createdById], references: [id])
+  parentId     String?
+  parent       Task?        @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks     Task[]       @relation("Subtasks")
+  dueAt        DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  handoffs   Handoff[]
+  activities AgentActivity[]
+
+  @@index([status, completedAt])
+  @@index([agentId])
+}
+
+model Handoff {
+  id          String        @id @default(cuid())
+  fromAgentId String
+  fromAgent   Agent         @relation("HandoffFrom", fields: [fromAgentId], references: [id], onDelete: Cascade)
+  toAgentId   String
+  toAgent     Agent         @relation("HandoffTo", fields: [toAgentId], references: [id], onDelete: Cascade)
+  taskId      String?
+  task        Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  status      HandoffStatus @default(PENDING)
+  note        String
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+}
+
+model Report {
+  id        String       @id @default(cuid())
+  agentId   String
+  agent     Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  period    ReportPeriod
+  title     String
+  body      String
+  createdAt DateTime     @default(now())
+}
+
+model ContentItem {
+  id            String         @id @default(cuid())
+  title         String
+  body          String
+  channel       ContentChannel
+  status        ContentStatus  @default(DRAFT)
+  scheduledFor  DateTime?
+  authorAgentId String?
+  authorAgent   Agent?         @relation(fields: [authorAgentId], references: [id], onDelete: SetNull)
+  /// The rep this content belongs to, when produced by a rep pod.
+  repId         String?
+  rep           User?          @relation(fields: [repId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  approvalRequests ApprovalRequest[]
+  complianceChecks ComplianceCheck[]
+
+  @@index([scheduledFor])
+}
+
+// ---------------------------------------------------------------------------
+// Approvals & compliance
+// ---------------------------------------------------------------------------
+
+model ApprovalRequest {
+  id                 String         @id @default(cuid())
+  type               ApprovalType
+  title              String
+  summary            String
+  /// Exactly what will leave the building if approved.
+  payload            Json
+  /// sha256 of the canonical payload. Dispatch refuses if the payload changed after approval.
+  payloadHash        String
+  revision           Int            @default(1)
+  /// The agent's reasoning — always shown above the decision buttons.
+  reasoning          String
+  /// [{ title, url?, note? }]
+  sources            Json
+  risk               RiskLevel
+  status             ApprovalStatus @default(PENDING)
+  /// Minimum role allowed to decide (computed from type + risk by the approval policy).
+  requiredRole       Role           @default(STAFF)
+  amountUsd          Decimal?       @db.Decimal(12, 2)
+  requestedByAgentId String?
+  requestedByAgent   Agent?         @relation(fields: [requestedByAgentId], references: [id], onDelete: SetNull)
+  requestedByUserId  String?
+  requestedByUser    User?          @relation("ApprovalRequester", fields: [requestedByUserId], references: [id])
+  decidedById        String?
+  decidedBy          User?          @relation("ApprovalDecider", fields: [decidedById], references: [id])
+  decidedAt          DateTime?
+  decisionNote       String?
+  contentItemId      String?
+  contentItem        ContentItem?   @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+  budgetId           String?
+  budget             Budget?        @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  complianceChecks ComplianceCheck[]
+  projects         Project[]
+
+  @@index([status, createdAt])
+}
+
+model ComplianceCheck {
+  id                String            @id @default(cuid())
+  approvalRequestId String?
+  approvalRequest   ApprovalRequest?  @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  contentItemId     String?
+  contentItem       ContentItem?      @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  outcome           ComplianceOutcome
+  risk              RiskLevel
+  /// [{ ruleId, type, match, message, severity }]
+  violations        Json
+  checkedAt         DateTime          @default(now())
+}
+
+/// Executive-configurable content rules.
+model ComplianceRule {
+  id          String             @id @default(cuid())
+  type        ComplianceRuleType
+  /// A plain term, or a regular expression when isRegex is true.
+  pattern     String
+  isRegex     Boolean            @default(false)
+  /// Empty = applies to every channel.
+  channels    ContentChannel[]
+  severity    RiskLevel          @default(HIGH)
+  description String
+  suggestion  String?
+  active      Boolean            @default(true)
+  createdById String?
+  createdBy   User?              @relation(fields: [createdById], references: [id])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([active, type])
+}
+
+// ---------------------------------------------------------------------------
+// Finance
+// ---------------------------------------------------------------------------
+
+model Budget {
+  id           String       @id @default(cuid())
+  name         String
+  kind         SpendKind    @default(OTHER)
+  departmentId String?
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  periodStart  DateTime
+  periodEnd    DateTime
+  limitUsd     Decimal      @db.Decimal(12, 2)
+  /// Alert + lock threshold as a fraction of limit (business rule: 0.75).
+  threshold    Decimal      @default(0.75) @db.Decimal(4, 3)
+  status       BudgetStatus @default(OK)
+  alertSentAt  DateTime?
+  lockedAt     DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  spendEvents      SpendEvent[]
+  approvalRequests ApprovalRequest[]
+
+  @@index([periodStart, periodEnd])
+}
+
+model SpendEvent {
+  id           String      @id @default(cuid())
+  kind         SpendKind
+  description  String
+  amountUsd    Decimal     @db.Decimal(14, 6)
+  budgetId     String?
+  budget       Budget?     @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  agentId      String?
+  agent        Agent?      @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  /// Model-call fields (kind = AI_MODEL)
+  provider     String?
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  occurredAt   DateTime    @default(now())
+
+  @@index([occurredAt])
+  @@index([departmentId, occurredAt])
+}
+
+model Transaction {
+  id           String            @id @default(cuid())
+  occurredAt   DateTime
+  description  String
+  category     String
+  type         TransactionType
+  amountUsd    Decimal           @db.Decimal(14, 2)
+  departmentId String?
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  source       TransactionSource @default(MANUAL)
+  externalId   String?           @unique
+  createdAt    DateTime          @default(now())
+
+  @@index([occurredAt])
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge, prompts, projects
+// ---------------------------------------------------------------------------
+
+model Document {
+  id          String           @id @default(cuid())
+  title       String
+  category    DocumentCategory
+  accessLevel AccessLevel
+  summary     String?
+  body        String
+  tags        String[]
+  ownerId     String?
+  owner       User?            @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([category, accessLevel])
+}
+
+model PromptTemplate {
+  id             String                  @id @default(cuid())
+  key            String                  @unique
+  name           String
+  description    String
+  variables      String[]
+  currentVersion Int                     @default(1)
+  departmentId   String?
+  department     Department?             @relation(fields: [departmentId], references: [id])
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  versions       PromptTemplateVersion[]
+}
+
+model PromptTemplateVersion {
+  id          String         @id @default(cuid())
+  templateId  String
+  template    PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version     Int
+  body        String
+  changeNote  String?
+  createdById String?
+  createdBy   User?          @relation(fields: [createdById], references: [id])
+  createdAt   DateTime       @default(now())
+
+  @@unique([templateId, version])
+}
+
+model Project {
+  id                        String           @id @default(cuid())
+  name                      String
+  description               String
+  phase                     ProjectPhase     @default(IDEA)
+  /// Locked projects show "Pending Approval" and cannot advance without an executive decision.
+  locked                    Boolean          @default(false)
+  requiresExecutiveApproval Boolean          @default(false)
+  isTokenization            Boolean          @default(false)
+  ownerId                   String?
+  owner                     User?            @relation(fields: [ownerId], references: [id])
+  approvalRequestId         String?
+  approvalRequest           ApprovalRequest? @relation(fields: [approvalRequestId], references: [id])
+  targetDate                DateTime?
+  sortOrder                 Int              @default(0)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Platform
+// ---------------------------------------------------------------------------
+
+model Integration {
+  id            String              @id @default(cuid())
+  provider      IntegrationProvider @unique
+  name          String
+  description   String
+  mode          IntegrationMode     @default(MOCK)
+  enabled       Boolean             @default(true)
+  status        HealthStatus        @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  lastError     String?
+  /// Non-secret settings only. Secrets live in environment variables.
+  config        Json                @default("{}")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+model HealthCheck {
+  id        String       @id @default(cuid())
+  component String
+  status    HealthStatus
+  latencyMs Int?
+  message   String?
+  checkedAt DateTime     @default(now())
+
+  @@index([component, checkedAt])
+}
+
+/// Append-only. Enforced by a database trigger; never update or delete rows.
+model AuditLog {
+  id           String    @id @default(cuid())
+  actorType    ActorType
+  actorUserId  String?
+  actorUser    User?     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorAgentId String?
+  action       String
+  entityType   String
+  entityId     String?
+  before       Json?
+  after        Json?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
