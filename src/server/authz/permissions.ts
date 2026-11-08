@@ -143,11 +143,10 @@ export const PERMISSIONS = {
     group: "Platform",
     roles: [EXECUTIVE, SYSTEM_ADMIN],
   },
-  // Executive-only: the log holds before/after values of every change (budgets, edits, roles).
   "audit_log.view": {
     label: "Read the audit log",
     group: "Platform",
-    roles: [EXECUTIVE],
+    roles: [EXECUTIVE, SYSTEM_ADMIN],
   },
   "system_status.view": { label: "System status", group: "Platform", roles: COMPANY },
   "account.manage_own": {
