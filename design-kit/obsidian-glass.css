@@ -1,0 +1,708 @@
+/*
+ * AACTIVATED AI BRAIN: "Obsidian Glass" skin (Style A)
+ * --------------------------------------------------------------------------
+ * Framework-free. Works in any web app (React, Vue, plain HTML, Tailwind or not).
+ * 1. Load this file once, after your other CSS.
+ * 2. Dark is the default. Add class="light" to <html> for the light theme.
+ * 3. Use the og-* classes below, or use the CSS variables in your own styles.
+ * Reference: design/reference/AARX_GUI_Dark_Style_A_Obsidian_Glass.pdf
+ * Rules: app name is plain text "AACTIVATED AI BRAIN", no logo, no emojis.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+/* ============================================================== tokens == */
+:root {
+  /* surfaces */
+  --og-background: #000b1d;
+  --og-surface-solid: #04163a;
+  --og-surface-muted: rgba(6, 30, 70, 0.55);
+  --og-surface-hover: rgba(40, 130, 255, 0.12);
+  --og-sidebar: rgba(2, 16, 40, 0.82);
+
+  /* text */
+  --og-foreground: #f3f7fd;
+  --og-muted: #b2c1d9;
+  --og-subtle: #93a5c3;
+
+  /* lines */
+  --og-border: rgba(64, 140, 255, 0.28);
+  --og-border-strong: rgba(80, 165, 255, 0.8);
+
+  /* actions */
+  --og-primary: #1667f0;
+  --og-primary-foreground: #ffffff;
+  --og-primary-gradient: linear-gradient(180deg, #3d8cff 0%, #1667f0 52%, #0c4fd0 100%);
+  --og-cyan: #2ec5ff;
+  --og-ring: #4cc3ff;
+
+  /* status */
+  --og-success: #3ee07f;
+  --og-success-soft: rgba(30, 200, 100, 0.13);
+  --og-success-line: rgba(52, 226, 122, 0.6);
+  --og-warning: #ffc04a;
+  --og-warning-soft: rgba(255, 176, 32, 0.14);
+  --og-warning-line: rgba(255, 186, 64, 0.6);
+  --og-danger: #ff6b6b;
+  --og-danger-soft: rgba(255, 70, 70, 0.14);
+  --og-danger-line: rgba(255, 96, 96, 0.65);
+  --og-info: #5fb4ff;
+  --og-info-soft: rgba(30, 120, 255, 0.18);
+  --og-info-line: rgba(80, 160, 255, 0.7);
+  --og-violet: #b9a2ff;
+  --og-violet-soft: rgba(124, 92, 255, 0.2);
+  --og-neutral-soft: rgba(150, 170, 205, 0.14);
+  --og-neutral-line: rgba(150, 170, 205, 0.4);
+
+  /* glass */
+  --og-panel-bg: linear-gradient(180deg, rgba(7, 32, 76, 0.66) 0%, rgba(2, 16, 40, 0.78) 100%);
+  --og-panel-border: rgba(58, 140, 255, 0.55);
+  --og-panel-shadow:
+    0 0 22px -4px rgba(30, 120, 255, 0.45), inset 0 1px 0 rgba(170, 210, 255, 0.12),
+    inset 0 0 36px rgba(30, 110, 255, 0.07);
+  --og-panel-hero-bg:
+    radial-gradient(120% 140% at 0% 0%, rgba(40, 120, 255, 0.42), transparent 55%),
+    linear-gradient(135deg, rgba(10, 52, 130, 0.8), rgba(2, 18, 46, 0.86) 70%);
+  --og-tile-bg: linear-gradient(180deg, rgba(10, 40, 92, 0.6), rgba(3, 20, 50, 0.7));
+  --og-tile-border: rgba(70, 150, 255, 0.42);
+  --og-glow: 0 0 0 1px rgba(110, 185, 255, 0.85), 0 0 22px rgba(30, 130, 255, 0.7);
+  --og-glow-soft: 0 0 18px -2px rgba(30, 130, 255, 0.55);
+  --og-bar-fill: linear-gradient(90deg, #12d0ff, #1d8bff);
+  --og-bar-glow: 0 0 10px rgba(30, 190, 255, 0.75);
+  --og-streak-opacity: 1;
+  --og-noise-opacity: 0.045;
+
+  /* charts (use for chart libraries) */
+  --og-chart-1: #29b6ff;
+  --og-chart-2: #1f7bff;
+  --og-chart-3: #7c8cff;
+  --og-chart-4: #c0c7d0;
+  --og-chart-grid: rgba(90, 150, 255, 0.14);
+
+  /* shape & layout */
+  --og-radius-card: 18px;
+  --og-radius-tile: 14px;
+  --og-radius-control: 12px;
+  --og-radius-pill: 999px;
+  --og-sidebar-width: 288px;
+  --og-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  color-scheme: dark;
+}
+
+/* Light theme: white and silver with royal-blue accents. */
+.light {
+  --og-background: #f5f8fd;
+  --og-surface-solid: #ffffff;
+  --og-surface-muted: #f1f5fc;
+  --og-surface-hover: rgba(26, 63, 191, 0.07);
+  --og-sidebar: rgba(255, 255, 255, 0.94);
+  --og-foreground: #0a1530;
+  --og-muted: #44516b;
+  --og-subtle: #56627a;
+  --og-border: #d6deeb;
+  --og-border-strong: rgba(26, 99, 230, 0.55);
+  --og-primary: #1557d8;
+  --og-primary-gradient: linear-gradient(180deg, #2f74ef 0%, #1557d8 55%, #1046b8 100%);
+  --og-cyan: #0a7cc2;
+  --og-ring: #1557d8;
+  --og-success: #047857;
+  --og-success-soft: rgba(4, 120, 87, 0.1);
+  --og-success-line: rgba(4, 120, 87, 0.45);
+  --og-warning: #a14a06;
+  --og-warning-soft: rgba(180, 83, 9, 0.1);
+  --og-warning-line: rgba(180, 83, 9, 0.45);
+  --og-danger: #b91c1c;
+  --og-danger-soft: rgba(185, 28, 28, 0.08);
+  --og-danger-line: rgba(185, 28, 28, 0.45);
+  --og-info: #1557d8;
+  --og-info-soft: rgba(21, 87, 216, 0.08);
+  --og-info-line: rgba(21, 87, 216, 0.4);
+  --og-violet: #6d28d9;
+  --og-violet-soft: rgba(109, 40, 217, 0.1);
+  --og-neutral-soft: rgba(68, 81, 107, 0.08);
+  --og-neutral-line: rgba(68, 81, 107, 0.3);
+  --og-panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.95));
+  --og-panel-border: rgba(26, 99, 230, 0.22);
+  --og-panel-shadow: 0 1px 2px rgba(10, 21, 48, 0.05), 0 10px 30px -14px rgba(21, 87, 216, 0.28);
+  --og-panel-hero-bg: linear-gradient(
+    135deg,
+    rgba(219, 233, 255, 0.95),
+    rgba(255, 255, 255, 0.96) 60%
+  );
+  --og-tile-bg: #f6f9ff;
+  --og-tile-border: rgba(26, 99, 230, 0.18);
+  --og-glow: 0 0 0 1px rgba(21, 87, 216, 0.35), 0 8px 22px -8px rgba(21, 87, 216, 0.45);
+  --og-glow-soft: 0 6px 18px -10px rgba(21, 87, 216, 0.45);
+  --og-bar-fill: linear-gradient(90deg, #0a84d6, #1557d8);
+  --og-bar-glow: 0 0 8px rgba(21, 87, 216, 0.35);
+  --og-streak-opacity: 0.35;
+  --og-noise-opacity: 0.02;
+  --og-chart-1: #1557d8;
+  --og-chart-2: #0a84d6;
+  --og-chart-3: #6d28d9;
+  --og-chart-4: #7c8aa5;
+  --og-chart-grid: #e1e7f1;
+  color-scheme: light;
+}
+
+/* ================================================================ base == */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--og-background);
+  color: var(--og-foreground);
+  font-family: var(--og-font);
+  -webkit-font-smoothing: antialiased;
+}
+/* Light streaks and grain behind everything. Keep app content above with .og-app (z-index 1). */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  opacity: var(--og-streak-opacity);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='none'%3E%3Cdefs%3E%3Cfilter id='b' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='6'/%3E%3C/filter%3E%3Cfilter id='w' x='-20%25' y='-50%25' width='140%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='26'/%3E%3C/filter%3E%3C/defs%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-80 930 C 260 760 520 1010 900 1000' stroke='%231d6bff' stroke-width='60' opacity='.35' filter='url(%23w)'/%3E%3Cpath d='M-80 930 C 260 760 520 1010 900 1000' stroke='%2380c8ff' stroke-width='3' opacity='.8' filter='url(%23b)'/%3E%3Cpath d='M1040 -40 C 1240 120 1400 60 1680 -20' stroke='%231d6bff' stroke-width='70' opacity='.3' filter='url(%23w)'/%3E%3Cpath d='M1080 -20 C 1260 110 1420 50 1660 -10' stroke='%2366b8ff' stroke-width='3' opacity='.65' filter='url(%23b)'/%3E%3Cpath d='M1680 620 C 1500 700 1380 860 1260 1040' stroke='%231d6bff' stroke-width='50' opacity='.28' filter='url(%23w)'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(900px 520px at 8% 100%, rgba(20, 90, 255, 0.28), transparent 65%),
+    radial-gradient(800px 480px at 92% 0%, rgba(20, 110, 255, 0.24), transparent 62%);
+  background-size:
+    100% 100%,
+    auto,
+    auto;
+}
+body::after {
+  opacity: var(--og-noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:focus-visible {
+  outline: 2px solid var(--og-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================================= app layout == */
+/* <div class="og-app"> <aside class="og-sidebar">…</aside> <div class="og-main">…</div> </div> */
+.og-app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100dvh;
+}
+.og-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  width: var(--og-sidebar-width);
+  flex-shrink: 0;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.og-sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px;
+  box-sizing: border-box;
+  border-radius: 22px;
+  background: var(--og-sidebar);
+  border: 1px solid var(--og-panel-border);
+  box-shadow: var(--og-panel-shadow);
+  backdrop-filter: blur(12px) saturate(140%);
+}
+/* Plain-text app name. No logo. */
+.og-brand {
+  padding: 4px 8px 16px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--og-foreground);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, var(--og-border-strong), transparent) 1;
+}
+.og-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.og-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--og-radius-control);
+  color: var(--og-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.og-nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.og-nav-item:hover {
+  border-color: var(--og-border);
+  background: var(--og-surface-hover);
+  color: var(--og-foreground);
+}
+.og-nav-item.active,
+.og-nav-item[aria-current="page"] {
+  background: var(--og-primary-gradient);
+  color: var(--og-primary-foreground);
+  border-color: rgba(140, 200, 255, 0.75);
+  box-shadow: var(--og-glow);
+}
+.og-nav-badge {
+  margin-left: auto;
+  min-width: 24px;
+  padding: 0 6px;
+  border-radius: var(--og-radius-pill);
+  background: var(--og-primary-gradient);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: center;
+}
+.og-nav-item.active .og-nav-badge {
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+}
+.og-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.og-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 32px 0;
+}
+.og-content {
+  flex: 1;
+  padding: 8px 32px 32px;
+}
+@media (max-width: 1023px) {
+  .og-sidebar {
+    display: none;
+  }
+  .og-header,
+  .og-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* Page title block */
+.og-page-title {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.og-page-description {
+  margin: 8px 0 24px;
+  max-width: 70ch;
+  color: var(--og-muted);
+  font-size: 14px;
+}
+
+/* ============================================================ surfaces == */
+.og-panel {
+  position: relative;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 20px;
+  background: var(--og-panel-bg);
+  border: 1px solid var(--og-panel-border);
+  border-radius: var(--og-radius-card);
+  box-shadow: var(--og-panel-shadow);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+.og-panel-hero {
+  background: var(--og-panel-hero-bg);
+  border-color: var(--og-border-strong);
+}
+.og-panel-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.og-tile {
+  padding: 16px;
+  background: var(--og-tile-bg);
+  border: 1px solid var(--og-tile-border);
+  border-radius: var(--og-radius-tile);
+}
+.og-glow {
+  box-shadow: var(--og-glow);
+}
+.og-muted {
+  color: var(--og-muted);
+}
+.og-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* KPI card: <div class="og-panel og-kpi"><span class="og-kpi-label">…</span><span class="og-kpi-value">…</span></div> */
+.og-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.og-kpi-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+.og-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.og-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--og-radius-control);
+  border: 1px solid var(--og-border-strong);
+  background: var(--og-info-soft);
+  box-shadow: var(--og-glow-soft);
+}
+
+/* ============================================================= controls == */
+.og-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--og-radius-control);
+  font: 600 14px/1 var(--og-font);
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    filter 0.15s,
+    background-color 0.15s;
+}
+.og-btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.og-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.og-btn-primary {
+  background: var(--og-primary-gradient);
+  color: var(--og-primary-foreground);
+  box-shadow: var(--og-glow);
+}
+.og-btn-primary:hover {
+  filter: brightness(1.1);
+}
+.og-btn-secondary {
+  background: var(--og-surface-muted);
+  color: var(--og-foreground);
+  border-color: var(--og-border-strong);
+  box-shadow: var(--og-glow-soft);
+  font-weight: 500;
+}
+.og-btn-secondary:hover,
+.og-btn-ghost:hover {
+  background: var(--og-surface-hover);
+}
+.og-btn-ghost {
+  background: transparent;
+  color: var(--og-muted);
+}
+.og-btn-danger {
+  background: var(--og-danger-soft);
+  color: var(--og-danger);
+  border-color: var(--og-danger-line);
+}
+.og-btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.og-btn-icon {
+  width: 40px;
+  padding: 0;
+}
+
+.og-input,
+.og-select,
+.og-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--og-border);
+  border-radius: var(--og-radius-control);
+  background: var(--og-surface-muted);
+  color: var(--og-foreground);
+  font: 400 14px/1.4 var(--og-font);
+}
+.og-input::placeholder,
+.og-textarea::placeholder {
+  color: var(--og-subtle);
+}
+.og-input:focus-visible,
+.og-select:focus-visible,
+.og-textarea:focus-visible {
+  border-color: var(--og-border-strong);
+  outline-offset: 0;
+}
+.og-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+/* Pill search bar (Knowledge Library, Approvals) */
+.og-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 20px;
+  border: 1px solid var(--og-panel-border);
+  border-radius: var(--og-radius-pill);
+  background: var(--og-panel-bg);
+  box-shadow: var(--og-panel-shadow);
+}
+.og-search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--og-foreground);
+  font: 14px var(--og-font);
+  outline: none;
+}
+
+/* Tabs: <div class="og-tabs"><button class="og-tab active">…</button>…</div> */
+.og-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--og-panel-border);
+  border-radius: var(--og-radius-pill);
+  background: var(--og-panel-bg);
+}
+.og-tab {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--og-radius-pill);
+  background: transparent;
+  color: var(--og-muted);
+  font: 600 12px var(--og-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.og-tab.active,
+.og-tab[aria-selected="true"] {
+  background: var(--og-primary-gradient);
+  color: #fff;
+  box-shadow: var(--og-glow);
+}
+
+/* ======================================================= status pills == */
+.og-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--og-neutral-line);
+  border-radius: var(--og-radius-pill);
+  background: var(--og-neutral-soft);
+  color: var(--og-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.og-badge-success {
+  border-color: var(--og-success-line);
+  background: var(--og-success-soft);
+  color: var(--og-success);
+}
+.og-badge-warning {
+  border-color: var(--og-warning-line);
+  background: var(--og-warning-soft);
+  color: var(--og-warning);
+}
+.og-badge-danger {
+  border-color: var(--og-danger-line);
+  background: var(--og-danger-soft);
+  color: var(--og-danger);
+}
+.og-badge-info {
+  border-color: var(--og-info-line);
+  background: var(--og-info-soft);
+  color: var(--og-info);
+}
+.og-badge-violet {
+  border-color: var(--og-violet);
+  background: var(--og-violet-soft);
+  color: var(--og-violet);
+}
+.og-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+/* Pulsing "online" dot */
+.og-dot-live {
+  position: relative;
+}
+.og-dot-live::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+  animation: og-pulse 2s ease-out infinite;
+}
+@keyframes og-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* ============================================================== meters == */
+/* <div class="og-meter"><div class="og-meter-fill" style="width:62%"></div></div> */
+.og-meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--og-radius-pill);
+  background: var(--og-surface-muted);
+}
+.og-meter-fill {
+  height: 100%;
+  border-radius: var(--og-radius-pill);
+  background: var(--og-bar-fill);
+  box-shadow: var(--og-bar-glow);
+}
+.og-meter-fill.warning {
+  background: var(--og-warning);
+  box-shadow: none;
+}
+.og-meter-fill.danger {
+  background: var(--og-danger);
+  box-shadow: none;
+}
+
+/* =============================================================== table == */
+/* Wrap wide tables so they scroll inside their panel on phones: <div class="og-table-wrap"> */
+.og-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.og-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.og-table th {
+  padding: 10px 12px;
+  background: var(--og-surface-muted);
+  color: var(--og-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.og-table th:first-child {
+  border-radius: 10px 0 0 10px;
+}
+.og-table th:last-child {
+  border-radius: 0 10px 10px 0;
+}
+.og-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--og-border);
+}
+.og-table tr:last-child td {
+  border-bottom: 0;
+}
+.og-table tbody tr:hover td {
+  background: var(--og-surface-hover);
+}
+
+/* ======================================================= header pieces == */
+/* "AI Brain Online · date · time" pill */
+.og-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--og-panel-border);
+  border-radius: var(--og-radius-pill);
+  background: var(--og-panel-bg);
+  box-shadow: var(--og-panel-shadow);
+  color: var(--og-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.og-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--og-border-strong);
+  border-radius: 999px;
+  background: var(--og-info-soft);
+  color: var(--og-info);
+  font-size: 12px;
+  font-weight: 700;
+}
