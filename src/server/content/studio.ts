@@ -262,6 +262,15 @@ export async function scheduleContent(
   if (!subAccountId)
     throw new DispatchBlockedError("The rep's GoHighLevel sub-account is not set up.");
 
+  // Claim before handing it to the scheduler, so it can never be scheduled twice. Released if
+  // the scheduler call fails.
+  const claimed = await client.approvalRequest.updateMany({
+    where: { id: approval.id, dispatchedAt: null },
+    data: { dispatchedAt: new Date() },
+  });
+  if (claimed.count !== 1)
+    throw new DispatchBlockedError("This post was already handed to the scheduler.");
+
   let posted: { externalId: string };
   try {
     posted = await getGoHighLevel().schedulePost({
@@ -273,6 +282,10 @@ export async function scheduleContent(
     });
   } catch (error) {
     // Graceful degradation: the post stays approved and can be scheduled once the integration is back.
+    await client.approvalRequest.update({
+      where: { id: approval.id },
+      data: { dispatchedAt: null },
+    });
     await recordAudit(client, {
       actor: { type: "USER", userId: actor.id },
       action: "content.schedule_failed",
@@ -285,12 +298,6 @@ export async function scheduleContent(
   }
 
   return client.$transaction(async (tx) => {
-    const claimed = await tx.approvalRequest.updateMany({
-      where: { id: approval.id, dispatchedAt: null },
-      data: { dispatchedAt: new Date() },
-    });
-    if (claimed.count !== 1)
-      throw new DispatchBlockedError("This post was already handed to the scheduler.");
     const updated = await tx.contentItem.update({
       where: { id },
       data: {

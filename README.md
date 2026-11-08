@@ -157,23 +157,24 @@ change limits directly in Finance & Budget with a note; any other executives are
 
 ## How the rules are enforced
 
-| Rule                                             | Where                                                                                                                                                        |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Role-based access, enforced on the server        | `src/server/authz/permissions.ts`: one matrix used by every page, action and the Admin matrix                                                                |
-| Legal, accounting and HR executive-only          | Permissions plus `policies.ts`. Confidential agents and activity are redacted server-side                                                                    |
-| Free reps get Coach and earnings only            | `rep_pod.coach` and `back_office.view_own`; asserted cell by cell in `tests/unit/authz.test.ts`                                                              |
-| Who can approve what                             | `src/server/approvals/policy.ts`: staff decide low/medium content; executives decide spend, legal, launches and high risk; nobody approves their own request |
-| Audit log is append-only                         | A database trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` (see the init migration)                                                                        |
-| Every change is audited                          | `recordAudit()` runs inside the same transaction as the change                                                                                               |
-| Every model call is costed                       | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                         |
-| Budgets lock at 75% until approved               | `src/server/budgets/`: `gateSpend()` before every model call and purchase; alerts executives and opens an approval request                                   |
-| Budget limits change through the Approval Queue  | `src/server/budgets/change-requests.ts`: staff request on `/budgets`, an executive approves; applied only if the limit has not changed since the request     |
-| Confidential documents stay on the server        | `src/server/knowledge/service.ts` filters by access level in the database query                                                                              |
-| Tokenization not launchable without an executive | `src/server/roadmap/policy.ts`: every step gated, decided with a written note; applied only by an approval or an executive decision                          |
-| Live integrations off by default                 | `src/server/integrations/index.ts`: feature flag + credentials + Admin off switch, checked on every call                                                     |
-| Stored credentials are encrypted                 | `src/server/crypto/secrets.ts`: AES-256-GCM with `TOKEN_ENCRYPTION_KEY`; tokens never appear in the UI or the audit log                                      |
-| Sign-in emails are rate limited                  | `src/server/security/rate-limit.ts`: 5 emails per address and 20 requests per network address every 15 minutes, same answer for every address                |
-| Always-on                                        | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                           |
+| Rule                                             | Where                                                                                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Role-based access, enforced on the server        | `src/server/authz/permissions.ts`: one matrix used by every page, action and the Admin matrix                                                                                        |
+| Legal, accounting and HR executive-only          | Permissions plus `policies.ts`. Confidential agents and activity are redacted server-side                                                                                            |
+| Free reps get Coach and earnings only            | `rep_pod.coach` and `back_office.view_own`; asserted cell by cell in `tests/unit/authz.test.ts`                                                                                      |
+| Who can approve what                             | `src/server/approvals/policy.ts`: staff decide low/medium content; executives decide spend, legal, launches and high risk; nobody approves their own request                         |
+| Two people before anything leaves                | The person who asked for content (or started the agent workflow) and the person who last edited it cannot approve it; outbound sends are claimed before sending, so they happen once |
+| Audit log is append-only                         | A database trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` (see the init migration)                                                                                                |
+| Every change is audited                          | `recordAudit()` runs inside the same transaction as the change                                                                                                                       |
+| Every model call is costed                       | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                                                 |
+| Budgets lock at 75% until approved               | `src/server/budgets/`: `gateSpend()` before every model call and purchase; alerts executives and opens an approval request                                                           |
+| Budget limits change through the Approval Queue  | `src/server/budgets/change-requests.ts`: staff request on `/budgets`, an executive approves; applied only if the limit has not changed since the request                             |
+| Confidential documents stay on the server        | `src/server/knowledge/service.ts` filters by access level in the database query                                                                                                      |
+| Tokenization not launchable without an executive | `src/server/roadmap/policy.ts`: every step gated, decided with a written note; applied only by an approval or an executive decision                                                  |
+| Live integrations off by default                 | `src/server/integrations/index.ts`: feature flag + credentials + Admin off switch, checked on every call                                                                             |
+| Stored credentials are encrypted                 | `src/server/crypto/secrets.ts`: AES-256-GCM with `TOKEN_ENCRYPTION_KEY`; tokens never appear in the UI or the audit log                                                              |
+| Sign-in emails are rate limited                  | `src/server/security/rate-limit.ts`: 5 emails per address and 20 requests per network address every 15 minutes, same answer for every address                                        |
+| Always-on                                        | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                                                   |
 
 The outbound gate, `assertDispatchable()` in `src/server/approvals/service.ts`, is the only path
 out of the building. It refuses anything that isn't approved, or whose content fingerprint
@@ -285,12 +286,14 @@ the Approval Queue. Model spend goes through the budget gate like every other ca
 
 ## Production checklist
 
-- `APP_ENV=production`, a long random `AUTH_SECRET`, `APP_URL` on HTTPS, `EMAIL_TRANSPORT=smtp`.
-  Demo login is refused at startup in production.
+- `APP_ENV=production`, a long random `AUTH_SECRET` (`npm run secret`), `APP_URL` on HTTPS and
+  `EMAIL_TRANSPORT=smtp`. The app refuses to start in production without these, with demo login
+  on, or when `APP_ENV` is missing. Sign-in links always point at `APP_URL`, never at the host a
+  request claims.
 - Run `npm run build` and `npm start` for the web app, `npm run worker` for the background worker
   (set `AGENT_EXECUTION=queue`), and `npx prisma migrate deploy` before each release.
-- Put the app behind a proxy that sets `X-Forwarded-For`; the sign-in limit per network address
-  reads it.
+- Put the app behind a proxy that sets `X-Real-IP` (or appends to `X-Forwarded-For`); the sign-in
+  limit per network address uses the address the proxy saw, never the client's own claim.
 - Security headers are sent on every page: no framing, no plugins, forms only to this site, and
   HSTS in production.
 - Secrets (`AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, API keys) go in the host's secret store. Changing

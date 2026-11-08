@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusDot } from "@/components/ui/status-dot";
 import { HEALTH_STATUS } from "@/lib/status";
-import { getSystemHealth } from "@/server/health/health";
+import { getPublicHealth } from "@/server/health/health";
 
 export const metadata: Metadata = { title: "System status" };
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ const HEADLINE = {
 
 /** Public status page: labels and states only, no internal details. */
 export default async function StatusPage() {
-  const health = await getSystemHealth();
+  const health = await getPublicHealth();
   const overall = HEALTH_STATUS[health.status];
 
   return (

@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
-import { ApprovalStatus, ApprovalType, type RiskLevel, Role } from "@/generated/prisma/enums";
+import type { ApprovalType, Role } from "@/generated/prisma/enums";
+import { ApprovalStatus, type RiskLevel } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 
 export type ApprovalTab = "pending" | "approved" | "rejected" | "all";
@@ -10,17 +11,8 @@ export type ApprovalTab = "pending" | "approved" | "rejected" | "all";
  * (Finance, Legal, HR), are executive-only. Applied in the database query so
  * the data never reaches a non-executive's browser.
  */
-export function approvalVisibilityWhere(role: Role): Prisma.ApprovalRequestWhereInput {
-  if (role === Role.EXECUTIVE) return {};
-  return {
-    type: { not: ApprovalType.LEGAL },
-    OR: [
-      { requestedByAgentId: null },
-      { requestedByAgent: { department: null } },
-      { requestedByAgent: { department: { isConfidential: false } } },
-    ],
-  };
-}
+export { approvalVisibilityWhere } from "@/server/approvals/visibility";
+import { approvalVisibilityWhere } from "@/server/approvals/visibility";
 
 const TAB_STATUS: Record<Exclude<ApprovalTab, "all">, ApprovalStatus[]> = {
   pending: [ApprovalStatus.PENDING],
@@ -125,6 +117,8 @@ export async function getApprovalDetail(role: Role, id: string) {
     },
   });
   if (!request) return null;
+  const { approvalOriginatorId } = await import("@/server/approvals/service");
+  const originatorUserId = await approvalOriginatorId(db, request.correlationId);
 
   const trailWhere: Prisma.AuditLogWhereInput[] = [{ entityType: "ApprovalRequest", entityId: id }];
   if (request.correlationId) trailWhere.push({ correlationId: request.correlationId });
@@ -144,7 +138,7 @@ export async function getApprovalDetail(role: Role, id: string) {
   const agentName = new Map(agents.map((a) => [a.id, `${a.name} (${a.title})`]));
 
   return {
-    request,
+    request: { ...request, originatorUserId },
     trail: trail.map((t) => ({
       id: t.id,
       action: t.action,

@@ -17,6 +17,7 @@ const ERRORS: Record<string, string> = {
   AccessDenied: "That account cannot sign in. Ask an administrator for an invite.",
   Verification: "That sign-in link has expired or was already used. Request a new one.",
   CredentialsSignin: "Demo sign-in failed for that user.",
+  RateLimited: "Too many sign-in requests. Wait 15 minutes and try again.",
 };
 
 export default async function LoginPage({

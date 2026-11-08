@@ -163,3 +163,64 @@ describe("prompt task skill", () => {
     expect(out.nextSteps.join(" ")).toContain("Approval Queue");
   });
 });
+
+describe("security hardening", () => {
+  it("sign-in links always use the app's own address, whatever host the request claimed", async () => {
+    const { pinToAppUrl } = await import("@/server/auth/email");
+    expect(
+      pinToAppUrl(
+        "https://evil.example/api/auth/callback/nodemailer?token=abc&email=ceo%40x.test",
+        "https://brain.aactivated.test",
+      ),
+    ).toBe(
+      "https://brain.aactivated.test/api/auth/callback/nodemailer?token=abc&email=ceo%40x.test",
+    );
+  });
+
+  it("rate limits use the address the proxy saw, never the client's own claim", async () => {
+    const { clientAddressFrom } = await import("@/server/security/rate-limit");
+    const h = (init: Record<string, string>) => new Headers(init);
+    expect(clientAddressFrom(h({ "x-real-ip": "198.51.100.7" }))).toBe("198.51.100.7");
+    expect(clientAddressFrom(h({ "x-forwarded-for": "1.2.3.4, 198.51.100.9" }))).toBe(
+      "198.51.100.9",
+    );
+    expect(clientAddressFrom(h({}))).toBe("unknown");
+  });
+});
+
+describe("production safety checks", () => {
+  const prod = {
+    DATABASE_URL: "postgresql://x",
+    APP_ENV: "production",
+    APP_URL: "https://brain.example.test",
+    AUTH_SECRET: "k".repeat(44),
+    EMAIL_TRANSPORT: "smtp",
+    EMAIL_SERVER: "smtp://mail.example.test:587",
+  };
+  const parse = (extra: Record<string, string | undefined>) => () =>
+    getEnv({ ...prod, ...extra } as unknown as NodeJS.ProcessEnv);
+
+  it("accepts a sound production configuration", () => {
+    expect(parse({})).not.toThrow();
+  });
+
+  it("refuses demo login, a weak secret, console email and plain http", () => {
+    expect(parse({ DEMO_LOGIN_ENABLED: "true" })).toThrow(/Demo login/);
+    expect(parse({ AUTH_SECRET: "replace-me-with-a-long-random-string-xxxx" })).toThrow(
+      /AUTH_SECRET/,
+    );
+    expect(parse({ AUTH_SECRET: "short" })).toThrow(/AUTH_SECRET/);
+    expect(parse({ EMAIL_TRANSPORT: "console" })).toThrow(/smtp/);
+    expect(parse({ APP_URL: "http://brain.example.test" })).toThrow(/https/);
+  });
+
+  it("a production server without APP_ENV refuses to start", () => {
+    expect(() =>
+      getEnv({
+        DATABASE_URL: "postgresql://x",
+        NODE_ENV: "production",
+        DEMO_LOGIN_ENABLED: "true",
+      } as unknown as NodeJS.ProcessEnv),
+    ).toThrow(/set APP_ENV/);
+  });
+});

@@ -199,3 +199,20 @@ async function persistHealth(components: ComponentHealth[]) {
     });
   }
 }
+
+const PUBLIC_TTL_MS = 30_000;
+let publicCache: { at: number; value: Promise<SystemHealth> } | undefined;
+
+/**
+ * For the public status page and /api/health, which need no sign-in: at most one real check
+ * every 30 seconds, so repeated requests cannot use up the integrations' rate limits.
+ */
+export function getPublicHealth(now = Date.now()): Promise<SystemHealth> {
+  if (publicCache && now - publicCache.at < PUBLIC_TTL_MS) return publicCache.value;
+  const value = getSystemHealth().catch((error) => {
+    publicCache = undefined;
+    throw error;
+  });
+  publicCache = { at: now, value };
+  return value;
+}

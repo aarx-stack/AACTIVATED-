@@ -19,7 +19,7 @@ import {
 import { formatRelativeTime, formatUsd } from "@/lib/utils";
 import { isSocialPostPayload, readSources } from "@/server/approvals/payload";
 import { readBudgetChange } from "@/server/budgets/change-requests";
-import { canDecideApproval } from "@/server/approvals/policy";
+import { canDecideApproval, canEditApproval } from "@/server/approvals/policy";
 import { can } from "@/server/authz/permissions";
 import { isContinuePayload } from "@/server/budgets/service";
 import { ROLE_LABELS } from "@/server/authz/permissions";
@@ -69,8 +69,7 @@ export function ApprovalPanel({
   const sources = readSources(request.sources);
   const post = isSocialPostPayload(request.payload) ? request.payload : null;
   const decision = canDecideApproval(viewer, request);
-  const canEdit =
-    post !== null && canDecideApproval(viewer, { ...request, requiredRole: "STAFF" }).ok;
+  const canEdit = post !== null && canEditApproval(viewer, request).ok;
   const status = APPROVAL_STATUS[request.status];
   const owner = request.requestedByAgent
     ? `${request.requestedByAgent.title} (${request.requestedByAgent.name})`

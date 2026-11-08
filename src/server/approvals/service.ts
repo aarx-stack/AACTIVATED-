@@ -28,7 +28,21 @@ import {
   type ApprovalSource,
   type SocialPostPayload,
 } from "./payload";
-import { canDecideApproval, requiredRoleFor } from "./policy";
+import { canDecideApproval, canEditApproval, requiredRoleFor } from "./policy";
+import { approvalVisibilityWhere } from "./visibility";
+
+/** The person who started the workflow a request came from (the root task's creator). */
+export async function approvalOriginatorId(
+  client: DbClient,
+  correlationId: string | null,
+): Promise<string | null> {
+  if (!correlationId) return null;
+  const root = await client.task.findFirst({
+    where: { correlationId, parentId: null },
+    select: { createdById: true },
+  });
+  return root?.createdById ?? null;
+}
 
 export class ApprovalConflictError extends Error {
   readonly status = 409;
@@ -135,8 +149,8 @@ export async function decideApproval(
   const { decision, note } = decisionSchema.parse(input);
 
   return client.$transaction(async (tx) => {
-    const request = await tx.approvalRequest.findUnique({
-      where: { id: approvalId },
+    const request = await tx.approvalRequest.findFirst({
+      where: { AND: [{ id: approvalId }, approvalVisibilityWhere(actor.role)] },
       include: {
         complianceChecks: { orderBy: { checkedAt: "desc" }, take: 1 },
         contentItem: {
@@ -146,7 +160,10 @@ export async function decideApproval(
     });
     if (!request) throw new ApprovalConflictError("Approval request not found.");
 
-    const allowed = canDecideApproval(actor, request);
+    const allowed = canDecideApproval(actor, {
+      ...request,
+      originatorUserId: await approvalOriginatorId(tx, request.correlationId),
+    });
     if (!allowed.ok) throw new ForbiddenError(allowed.reason);
 
     const latestCheck = request.complianceChecks[0];
@@ -334,10 +351,12 @@ export async function editApproval(
 ) {
   const data = editSchema.parse(input);
   return client.$transaction(async (tx) => {
-    const request = await tx.approvalRequest.findUnique({ where: { id: approvalId } });
+    const request = await tx.approvalRequest.findFirst({
+      where: { AND: [{ id: approvalId }, approvalVisibilityWhere(actor.role)] },
+    });
     if (!request) throw new ApprovalConflictError("Approval request not found.");
     // Anyone who may decide at the standard level may propose an edit; the decision rules still apply afterwards.
-    const allowed = canDecideApproval(actor, { ...request, requiredRole: "STAFF" });
+    const allowed = canEditApproval(actor, request);
     if (!allowed.ok) throw new ForbiddenError(allowed.reason);
     const before = request.payload;
     if (!isSocialPostPayload(before))

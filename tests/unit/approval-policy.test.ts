@@ -94,3 +94,31 @@ describe("canDecideApproval", () => {
     ).toBe(false);
   });
 });
+
+describe("two people before anything leaves", () => {
+  const content = { ...pending, requiredRole: Role.STAFF };
+
+  it("whoever started the workflow cannot decide what it produced", () => {
+    expect(canDecideApproval(staff, { ...content, originatorUserId: "staff" })).toMatchObject({
+      ok: false,
+      reason: "You asked for this, so someone else must decide it.",
+    });
+    expect(canDecideApproval(exec, { ...content, originatorUserId: "staff" }).ok).toBe(true);
+  });
+
+  it("whoever last edited the content cannot approve it, but may edit it", async () => {
+    const { canEditApproval } = await import("@/server/approvals/policy");
+    const edited = { ...content, editedById: "staff", originatorUserId: "staff" };
+    expect(canDecideApproval(staff, edited)).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/someone else must decide/),
+    });
+    expect(canEditApproval(staff, edited).ok).toBe(true);
+    // Editing an executive-level item is allowed at the standard level; deciding is not.
+    expect(canEditApproval(staff, { ...edited, requiredRole: Role.EXECUTIVE }).ok).toBe(true);
+  });
+
+  it("budget limit changes need an executive", () => {
+    expect(requiredRoleFor(ApprovalType.BUDGET_CHANGE, RiskLevel.LOW)).toBe(Role.EXECUTIVE);
+  });
+});

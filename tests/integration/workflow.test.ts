@@ -150,7 +150,8 @@ describe("compliance routing", () => {
     });
     expect(approval.requiredRole).toBe(Role.EXECUTIVE);
 
-    await expect(decideApproval(staff, approval.id, { decision: "APPROVE" })).rejects.toThrow(
+    const otherStaff = await createUser(Role.STAFF);
+    await expect(decideApproval(otherStaff, approval.id, { decision: "APPROVE" })).rejects.toThrow(
       /executive/,
     );
     await expect(decideApproval(exec, approval.id, { decision: "APPROVE" })).rejects.toThrow(
@@ -199,8 +200,12 @@ describe("compliance routing", () => {
     expect(after.editedById).toBe(editor.id);
     expect(after.contentItem?.body).toContain("consistent habits");
 
-    // Staff can now decide the cleaned-up revision.
-    await decideApproval(editor, before.id, { decision: "APPROVE" });
+    // Staff can now decide the cleaned-up revision, but never the person who edited it.
+    await expect(decideApproval(editor, before.id, { decision: "APPROVE" })).rejects.toThrow(
+      "You edited this, so someone else must decide it.",
+    );
+    const secondReviewer = await createUser(Role.STAFF);
+    await decideApproval(secondReviewer, before.id, { decision: "APPROVE" });
     await expect(assertDispatchable(db, before.id, before.payload)).rejects.toThrow(/changed/);
     await expect(assertDispatchable(db, before.id, after.payload)).resolves.toBeTruthy();
 
@@ -215,10 +220,14 @@ describe("compliance routing", () => {
       staff,
       "A friendly post welcoming new members to the community.",
     );
-    await expect(decideApproval(staff, result.approvalId!, { decision: "REJECT" })).rejects.toThrow(
-      /note/,
-    );
-    await decideApproval(staff, result.approvalId!, {
+    const reviewer = await createUser(Role.STAFF);
+    await expect(
+      decideApproval(staff, result.approvalId!, { decision: "APPROVE" }),
+    ).rejects.toThrow("You asked for this, so someone else must decide it.");
+    await expect(
+      decideApproval(reviewer, result.approvalId!, { decision: "REJECT" }),
+    ).rejects.toThrow(/note/);
+    await decideApproval(reviewer, result.approvalId!, {
       decision: "REJECT",
       note: "Off-brand tone.",
     });

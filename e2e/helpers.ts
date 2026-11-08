@@ -4,6 +4,7 @@ export const USERS = {
   guy: "guy@aactivated.test",
   isaac: "isaac@aactivated.test",
   maya: "maya@aactivated.test",
+  devon: "devon@aactivated.test",
   jordan: "jordan@aactivated.test",
   sam: "sam@aactivated.test",
 } as const;

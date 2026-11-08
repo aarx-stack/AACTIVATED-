@@ -624,20 +624,31 @@ export async function sendFollowUp(actor: Actor, approvalId: string, client: Db 
       "This contact is not linked to GoHighLevel yet. Nothing was sent.",
     );
   }
-  const sent = await ghl.sendMessage({
-    subAccountId: profile.ghlSubAccountId,
-    contactId: approval.contact.ghlContactId ?? approval.contact.id,
-    channel: payload.channel,
-    subject: payload.subject,
-    message: payload.message,
+  // Claim before sending, so a double click or a retry can never send twice. If the send
+  // fails, the claim is released and it can be tried again.
+  const claimed = await client.approvalRequest.updateMany({
+    where: { id: approvalId, dispatchedAt: null },
+    data: { dispatchedAt: new Date() },
   });
+  if (claimed.count !== 1) throw new DispatchBlockedError("Already sent.");
+  let sent: { externalId: string };
+  try {
+    sent = await ghl.sendMessage({
+      subAccountId: profile.ghlSubAccountId,
+      contactId: approval.contact.ghlContactId ?? approval.contact.id,
+      channel: payload.channel,
+      subject: payload.subject,
+      message: payload.message,
+    });
+  } catch (error) {
+    await client.approvalRequest.update({
+      where: { id: approvalId },
+      data: { dispatchedAt: null },
+    });
+    throw error;
+  }
 
   return client.$transaction(async (tx) => {
-    const claimed = await tx.approvalRequest.updateMany({
-      where: { id: approvalId, dispatchedAt: null },
-      data: { dispatchedAt: new Date() },
-    });
-    if (claimed.count !== 1) throw new DispatchBlockedError("Already sent.");
     await tx.contact.update({
       where: { id: approval.contact!.id },
       data: { status: ContactStatus.FOLLOWING_UP, lastContactedAt: new Date() },

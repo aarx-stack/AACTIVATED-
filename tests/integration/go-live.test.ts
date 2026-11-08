@@ -303,3 +303,14 @@ describe("prompt tasks", () => {
     ).rejects.toThrow(/not set up to work prompt tasks/);
   });
 });
+
+describe("sign-in rate limit under a burst", () => {
+  it("parallel requests never exceed the limit", async () => {
+    const key = `burst:${randomBytes(6).toString("hex")}`;
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () => consume(key, { max: 5, windowMs: 60_000 })),
+    );
+    expect(results.filter((r) => r.allowed)).toHaveLength(5);
+    expect(await db.rateLimitHit.count({ where: { key } })).toBe(5);
+  });
+});

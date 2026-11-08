@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSystemHealth } from "@/server/health/health";
+import { getPublicHealth } from "@/server/health/health";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * critical component (the database) is down. Messages are omitted on purpose.
  */
 export async function GET() {
-  const health = await getSystemHealth();
+  const health = await getPublicHealth();
   return NextResponse.json(
     {
       status: health.status,

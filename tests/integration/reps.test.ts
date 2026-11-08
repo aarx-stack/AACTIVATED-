@@ -313,6 +313,51 @@ describe("consented contacts and follow-ups", () => {
     await expect(draftFollowUp(rep, second.id, undefined)).rejects.toThrow(/opted out/);
   });
 
+  it("an approved follow-up is sent exactly once, even when sent twice at the same moment", async () => {
+    const { buildAdapters, resetAdapters } = await import("@/server/integrations");
+    const base = buildAdapters();
+    let sends = 0;
+    let failNext = true;
+    resetAdapters({
+      ...base,
+      GOHIGHLEVEL: {
+        ...base.GOHIGHLEVEL,
+        sendMessage: async (input) => {
+          if (failNext) {
+            failNext = false;
+            throw new IntegrationUnavailableError("GoHighLevel could not be reached.");
+          }
+          sends++;
+          await new Promise((r) => setTimeout(r, 30));
+          return base.GOHIGHLEVEL.sendMessage(input);
+        },
+      },
+    });
+    try {
+      const rep = await onboardedRep();
+      const staff = await createUser(Role.STAFF);
+      const contact = await addContact(rep, {
+        ...consent,
+        name: "Robin",
+        email: `robin${Date.now()}@example.test`,
+      });
+      const draft = await draftFollowUp(rep, contact.id, "Asked about the next class");
+      await decideApproval(staff, draft.approvalId!, { decision: "APPROVE" });
+
+      // A failed send releases its claim, so it can be tried again.
+      await expect(sendFollowUp(rep, draft.approvalId!)).rejects.toThrow(/could not be reached/);
+      const results = await Promise.allSettled([
+        sendFollowUp(rep, draft.approvalId!),
+        sendFollowUp(rep, draft.approvalId!),
+        sendFollowUp(rep, draft.approvalId!),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect(sends).toBe(1);
+    } finally {
+      resetAdapters();
+    }
+  });
+
   it("reps cannot see or act on other reps' contacts", async () => {
     const a = await onboardedRep();
     const b = await onboardedRep();

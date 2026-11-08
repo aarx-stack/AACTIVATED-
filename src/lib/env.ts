@@ -10,6 +10,8 @@ const schema = z
     APP_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
     APP_URL: z.string().url().default("http://localhost:3000"),
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    /** Signs sessions. Checked for strength in production. */
+    AUTH_SECRET: z.string().optional(),
     EMAIL_TRANSPORT: z.enum(["console", "smtp"]).default("console"),
     EMAIL_SERVER: z.string().optional(),
     EMAIL_FROM: z.string().default("AACTIVATED AI Brain <no-reply@aactivated.test>"),
@@ -39,12 +41,39 @@ const schema = z
     SLACK_WEBHOOK_URL: z.string().optional(),
   })
   .superRefine((env, ctx) => {
-    if (env.APP_ENV === "production" && env.DEMO_LOGIN_ENABLED) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["DEMO_LOGIN_ENABLED"],
-        message: "Demo login must never be enabled in production.",
-      });
+    if (env.APP_ENV === "production") {
+      if (env.DEMO_LOGIN_ENABLED) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["DEMO_LOGIN_ENABLED"],
+          message: "Demo login must never be enabled in production.",
+        });
+      }
+      if (
+        !env.AUTH_SECRET ||
+        env.AUTH_SECRET.length < 32 ||
+        env.AUTH_SECRET.startsWith("replace-me")
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["AUTH_SECRET"],
+          message: "Set AUTH_SECRET to a long random value (npm run secret).",
+        });
+      }
+      if (env.EMAIL_TRANSPORT !== "smtp") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["EMAIL_TRANSPORT"],
+          message: "Production must send sign-in emails (smtp), not print them to the log.",
+        });
+      }
+      if (!env.APP_URL.startsWith("https://")) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["APP_URL"],
+          message: "Production must be served over https.",
+        });
+      }
     }
     if (env.QUICKBOOKS_CLIENT_ID && !env.TOKEN_ENCRYPTION_KEY) {
       ctx.addIssue({
@@ -69,6 +98,13 @@ let cached: Env | undefined;
 /** Parsed, validated server environment. Throws with a readable message on misconfiguration. */
 export function getEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (source === process.env && cached) return cached;
+  // A production server must say which environment it is. Without this, a deploy that forgot
+  // APP_ENV would count as "development" and skip every production safety check above.
+  if (source.NODE_ENV === "production" && !source.APP_ENV) {
+    throw new Error(
+      "Invalid environment configuration:\n  - APP_ENV: set APP_ENV (production, staging or development).",
+    );
+  }
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
     const issues = parsed.error.issues

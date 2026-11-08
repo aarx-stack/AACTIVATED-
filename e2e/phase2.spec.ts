@@ -27,12 +27,20 @@ test.describe("Phase 2 milestone workflow", () => {
     await expect(page.getByTestId("approval-status")).toHaveText("Pending");
     await expect(page.getByTestId("content-preview")).toContainText("#RecoveryStack");
 
+    // Two people: whoever asked for the post cannot approve it.
+    await expect(
+      page.getByText("You asked for this, so someone else must decide it."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
+    const href = page.url();
+    await signInAs(page, USERS.devon);
+    await page.goto(href);
+
     // Reasoning and sources are shown above the decision buttons.
     const reasoning = await page.getByTestId("agent-reasoning").boundingBox();
     const approve = await page.getByRole("button", { name: "Approve" }).boundingBox();
     expect(reasoning!.y).toBeLessThan(approve!.y);
     await expect(page.getByTestId("sources")).toContainText("Request brief");
-
     await page.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByTestId("approval-status")).toHaveText("Approved");
     await expect(page.getByTestId("content-status")).toHaveText("Approved · ready to schedule");
@@ -61,8 +69,13 @@ test.describe("Phase 2 milestone workflow", () => {
       "TIKTOK",
     );
     await expect(result).toContainText("Compliance fail");
-    await result.getByRole("link", { name: /Open in Approval Queue/ }).click();
+    const href = await result
+      .getByRole("link", { name: /Open in Approval Queue/ })
+      .getAttribute("href");
 
+    // A second staff reviewer picks it up: it needs an executive as it stands.
+    await signInAs(page, USERS.devon);
+    await page.goto(href!);
     await expect(page.getByTestId("compliance-result")).toContainText("cures");
     await expect(page.getByText("This request needs an executive decision.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
@@ -78,6 +91,10 @@ test.describe("Phase 2 milestone workflow", () => {
     await page.getByRole("button", { name: "Save and re-check" }).click();
 
     await expect(page.getByTestId("compliance-result")).toContainText("Compliance passed");
+    // The editor cannot approve their own edit, and the requester cannot either; an executive does.
+    await expect(page.getByText("You edited this, so someone else must decide it.")).toBeVisible();
+    await signInAs(page, USERS.guy);
+    await page.goto(href!);
     await page.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByTestId("approval-status")).toHaveText("Approved");
     await expect(

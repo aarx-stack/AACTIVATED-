@@ -5,7 +5,9 @@
  *  - Restricted types (spend, payments, site changes, legal, outside work, launches)
  *    budget limit changes, and anything HIGH/CRITICAL risk need an EXECUTIVE.
  *  - Low/medium-risk content (posts, emails, DMs) can be decided by STAFF or EXECUTIVE.
- *  - Agents never decide. Nobody decides their own request.
+ *  - Agents never decide. Nobody decides their own request: not the person who asked for it
+ *    (directly, or by starting the agent workflow that produced it), and not the person who
+ *    last edited it. Two people are always involved before anything leaves.
  */
 import { ApprovalStatus, ApprovalType, RiskLevel, Role } from "@/generated/prisma/enums";
 import { can, type Actor } from "@/server/authz/permissions";
@@ -32,6 +34,10 @@ export interface ApprovalForDecision {
   status: ApprovalStatus;
   requiredRole: Role;
   requestedByUserId: string | null;
+  /** The person who started the workflow an agent request came from. */
+  originatorUserId?: string | null;
+  /** The person who last edited the content. */
+  editedById?: string | null;
 }
 
 export function canDecideApproval(actor: Actor, request: ApprovalForDecision): Decision {
@@ -45,8 +51,27 @@ export function canDecideApproval(actor: Actor, request: ApprovalForDecision): D
   if (request.requestedByUserId && request.requestedByUserId === actor.id) {
     return { ok: false, reason: "You cannot approve your own request." };
   }
+  if (request.originatorUserId && request.originatorUserId === actor.id) {
+    return { ok: false, reason: "You asked for this, so someone else must decide it." };
+  }
+  if (request.editedById && request.editedById === actor.id) {
+    return { ok: false, reason: "You edited this, so someone else must decide it." };
+  }
   if (request.requiredRole === Role.EXECUTIVE && !can(actor.role, "approvals.decide_restricted")) {
     return { ok: false, reason: "This request needs an executive decision." };
   }
   return { ok: true };
+}
+
+/**
+ * Who may edit outbound content before the decision: anyone who could decide it at the standard
+ * level, including the person who asked for it. Editing never lets them decide it.
+ */
+export function canEditApproval(actor: Actor, request: ApprovalForDecision): Decision {
+  return canDecideApproval(actor, {
+    ...request,
+    requiredRole: Role.STAFF,
+    originatorUserId: null,
+    editedById: null,
+  });
 }
