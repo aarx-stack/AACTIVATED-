@@ -608,6 +608,7 @@ model ApprovalRequest {
 
   complianceChecks ComplianceCheck[]
   projects         Project[]
+  spendEvent       SpendEvent?
 
   @@index([status, createdAt])
 }
@@ -674,22 +675,25 @@ model Budget {
 }
 
 model SpendEvent {
-  id           String      @id @default(cuid())
-  kind         SpendKind
-  description  String
-  amountUsd    Decimal     @db.Decimal(14, 6)
-  budgetId     String?
-  budget       Budget?     @relation(fields: [budgetId], references: [id], onDelete: SetNull)
-  agentId      String?
-  agent        Agent?      @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
+  id                String           @id @default(cuid())
+  kind              SpendKind
+  description       String
+  amountUsd         Decimal          @db.Decimal(14, 6)
+  budgetId          String?
+  budget            Budget?          @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  agentId           String?
+  agent             Agent?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  departmentId      String?
+  department        Department?      @relation(fields: [departmentId], references: [id])
   /// Model-call fields (kind = AI_MODEL)
-  provider     String?
-  model        String?
-  inputTokens  Int?
-  outputTokens Int?
-  occurredAt   DateTime    @default(now())
+  provider          String?
+  model             String?
+  inputTokens       Int?
+  outputTokens      Int?
+  /// Set when this spend was a specific purchase approved in the Approval Queue (recorded once).
+  approvalRequestId String?          @unique
+  approvalRequest   ApprovalRequest? @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
+  occurredAt        DateTime         @default(now())
 
   @@index([occurredAt])
   @@index([departmentId, occurredAt])
@@ -716,17 +720,20 @@ model Transaction {
 // ---------------------------------------------------------------------------
 
 model Document {
-  id          String           @id @default(cuid())
-  title       String
-  category    DocumentCategory
-  accessLevel AccessLevel
-  summary     String?
-  body        String
-  tags        String[]
-  ownerId     String?
-  owner       User?            @relation(fields: [ownerId], references: [id])
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id           String           @id @default(cuid())
+  title        String
+  category     DocumentCategory
+  accessLevel  AccessLevel
+  summary      String?
+  /// AI summary key takeaways (set with summary).
+  keyPoints    String[]         @default([])
+  summarizedAt DateTime?
+  body         String
+  tags         String[]
+  ownerId      String?
+  owner        User?            @relation(fields: [ownerId], references: [id])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([category, accessLevel])
 }

@@ -94,6 +94,11 @@ export const PERMISSIONS = {
   "finance.view": { label: "Finance & Budget", group: "Finance", roles: [EXECUTIVE] },
   "budget.manage": { label: "Create and change budgets", group: "Finance", roles: [EXECUTIVE] },
   "knowledge.view": { label: "Knowledge Library", group: "Knowledge", roles: ALL_ROLES },
+  "knowledge.manage": {
+    label: "Add documents and refresh AI summaries",
+    group: "Knowledge",
+    roles: [EXECUTIVE, STAFF],
+  },
   "prompts.use": { label: "Prompt Generator", group: "Knowledge", roles: [EXECUTIVE, STAFF] },
   "confidential.legal": { label: "Legal records", group: "Confidential", roles: [EXECUTIVE] },
   "confidential.accounting": {

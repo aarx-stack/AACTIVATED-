@@ -4,11 +4,12 @@ The internal operating system for AACTIVATED RX. An AI CEO ("the Brain") runs a 
 AI agents across departments and gives every Premium rep a private AI team. **Humans approve
 anything that leaves the building.**
 
-> Status: **Phase 3 complete.** Phase 1 delivered setup, design tokens, auth and roles, demo data,
+> Status: **Phase 4 complete.** Phase 1 delivered setup, design tokens, auth and roles, demo data,
 > and pages 1 (Command Center), 2 (Company Team) and 12 (Admin). Phase 2 added the first end-to-end
 > agent workflow, page 3 (Agent Workspace) and page 5 (Approval & Compliance Queue). Phase 3 added
-> rep onboarding, page 4 (My AI Team), page 6 (Content Studio) and page 8 (Back Office). Pages 7, 9,
-> 10 and 11 are permission-guarded placeholders until Phases 4 and 5.
+> rep onboarding, page 4 (My AI Team), page 6 (Content Studio) and page 8 (Back Office). Phase 4
+> added the 75% budget rule, page 7 (Finance & Budget), page 9 (Knowledge Library) and page 10
+> (Prompt Generator). Page 11 (Development Map) is a permission-guarded placeholder until Phase 5.
 
 ## The Phase 2 workflow
 
@@ -107,6 +108,38 @@ Invite a user** before go-live.
 Integration tests rebuild the database in `TEST_DATABASE_URL` from migrations on every run. They
 refuse to touch any database whose name doesn't end in `_test`.
 
+## The 75% budget rule (Phase 4)
+
+Every budget covers one kind of spend (AI models, advertising, software, contractors) for a
+period, company-wide or for one department. The rule lives in `src/server/budgets/`:
+
+1. **Below 75%** of the limit, spend is recorded against its budget as usual.
+2. **At 75%** the budget locks. Executives get an in-app alert (and a Slack message, mock by
+   default), the event is audited, and the system opens one **"More spending: …"** request in the
+   Approval Queue. Further spending in that budget is refused, including the agents' model calls:
+   an agent whose AI budget is paused stops with a clear message and nothing is spent.
+3. A purchase that would take a budget past 75% is refused **before** it happens, with a link to
+   the request.
+4. When an executive **approves** the request, spending can continue up to the approved amount;
+   the budget locks again when that is used up. Approved purchase requests (for example an agent's
+   "Spend: …" request) are recorded once, by an executive, from the Approval Queue or Finance.
+5. Executives can also change a limit, with a reason that is kept in the audit log.
+
+The rule's arithmetic is a pure function (`rules.ts`) with unit tests; the database side is
+covered by integration tests in `tests/integration/budgets.test.ts`.
+
+## Knowledge Library and Prompt Generator (Phase 4)
+
+- **Knowledge Library** (`/knowledge`): search, categories, access tags (Executive Only,
+  All Staff, Everyone) and an AI summary panel written by the Brain. Access is filtered in the
+  database query, so a document a role may not read never reaches the browser, search results,
+  counts or the detail page. Legal research is always executive-only. Staff can add documents;
+  only executives can add executive-only ones.
+- **Prompt Generator** (`/prompts`, executives and staff): chat with the Brain to draft or improve
+  a template, fill its `{{variables}}`, keep an append-only version history (restoring copies an
+  old version forward), and **Send to Agent**, which puts the filled-in prompt on a company
+  agent's task board. Prompts stay inside the company.
+
 ## How the rules are enforced
 
 | Rule                                      | Where                                                                                                                                                        |
@@ -118,11 +151,14 @@ refuse to touch any database whose name doesn't end in `_test`.
 | Audit log is append-only                  | A database trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` (see the init migration)                                                                        |
 | Every change is audited                   | `recordAudit()` runs inside the same transaction as the change                                                                                               |
 | Every model call is costed                | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                         |
+| Budgets lock at 75% until approved        | `src/server/budgets/`: `gateSpend()` before every model call and purchase; alerts executives and opens an approval request                                   |
+| Confidential documents stay on the server | `src/server/knowledge/service.ts` filters by access level in the database query                                                                              |
 | Always-on                                 | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                           |
 
 The outbound gate, `assertDispatchable()` in `src/server/approvals/service.ts`, is the only path
 out of the building. It refuses anything that isn't approved, or whose content fingerprint
-changed after approval. Phase 4 adds the 75% budget lock.
+changed after approval. Spending has its own gate, `gateSpend()` in
+`src/server/budgets/service.ts`, which every model call and recorded purchase passes through.
 
 ## AI
 
@@ -141,7 +177,7 @@ refusal fallbacks enabled. Prices per million tokens are in `src/lib/ai/pricing.
 ## Integrations
 
 GoHighLevel, QuickBooks and Slack sit behind interfaces in `src/server/integrations` and use
-mock adapters by default. Setting an `INTEGRATION_*` flag to `live` currently reports the
+mock adapters by default. QuickBooks is read-only: the Finance page's **Sync now** only reads. Setting an `INTEGRATION_*` flag to `live` currently reports the
 integration as down instead of calling anything; live adapters arrive in Phase 5 and need your
 approval. To simulate an outage, set `MOCK_INTEGRATIONS_DOWN=SLACK,QUICKBOOKS`.
 

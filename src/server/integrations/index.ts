@@ -7,6 +7,8 @@ import {
   type IntegrationAdapter,
   type IntegrationKey,
   IntegrationUnavailableError,
+  type QuickBooksAdapter,
+  type SlackAdapter,
 } from "./types";
 
 /**
@@ -40,6 +42,28 @@ export function getGoHighLevel(): GoHighLevelAdapter {
     };
   }
   return mockGoHighLevel;
+}
+
+/** Slack for internal alerts. Live mode is not enabled: it reports "not delivered" instead. */
+export function getSlack(): SlackAdapter {
+  if (getEnv().INTEGRATION_SLACK === "live") {
+    return { ...mockSlack, mode: "live", notify: async () => ({ delivered: false }) };
+  }
+  return mockSlack;
+}
+
+/** QuickBooks, read-only. Live mode is not enabled: sync reports unavailable. */
+export function getQuickBooks(): QuickBooksAdapter {
+  if (getEnv().INTEGRATION_QUICKBOOKS === "live") {
+    return {
+      ...mockQuickBooks,
+      mode: "live",
+      lastSync: async () => {
+        throw new IntegrationUnavailableError("The live QuickBooks adapter is not enabled yet.");
+      },
+    };
+  }
+  return mockQuickBooks;
 }
 
 export function getIntegrations(): IntegrationAdapter[] {

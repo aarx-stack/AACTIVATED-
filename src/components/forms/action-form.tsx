@@ -15,14 +15,14 @@ export function ActionFeedback({ state }: { state: ActionState }) {
       className={cn("text-sm", state.status === "error" ? "text-danger" : "text-success")}
     >
       {state.message}
-      {state.status === "done" && state.href && (
+      {state.href && (
         <>
           {" "}
           <Link
             href={state.href}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
-            Open
+            {state.hrefLabel ?? "Open"}
           </Link>
         </>
       )}

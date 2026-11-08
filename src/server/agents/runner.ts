@@ -3,6 +3,7 @@ import { runModel } from "@/lib/ai";
 import { toStructuredOutputSchema } from "@/lib/ai/schema";
 import type { ModelAdapter } from "@/lib/ai/types";
 import type { DbClient } from "@/lib/db";
+import { BudgetApprovalRequiredError } from "@/server/budgets/errors";
 import { buildSystemPrompt, hasTool } from "./config";
 import type { Skill } from "./skills";
 
@@ -43,20 +44,28 @@ export async function runSkill<I, O>(
     );
   }
 
-  const result = await runModel(
-    {
-      tier: skill.tier,
-      purpose: options.purpose,
-      agentId: agent.id,
-      departmentId: agent.departmentId,
-      system: `${buildSystemPrompt(agent)}\n\nReply with a single JSON object that matches the required schema.`,
-      messages: [{ role: "user", content: skill.prompt(input) }],
-      jsonSchema: toStructuredOutputSchema(skill.output),
-      mockOutput: skill.mock(input),
-      maxTokens: 8000,
-    },
-    { client: options.client, adapter: options.adapter },
-  );
+  let result: Awaited<ReturnType<typeof runModel>>;
+  try {
+    result = await runModel(
+      {
+        tier: skill.tier,
+        purpose: options.purpose,
+        agentId: agent.id,
+        departmentId: agent.departmentId,
+        system: `${buildSystemPrompt(agent)}\n\nReply with a single JSON object that matches the required schema.`,
+        messages: [{ role: "user", content: skill.prompt(input) }],
+        jsonSchema: toStructuredOutputSchema(skill.output),
+        mockOutput: skill.mock(input),
+        maxTokens: 8000,
+      },
+      { client: options.client, adapter: options.adapter },
+    );
+  } catch (error) {
+    if (error instanceof BudgetApprovalRequiredError) {
+      throw new AgentUnavailableError(`${agent.title} is paused. ${error.message}`);
+    }
+    throw error;
+  }
 
   if (result.refused) throw new SkillOutputError(`${agent.title} declined this task.`);
   let json: unknown;

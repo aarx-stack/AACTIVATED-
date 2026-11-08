@@ -23,7 +23,7 @@ import type {
 } from "../src/generated/prisma/enums";
 import { requiredRoleFor } from "../src/server/approvals/policy";
 import { hashPayload } from "../src/server/approvals/payload";
-import { coachPlanSkill } from "../src/server/agents/skills";
+import { coachPlanSkill, knowledgeSummarySkill } from "../src/server/agents/skills";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -546,7 +546,14 @@ async function main() {
         "Plan the company's day, delegate to department agents, collect their outputs and route anything external to the Approval Queue.",
         "AACTIVATED RX is a peptide education and wellness brand. Humans approve anything that leaves the company. Never make medical claims.",
         "06:00 plan the day · hourly check progress · 17:00 executive summary.",
-        ["tasks.create", "handoff.create", "approval.request", "report.write"],
+        [
+          "tasks.create",
+          "handoff.create",
+          "approval.request",
+          "report.write",
+          "knowledge.summarize",
+          "prompts.write",
+        ],
       ),
     },
   });
@@ -1072,31 +1079,57 @@ async function main() {
     ],
   });
 
-  // Transactions (this and last month)
+  // Transactions (last six months, as synced from QuickBooks in mock mode)
   const txns: Prisma.TransactionCreateManyInput[] = [];
-  for (let m = 1; m >= 0; m--) {
+  const revenueLines = [
+    { description: "Membership renewals", dept: "sales" },
+    { description: "Education program sales", dept: "sales" },
+    { description: "Event tickets", dept: "marketing" },
+    { description: "Affiliate program fees", dept: "sales" },
+  ] as const;
+  const expenseLines = [
+    { description: "Contractor invoice", category: "Contractors", dept: "development" },
+    { description: "Software subscription", category: "Software", dept: "technology" },
+    { description: "Ad platform charge", category: "Advertising", dept: "marketing" },
+    { description: "Shipping supplies", category: "Operations", dept: "operations" },
+    { description: "Video production", category: "Media", dept: "media" },
+  ] as const;
+  for (let m = 5; m >= 0; m--) {
     const base = new Date(NOW.getFullYear(), NOW.getMonth() - m, 1);
     const days = m === 0 ? Math.max(1, NOW.getDate()) : 28;
-    for (let i = 0; i < 18; i++) {
+    // Gentle growth month over month.
+    const growth = 1 + (5 - m) * 0.06;
+    const count = m === 0 ? Math.max(4, Math.round((22 * days) / 30)) : 22;
+    for (let i = 0; i < count; i++) {
       const revenue = i % 3 !== 0;
-      txns.push({
-        occurredAt: new Date(base.getTime() + Math.floor(between(0, days)) * DAY + 12 * HOUR),
-        description: revenue
-          ? pick(["Membership renewals", "Education program sales", "Event tickets"])
-          : pick([
-              "Contractor invoice",
-              "Software subscription",
-              "Ad platform charge",
-              "Shipping supplies",
-            ]),
-        category: revenue
-          ? "Sales"
-          : pick(["Contractors", "Software", "Advertising", "Operations"]),
-        type: revenue ? "REVENUE" : "EXPENSE",
-        amountUsd: usd(revenue ? between(800, 6400) : between(120, 2600)),
-        source: "QUICKBOOKS",
-        externalId: `qb-mock-${m}-${i}`,
-      });
+      const day = Math.min(days - 1, Math.floor((i / count) * days + between(0, 1)));
+      const occurredAt = new Date(base.getTime() + day * DAY + 12 * HOUR);
+      if (occurredAt > NOW) continue;
+      if (revenue) {
+        const line = pick(revenueLines);
+        txns.push({
+          occurredAt,
+          description: line.description,
+          category: "Sales",
+          type: "REVENUE",
+          amountUsd: usd(between(900, 5200) * growth),
+          departmentId: depts[line.dept].id,
+          source: "QUICKBOOKS",
+          externalId: `qb-mock-${m}-${i}`,
+        });
+      } else {
+        const line = pick(expenseLines);
+        txns.push({
+          occurredAt,
+          description: line.description,
+          category: line.category,
+          type: "EXPENSE",
+          amountUsd: usd(between(350, 3100) * growth),
+          departmentId: depts[line.dept].id,
+          source: "QUICKBOOKS",
+          externalId: `qb-mock-${m}-${i}`,
+        });
+      }
     }
   }
   await db.transaction.createMany({ data: txns });
@@ -1291,107 +1324,454 @@ async function main() {
     }
   }
 
-  // Knowledge documents
+  // The Software budget passed 75%, so the budget rule paused it and asked executives to approve
+  // more spending (system-generated, as src/server/budgets/service.ts does at runtime).
+  {
+    const softwarePayload = {
+      purpose: "continue",
+      budgetId: budgets.software.id,
+      budget: "Software subscriptions",
+      amountUsd: 265,
+      limitUsd: 1200,
+      spentUsd: 935,
+    };
+    const lockRequest = await db.approvalRequest.create({
+      data: {
+        type: "SPEND",
+        title: "More spending: Software subscriptions",
+        summary:
+          "Software subscriptions is at 78% of its $1,200.00 budget. Approve up to $265.00 more this period.",
+        payload: softwarePayload,
+        payloadHash: hashPayload(softwarePayload),
+        reasoning:
+          "Budget rule: once spend reaches 75% of a budget, more spending in it needs management approval. Software subscriptions has spent $935.00 of $1,200.00. Approving lets spending continue by up to $265.00 this period. Rejecting keeps it paused.",
+        sources: [
+          { title: "Software subscriptions budget, this period" },
+          { title: "Business rule: approval required from 75% of a budget" },
+        ] as Prisma.InputJsonValue,
+        risk: "MEDIUM",
+        requiredRole: requiredRoleFor("SPEND", "MEDIUM"),
+        amountUsd: usd(265),
+        budgetId: budgets.software.id,
+        createdAt: ago(26 * HOUR),
+      },
+    });
+    await db.auditLog.createMany({
+      data: [
+        {
+          actorType: "SYSTEM",
+          action: "budget.threshold_reached",
+          entityType: "Budget",
+          entityId: budgets.software.id,
+          after: { spentUsd: 935, limitUsd: 1200, ratio: 0.779 },
+          createdAt: ago(26 * HOUR),
+        },
+        {
+          actorType: "SYSTEM",
+          action: "budget.locked",
+          entityType: "Budget",
+          entityId: budgets.software.id,
+          before: { status: "OK" },
+          after: { status: "LOCKED", spentUsd: 935, limitUsd: 1200 },
+          createdAt: ago(26 * HOUR),
+        },
+        {
+          actorType: "SYSTEM",
+          action: "approval.requested",
+          entityType: "ApprovalRequest",
+          entityId: lockRequest.id,
+          after: { type: "SPEND", risk: "MEDIUM", requiredRole: "EXECUTIVE" },
+          createdAt: ago(26 * HOUR),
+        },
+      ],
+    });
+  }
+
+  // Knowledge documents (demo content; summaries come from the same skill the app uses)
   const docs: {
     title: string;
     category: "POLICIES" | "TRAINING" | "LEGAL_RESEARCH" | "BRAND" | "PRODUCT_EDUCATION";
     access: "EXECUTIVE_ONLY" | "ALL_STAFF" | "ALL_USERS";
-    summary: string;
+    owner: "guy" | "maya" | "devon" | "isaac";
+    tags: string[];
+    daysAgo: number;
+    /** Leave unsummarized to show the "Generate summary" step. */
+    noSummary?: boolean;
+    body: string;
   }[] = [
     {
       title: "Content & posting rules",
       category: "POLICIES",
       access: "ALL_USERS",
-      summary: "No medical claims, branded stack names only, platform rules apply.",
+      owner: "maya",
+      tags: ["compliance", "social", "content"],
+      daysAgo: 3,
+      body: `These rules apply to every post, email and message written by staff, reps or agents. They keep our accounts in good standing and keep us honest with our community.
+Every draft goes through the automated compliance check before it reaches a human reviewer. Anything outside these rules goes to the management review queue.
+- Never make medical or health claims, or promise outcomes.
+- Use branded stack names on social media, never specific peptide names.
+- Avoid the words on the algorithm blocklist; the compliance check lists them.
+- Follow each platform's own rules for promotions and disclosures.
+- Nothing is published until a person approves it.`,
     },
     {
       title: "Lead generation policy",
       category: "POLICIES",
       access: "ALL_USERS",
-      summary: "Consented inbound contacts only. No scraping, purchased lists or cold outreach.",
+      owner: "maya",
+      tags: ["leads", "consent", "outreach"],
+      daysAgo: 12,
+      body: `We only contact people who reached out to us or opted in. Every contact needs a consent record that says how and when they opted in.
+This protects our community and our accounts. It is also the law in many places.
+- Consented inbound contacts only.
+- No scraping, purchased lists, cold DMs, follows or comments.
+- Record the consent source and the date for every contact.
+- Stop immediately when someone opts out.`,
     },
     {
       title: "Agent usage policy",
       category: "POLICIES",
       access: "ALL_STAFF",
-      summary: "Agents are for company purposes only; exceptions need management approval.",
+      owner: "devon",
+      tags: ["agents", "ai"],
+      daysAgo: 20,
+      body: `Our AI agents work for the company. They plan, draft and report, and people decide.
+Agents may only be used for company purposes. Outside work needs a management-approved exception with a limited scope and an end date.
+- Every agent has a named human owner.
+- Agents never send anything outside the company without approval.
+- AI spend is tracked per agent and per department.
+- Budgets pause at 75% until an executive approves more.`,
+    },
+    {
+      title: "Information security policy",
+      category: "POLICIES",
+      access: "ALL_STAFF",
+      owner: "isaac",
+      tags: ["security", "access"],
+      daysAgo: 30,
+      body: `This policy explains how we protect company and member data. It covers accounts, devices and sharing.
+Access follows roles. Executive-only areas such as legal, corporate accounting and HR records are restricted on the server, not just hidden.
+- Use the magic-link sign-in; never share accounts.
+- Report a lost device or a suspicious message to the System Admin the same day.
+- Keep member data inside approved systems.
+- API keys and secrets never go in documents or chat.`,
     },
     {
       title: "Rep onboarding guide",
       category: "TRAINING",
       access: "ALL_USERS",
-      summary: "First 30 days for new reps.",
+      owner: "maya",
+      tags: ["reps", "onboarding"],
+      daysAgo: 6,
+      body: `Welcome to the team. This guide covers your first 30 days as a representative.
+Your AI team is ready when you accept the posting rules. Your Business Coach plans each week with you.
+- Week 1: accept the rules and meet your AI team.
+- Week 2: publish your first approved posts.
+- Week 3: follow up with consented contacts only.
+- Week 4: review your progress with your coach.`,
+    },
+    {
+      title: "Using your AI team",
+      category: "TRAINING",
+      access: "ALL_USERS",
+      owner: "maya",
+      tags: ["reps", "agents"],
+      daysAgo: 9,
+      body: `Your AI team has four members: a Content Creator, a Social Media Manager, a Lead Follow-up Specialist and a Business Coach.
+They draft and plan. The company approves anything that goes out, so expect a short review before posts and messages are sent.
+- Ask your Content Creator for a post and pick a channel.
+- Schedule approved posts in the Content Studio.
+- Ask for follow-ups only for contacts who opted in.
+- Use the weekly plan to stay consistent.`,
+    },
+    {
+      title: "Approval queue reviewer guide",
+      category: "TRAINING",
+      access: "ALL_STAFF",
+      owner: "devon",
+      tags: ["approvals", "compliance"],
+      daysAgo: 15,
+      body: `Reviewers decide what leaves the company. Read the agent's reasoning and sources before you approve.
+Restricted items such as spend, legal and launches need an executive. You cannot approve your own request.
+- Check the compliance result first.
+- Edit the content if a small change fixes it; the check runs again.
+- Approving a failed check needs a written acknowledgement.
+- Reject with a short note so the agent can learn.`,
     },
     {
       title: "Brand voice guide v3",
       category: "BRAND",
       access: "ALL_USERS",
-      summary: "Calm, factual, encouraging.",
+      owner: "maya",
+      tags: ["brand", "voice"],
+      daysAgo: 25,
+      body: `Our voice is calm, factual and encouraging. We teach; we do not sell hard.
+Write the way a knowledgeable friend talks. Short sentences, plain words, one idea at a time.
+- Lead with something useful.
+- Invite questions instead of making promises.
+- Use branded stack names, not ingredient names, on social.
+- No hype words, no countdown pressure.`,
+    },
+    {
+      title: "Visual identity basics",
+      category: "BRAND",
+      access: "ALL_STAFF",
+      owner: "maya",
+      tags: ["brand", "design"],
+      daysAgo: 40,
+      noSummary: true,
+      body: `Our visual identity is dark navy with electric blue accents and clean white type. Keep layouts simple with plenty of space.
+Photos show real routines and real people, never before-and-after comparisons.
+- Use the approved color palette only.
+- One headline per graphic.
+- Captions must match the graphic's message.
+- No product claims in images.`,
     },
     {
       title: "Recovery Stack education notes",
       category: "PRODUCT_EDUCATION",
       access: "ALL_USERS",
-      summary: "How to talk about the Recovery Stack without claims.",
+      owner: "maya",
+      tags: ["recovery stack", "education"],
+      daysAgo: 4,
+      body: `How to talk about the Recovery Stack in education content. We explain routines and habits; we never claim results.
+Questions about health go to a qualified professional, and we say so.
+- Describe the routine, not an outcome.
+- Use the branded name "Recovery Stack" on social.
+- Point people to the education program for detail.
+- Never compare against medications.`,
+    },
+    {
+      title: "Morning Routine Stack FAQ",
+      category: "PRODUCT_EDUCATION",
+      access: "ALL_USERS",
+      owner: "maya",
+      tags: ["morning routine", "faq"],
+      daysAgo: 11,
+      noSummary: true,
+      body: `Answers to the questions we hear most about the Morning Routine Stack. Keep answers educational and point to the program for detail.
+When someone asks about a health condition, recommend they speak with a qualified professional.
+- What is it: a structured morning routine people follow with our education program.
+- Who is it for: members who want a consistent start to the day.
+- What we never say: that it treats, cures or prevents anything.`,
     },
     {
       title: "Regulatory landscape memo",
       category: "LEGAL_RESEARCH",
       access: "EXECUTIVE_ONLY",
-      summary: "Confidential legal research.",
+      owner: "guy",
+      tags: ["legal", "regulatory"],
+      daysAgo: 18,
+      body: `Confidential legal research on the regulatory landscape for education and wellness brands. Prepared for executive review.
+Rules on health claims and promotions differ by platform and by state. Counsel recommends keeping all public content educational.
+- Health claims carry the highest risk; keep the automated check strict.
+- Affiliate disclosures must be clear on every platform.
+- Review this memo each quarter with counsel.`,
     },
     {
       title: "Tokenization legal considerations",
       category: "LEGAL_RESEARCH",
       access: "EXECUTIVE_ONLY",
-      summary: "Confidential. Required before any tokenization launch.",
+      owner: "guy",
+      tags: ["legal", "tokenization"],
+      daysAgo: 8,
+      body: `Confidential. Legal questions to settle before any tokenization launch. The project stays locked until an executive approves.
+Counsel needs to review securities, consumer protection and tax treatment before a build starts.
+- No public mention of tokenization until counsel signs off.
+- Any launch needs executive approval in the Approval Queue.
+- Keep the scope document in this library, executive-only.`,
+    },
+    {
+      title: "Commission plan overview",
+      category: "TRAINING",
+      access: "ALL_USERS",
+      owner: "devon",
+      tags: ["commission", "reps"],
+      daysAgo: 22,
+      body: `How earnings are tracked in the Back Office. Figures are records of what was earned, not promises of future income.
+The plan shown in the app is a placeholder until the final plan is approved.
+- Earnings show as pending until they are approved.
+- Payouts are listed with their reference numbers.
+- Presenter status depends on the plan's requirements.`,
     },
   ];
   for (const d of docs) {
+    const summary = d.noSummary
+      ? null
+      : knowledgeSummarySkill.mock({ title: d.title, body: d.body });
     await db.document.create({
       data: {
         title: d.title,
         category: d.category,
         accessLevel: d.access,
-        summary: d.summary,
-        body: `${d.summary}\n\n(Demo document body.)`,
-        tags: [d.category.toLowerCase()],
-        ownerId: d.access === "EXECUTIVE_ONLY" ? users.guy.id : users.maya.id,
+        summary: summary?.summary ?? null,
+        keyPoints: summary?.keyPoints ?? [],
+        summarizedAt: summary ? ago(d.daysAgo * DAY - HOUR) : null,
+        body: d.body,
+        tags: d.tags,
+        ownerId: users[d.owner].id,
+        createdAt: ago(d.daysAgo * DAY),
+        updatedAt: ago(d.daysAgo * DAY),
       },
     });
   }
 
-  // Prompt templates
-  const prompt = await db.promptTemplate.create({
-    data: {
+  // Prompt templates, each with its version history
+  const promptLibrary: {
+    key: string;
+    name: string;
+    description: string;
+    dept: DeptSlug | null;
+    author: "devon" | "maya" | "guy";
+    versions: { body: string; note: string; daysAgo: number }[];
+  }[] = [
+    {
       key: "content.educational_post",
       name: "Educational post",
       description: "Draft an educational social post for a branded stack.",
-      variables: ["stack_name", "channel", "hook"],
-      currentVersion: 2,
-      departmentId: depts.marketing.id,
+      dept: "marketing",
+      author: "devon",
+      versions: [
+        {
+          body: "Write a {{channel}} post about {{stack_name}}. No medical claims.",
+          note: "Initial template",
+          daysAgo: 30,
+        },
+        {
+          body: 'Write a {{channel}} post about {{stack_name}} that opens with the hook "{{hook}}". Educational tone, no medical or outcome claims, branded names only.',
+          note: "Added question hook",
+          daysAgo: 9,
+        },
+      ],
     },
-  });
-  await db.promptTemplateVersion.createMany({
-    data: [
-      {
-        templateId: prompt.id,
-        version: 1,
-        body: "Write a {{channel}} post about {{stack_name}}. No medical claims.",
-        changeNote: "Initial",
-        createdById: users.devon.id,
-        createdAt: ago(30 * DAY),
+    {
+      key: "content.launch_email",
+      name: "Product launch email",
+      description: "A launch email to consented subscribers, with subject line options.",
+      dept: "marketing",
+      author: "maya",
+      versions: [
+        {
+          body: "You are a marketing copywriter at AACTIVATED. Write a launch email for {{product_name}} to {{target_audience}}.",
+          note: "Initial template",
+          daysAgo: 14,
+        },
+        {
+          body: [
+            "You are a marketing copywriter at AACTIVATED. Write a launch email for {{product_name}}, a {{product_category}}, to {{target_audience}}.",
+            "Goals:",
+            "- Announce the launch and explain what it is in plain words.",
+            "- Highlight the top {{key_benefits}} as education, not promises.",
+            "- Use a {{tone}} tone.",
+          ].join("\n"),
+          note: "Added goals and tone",
+          daysAgo: 13,
+        },
+        {
+          body: [
+            "You are a marketing copywriter at AACTIVATED. Write a launch email for {{product_name}}, a {{product_category}}, to {{target_audience}}.",
+            "Goals:",
+            "- Announce the launch and explain what it is in plain words.",
+            "- Highlight the top {{key_benefits}} as education, not promises.",
+            "- Use a {{tone}} tone. No health or medical claims.",
+            "- Keep the email to about {{email_length}}.",
+            "- Give 3 subject line options.",
+            "- End with this call to action: {{call_to_action}}.",
+          ].join("\n"),
+          note: "Added length, subject lines and call to action",
+          daysAgo: 13,
+        },
+      ],
+    },
+    {
+      key: "marketing.ad_copy",
+      name: "Marketing ad copy",
+      description: "Short ad copy variations that pass the posting rules.",
+      dept: "marketing",
+      author: "maya",
+      versions: [
+        {
+          body: "Write 3 short {{channel}} ad variations for {{offer}} aimed at {{audience}}. Educational, no claims, no countdown pressure.",
+          note: "Initial template",
+          daysAgo: 21,
+        },
+      ],
+    },
+    {
+      key: "content.blog_outline",
+      name: "Blog post outline",
+      description: "A structured outline for an education blog post.",
+      dept: "marketing",
+      author: "devon",
+      versions: [
+        {
+          body: "Outline a blog post titled {{title}} for {{audience}}. Give 5 sections with one-line notes each.",
+          note: "Initial template",
+          daysAgo: 18,
+        },
+        {
+          body: "Outline a blog post titled {{title}} for {{audience}}. Give 5 sections with one-line notes each, a short intro and a closing that points to {{next_step}}. Cite only our own education program.",
+          note: "Added intro, closing and sources rule",
+          daysAgo: 5,
+        },
+      ],
+    },
+    {
+      key: "social.post",
+      name: "Social media post",
+      description: "A single post with hashtags for one channel.",
+      dept: "social",
+      author: "maya",
+      versions: [
+        {
+          body: "Write one {{channel}} post about {{topic}} in our brand voice: calm, factual, encouraging. Add up to {{hashtag_count}} hashtags. Branded stack names only.",
+          note: "Initial template",
+          daysAgo: 10,
+        },
+      ],
+    },
+    {
+      key: "leads.consented_followup",
+      name: "Follow-up for consented leads",
+      description: "A friendly reply to someone who opted in. Never for cold outreach.",
+      dept: "sales",
+      author: "devon",
+      versions: [
+        {
+          body: "Write a short follow-up to {{first_name}}, who opted in via {{consent_source}} and asked about {{interest}}. Answer helpfully, invite questions and offer {{next_step}}. Do not send to anyone who has not opted in.",
+          note: "Initial template",
+          daysAgo: 7,
+        },
+      ],
+    },
+  ];
+  for (const t of promptLibrary) {
+    const last = t.versions[t.versions.length - 1]!;
+    const created = await db.promptTemplate.create({
+      data: {
+        key: t.key,
+        name: t.name,
+        description: t.description,
+        variables: [
+          ...new Set([...last.body.matchAll(/\{\{\s*([a-z0-9_]+)\s*\}\}/g)].map((m) => m[1]!)),
+        ],
+        currentVersion: t.versions.length,
+        departmentId: t.dept ? depts[t.dept].id : null,
+        createdAt: ago(t.versions[0]!.daysAgo * DAY),
+        updatedAt: ago(last.daysAgo * DAY),
       },
-      {
-        templateId: prompt.id,
-        version: 2,
-        body: 'Write a {{channel}} post about {{stack_name}} that opens with the hook "{{hook}}". Educational tone, no medical or outcome claims, branded names only.',
-        changeNote: "Added question hook",
-        createdById: users.devon.id,
-        createdAt: ago(9 * DAY),
-      },
-    ],
-  });
+    });
+    await db.promptTemplateVersion.createMany({
+      data: t.versions.map((v, i) => ({
+        templateId: created.id,
+        version: i + 1,
+        body: v.body,
+        changeNote: v.note,
+        createdById: users[t.author].id,
+        createdAt: ago(v.daysAgo * DAY - i * HOUR),
+      })),
+    });
+  }
 
   // Projects
   await db.project.createMany({
@@ -1471,6 +1851,7 @@ async function main() {
         mode: "MOCK",
         status: "OPERATIONAL",
         lastCheckedAt: ago(12 * 60_000),
+        config: { lastSyncAt: ago(42 * 60_000).toISOString(), syncedTransactions: txns.length },
       },
       {
         provider: "SLACK",

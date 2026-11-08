@@ -413,6 +413,171 @@ export const rewriteSkill = defineSkill<RewriteInput, RewriteOutput>({
   },
 });
 
+// ------------------------------------------------------- Knowledge summary --
+
+export interface SummaryInput {
+  title: string;
+  body: string;
+}
+
+export const summaryOutput = z.object({
+  summary: z.string().min(10).max(700),
+  keyPoints: z.array(z.string().min(3).max(220)).min(2).max(5),
+});
+export type SummaryOutput = z.infer<typeof summaryOutput>;
+
+function sentences(text: string) {
+  return text
+    .replace(/^#+\s.*$/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 3);
+}
+
+export const knowledgeSummarySkill = defineSkill<SummaryInput, SummaryOutput>({
+  name: "knowledge.summarize",
+  tier: "agent",
+  requiresTool: "knowledge.summarize",
+  output: summaryOutput,
+  prompt: (i) =>
+    [
+      `Summarize the internal document "${i.title}" for colleagues.`,
+      `Document:\n"""${i.body.slice(0, 20_000)}"""`,
+      "Write a plain summary of at most 4 sentences, then 2-5 key takeaways. Use only what the document says.",
+    ].join("\n"),
+  mock: (i) => {
+    const bullets = i.body
+      .split("\n")
+      .filter((l) => /^\s*[-*]\s+/.test(l))
+      .map((l) => l.replace(/^\s*[-*]\s+/, "").trim())
+      .filter((l) => l.length >= 3);
+    const all = sentences(i.body);
+    const summary = all.slice(0, 3).join(" ").slice(0, 700) || `${i.title}.`;
+    const points = (bullets.length >= 2 ? bullets : all.slice(3, 8))
+      .slice(0, 4)
+      .map((p) => (p.length > 220 ? `${p.slice(0, 219).trimEnd()}…` : p));
+    return {
+      summary: summary.length >= 10 ? summary : `${i.title}: ${summary}`,
+      keyPoints:
+        points.length >= 2 ? points : [`Read "${i.title}" in full.`, "Ask an owner if unsure."],
+    };
+  },
+});
+
+// ------------------------------------------------------ Prompt Generator chat --
+
+export interface PromptChatInput {
+  message: string;
+  /** Earlier turns, oldest first. */
+  history: { role: "user" | "brain"; text: string }[];
+  /** The template on screen, if any, so the Brain can improve it. */
+  template?: { name: string; body: string; variables: string[] } | null;
+}
+
+export const promptChatOutput = z.object({
+  reply: z.string().min(2).max(1500),
+  template: z
+    .object({
+      name: z.string().min(3).max(80),
+      description: z.string().min(3).max(200),
+      body: z.string().min(20).max(6000),
+    })
+    .nullable(),
+});
+export type PromptChatOutput = z.infer<typeof promptChatOutput>;
+
+/** Variables are written {{like_this}}. */
+export function templateVariables(body: string) {
+  return [
+    ...new Set(
+      [...body.matchAll(/\{\{\s*([a-z][a-z0-9_]{0,39})\s*\}\}/gi)].map((m) => m[1]!.toLowerCase()),
+    ),
+  ];
+}
+
+function titleCase(text: string) {
+  return text
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((w) => w[0]!.toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+export const promptChatSkill = defineSkill<PromptChatInput, PromptChatOutput>({
+  name: "prompts.chat",
+  tier: "brain",
+  requiresTool: "prompts.write",
+  output: promptChatOutput,
+  prompt: (i) =>
+    [
+      "You help AACTIVATED staff write reusable prompt templates for the company's AI agents.",
+      "Templates use {{variable_name}} placeholders (lowercase, underscores). Never include medical or health claims.",
+      i.template
+        ? `Template on screen, "${i.template.name}":\n"""${i.template.body}"""`
+        : "No template is open.",
+      i.history.length
+        ? `Conversation so far:\n${i.history.map((h) => `${h.role === "user" ? "Staff" : "Brain"}: ${h.text}`).join("\n")}`
+        : "",
+      `Staff: """${i.message}"""`,
+      "Reply briefly. If they asked for a new or changed template, return the full template; otherwise return template: null.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  mock: (i) => {
+    const text = i.message.toLowerCase();
+    const wantsTemplate = /prompt|template|write|create|improve|add|specific|variable/.test(text);
+    if (!wantsTemplate) {
+      return {
+        reply:
+          "I can draft a reusable prompt template for that. Tell me who it is for and what the agent should produce, and I'll add variables you can fill in.",
+        template: null,
+      };
+    }
+    const base = i.template?.body;
+    if (base && /improve|add|specific|length|call to action|variable/.test(text)) {
+      const extra: string[] = [];
+      if (/length|specific/.test(text) && !base.includes("{{length}}"))
+        extra.push("- Keep it to about {{length}}.");
+      if (/call to action|cta/.test(text) && !base.includes("{{call_to_action}}"))
+        extra.push("- End with this call to action: {{call_to_action}}.");
+      if (/variable/.test(text) && !base.includes("{{audience}}"))
+        extra.push("- Write for {{audience}}.");
+      if (extra.length === 0) extra.push("- Use short sentences and one clear idea per paragraph.");
+      return {
+        reply: `Done. I updated "${i.template!.name}" with ${extra.length === 1 ? "one change" : `${extra.length} changes`}. Review it in the template panel, then save it as a new version.`,
+        template: {
+          name: i.template!.name,
+          description: "Updated by the Brain from your request.",
+          body: `${base.trimEnd()}\n${extra.join("\n")}`,
+        },
+      };
+    }
+    const topic = i.message
+      .replace(/^(please\s+)?(create|write|make|draft)\s+(a|an)?\s*/i, "")
+      .slice(0, 120);
+    const name =
+      titleCase(topic.replace(/\b(prompt|template|for|a|an|the|to|of)\b/gi, " ")) || "New prompt";
+    return {
+      reply: `Here is a reusable template for "${name}". Fill in the variables, then save it or send it to an agent.`,
+      template: {
+        name,
+        description: `Reusable prompt: ${topic}`.slice(0, 200),
+        body: [
+          `You are a {{role}} at AACTIVATED. ${topic.charAt(0).toUpperCase()}${topic.slice(1)}.`,
+          "Audience: {{audience}}.",
+          "Goals:",
+          "- Lead with the most useful point for {{audience}}.",
+          "- Keep the tone {{tone}} and educational. No health or medical claims.",
+          "- Use branded stack names only.",
+          "- End with: {{call_to_action}}.",
+        ].join("\n"),
+      },
+    };
+  },
+});
+
 export const SKILLS = [
   brainPlanSkill,
   opsDelegateSkill,
@@ -420,4 +585,6 @@ export const SKILLS = [
   coachPlanSkill,
   followUpSkill,
   rewriteSkill,
+  knowledgeSummarySkill,
+  promptChatSkill,
 ] as const;

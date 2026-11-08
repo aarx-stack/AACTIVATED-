@@ -51,10 +51,14 @@ export const mockQuickBooks: QuickBooksAdapter = {
   key: "QUICKBOOKS",
   mode: "mock",
   healthCheck: async () => mockHealth("QUICKBOOKS"),
-  lastSync: async () => ({
-    syncedAt: new Date(Date.now() - 1000 * 60 * 42),
-    transactionCount: 128,
-  }),
+  lastSync: async () => {
+    if (isSimulatedDown("QUICKBOOKS")) {
+      throw new IntegrationUnavailableError(
+        "QuickBooks is unavailable. Showing the last synced data.",
+      );
+    }
+    return { syncedAt: new Date(), transactionCount: 128 };
+  },
 };
 
 export const mockSlack: SlackAdapter = {
@@ -62,7 +66,7 @@ export const mockSlack: SlackAdapter = {
   mode: "mock",
   healthCheck: async () => mockHealth("SLACK"),
   notify: async (channel, text) => {
-    console.info(`[slack:mock] #${channel}: ${text}`);
+    console.info(`[slack:mock] ${channel}: ${text}`);
     return { delivered: !isSimulatedDown("SLACK") };
   },
 };

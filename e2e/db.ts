@@ -1,0 +1,49 @@
+import "dotenv/config";
+import { randomUUID } from "node:crypto";
+import { Client } from "pg";
+
+/** Direct database access for test setup only (the app is always driven through the UI). */
+export async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * A fresh company-wide contractor budget for this month at a given spend, so the 75% flow can be
+ * exercised on every run without touching the demo budgets.
+ */
+export async function createTestBudget(limitUsd: number, spentUsd: number) {
+  const id = `e2e_${randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  const name = `E2E contractor budget ${id.slice(4, 10)}`;
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  await withDb(async (db) => {
+    await db.query(
+      `INSERT INTO "Budget" (id, name, kind, "periodStart", "periodEnd", "limitUsd", "updatedAt")
+       VALUES ($1, $2, 'CONTRACTOR', $3, $4, $5, now())`,
+      [id, name, start, end, limitUsd],
+    );
+    await db.query(
+      `INSERT INTO "SpendEvent" (id, kind, description, "amountUsd", "budgetId")
+       VALUES ($1, 'CONTRACTOR', 'Earlier contractor work', $2, $3)`,
+      [`${id}_s`, spentUsd, id],
+    );
+  });
+  return { id, name };
+}
+
+/** Ends the test budget's period so it drops off the Finance page. History is kept. */
+export async function retireTestBudget(id: string) {
+  await withDb((db) =>
+    db.query(
+      `UPDATE "Budget" SET "periodEnd" = now() - interval '1 day', "updatedAt" = now() WHERE id = $1`,
+      [id],
+    ),
+  );
+}

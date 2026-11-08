@@ -1,11 +1,12 @@
 /**
  * The single server-side entry point for model calls.
- * Every call is logged to SpendEvent (agent, model, tokens, cost).
+ * Every call is checked against its AI budget first (the 75% rule) and then logged to
+ * SpendEvent (agent, model, tokens, cost) against that budget.
  */
 import "server-only";
-import { Prisma } from "@/generated/prisma/client";
 import { SpendKind } from "@/generated/prisma/enums";
 import { db, type DbClient } from "@/lib/db";
+import { gateSpend, recordSpend } from "@/server/budgets/service";
 import { getEnv } from "@/lib/env";
 import { AnthropicModelAdapter } from "./anthropic";
 import { MockModelAdapter } from "./mock";
@@ -45,21 +46,26 @@ export async function runModel(
   options: { client?: DbClient; adapter?: ModelAdapter } = {},
 ): Promise<CompletionResult & { costUsd: number }> {
   const client = options.client ?? db;
+  // Throws BudgetApprovalRequiredError while the covering AI budget is paused.
+  const budget = await gateSpend(client, {
+    kind: SpendKind.AI_MODEL,
+    departmentId: input.departmentId,
+    amountUsd: 0,
+  });
   const result = await (options.adapter ?? getModelAdapter()).complete(input);
   const cost = costUsd(result.model, result.inputTokens, result.outputTokens);
 
-  await client.spendEvent.create({
-    data: {
-      kind: SpendKind.AI_MODEL,
-      description: input.purpose,
-      amountUsd: new Prisma.Decimal(cost.toFixed(6)),
-      agentId: input.agentId ?? null,
-      departmentId: input.departmentId ?? null,
-      provider: result.provider,
-      model: result.model,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-    },
+  await recordSpend(client, {
+    kind: SpendKind.AI_MODEL,
+    description: input.purpose,
+    amountUsd: cost,
+    budget,
+    agentId: input.agentId ?? null,
+    departmentId: input.departmentId ?? null,
+    provider: result.provider,
+    model: result.model,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
   });
 
   return { ...result, costUsd: cost };

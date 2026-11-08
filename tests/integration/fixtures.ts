@@ -8,7 +8,13 @@ const AGENTS = [
     title: "AI CEO",
     kind: "BRAIN" as const,
     dept: null,
-    tools: ["tasks.create", "handoff.create", "approval.request"],
+    tools: [
+      "tasks.create",
+      "handoff.create",
+      "approval.request",
+      "knowledge.summarize",
+      "prompts.write",
+    ],
   },
   {
     slug: "ops-manager",

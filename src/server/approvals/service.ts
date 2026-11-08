@@ -262,14 +262,23 @@ export async function decideApproval(
       }
     }
 
+    // Approved spend changes what the budget allows: recompute it (may lift a pause).
+    if (request.budgetId && decision === "APPROVE") {
+      const { refreshBudget } = await import("@/server/budgets/service");
+      await refreshBudget(tx, request.budgetId);
+    }
+
     if (request.requestedByAgentId) {
+      const isSpend = request.type === "SPEND";
       await tx.agentActivity.create({
         data: {
           agentId: request.requestedByAgentId,
           kind: decision === "APPROVE" ? ActivityKind.COMPLETED : ActivityKind.FLAGGED,
           message:
             decision === "APPROVE"
-              ? `"${request.title}" was approved and is ready to schedule.`
+              ? isSpend
+                ? `"${request.title}" was approved and can be recorded.`
+                : `"${request.title}" was approved and is ready to schedule.`
               : `"${request.title}" was rejected by a reviewer.`,
           taskId: content?.taskId ?? null,
         },

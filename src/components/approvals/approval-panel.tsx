@@ -1,6 +1,7 @@
 import { CircleCheck, ExternalLink, FileText, ShieldAlert, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { DecisionPanel } from "@/components/approvals/decision-panel";
+import { RecordPurchaseButton } from "@/components/finance/budget-forms";
 import { HighlightedText } from "@/components/approvals/highlighted-text";
 import { ApprovalTypeIcon } from "@/components/approvals/type-icon";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,8 @@ import {
 import { formatRelativeTime, formatUsd } from "@/lib/utils";
 import { isSocialPostPayload, readSources } from "@/server/approvals/payload";
 import { canDecideApproval } from "@/server/approvals/policy";
+import { can } from "@/server/authz/permissions";
+import { isContinuePayload } from "@/server/budgets/service";
 import { ROLE_LABELS } from "@/server/authz/permissions";
 import { groupViolations } from "@/server/compliance/engine";
 import { readViolations } from "@/server/compliance/service";
@@ -277,9 +280,35 @@ export function ApprovalPanel({
                   </Link>
                 </p>
               )}
+              {request.status === "APPROVED" &&
+                request.type === "SPEND" &&
+                request.budget &&
+                (isContinuePayload(request.payload) ? (
+                  <p className="mt-2 text-success">
+                    Spending in {request.budget.name} can continue by up to{" "}
+                    {formatUsd(Number(request.amountUsd ?? 0))}.{" "}
+                    <Link
+                      href="/finance"
+                      className="font-semibold underline-offset-4 hover:underline"
+                    >
+                      Open Finance & Budget
+                    </Link>
+                  </p>
+                ) : (
+                  !request.dispatchedAt &&
+                  can(viewer.role, "budget.manage") && (
+                    <div className="mt-3">
+                      <RecordPurchaseButton
+                        approvalId={request.id}
+                        label={`Record purchase (${formatUsd(Number(request.amountUsd ?? 0))})`}
+                      />
+                    </div>
+                  )
+                ))}
               {request.dispatchedAt && (
                 <p className="mt-1 text-muted-foreground">
-                  Sent {formatRelativeTime(request.dispatchedAt)}.
+                  {request.type === "SPEND" ? "Recorded" : "Sent"}{" "}
+                  {formatRelativeTime(request.dispatchedAt)}.
                 </p>
               )}
             </div>

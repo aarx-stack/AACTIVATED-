@@ -2,12 +2,13 @@ import { z } from "zod";
 import { AgentUnavailableError, SkillOutputError } from "@/server/agents/runner";
 import { ApprovalConflictError, DispatchBlockedError } from "@/server/approvals/service";
 import { ForbiddenError, UnauthenticatedError } from "@/server/authz/permissions";
+import { BudgetApprovalRequiredError } from "@/server/budgets/errors";
 import { IntegrationUnavailableError } from "@/server/integrations/types";
 
 export type ActionState =
   | { status: "idle" }
-  | { status: "error"; message: string }
-  | { status: "done"; message: string; href?: string };
+  | { status: "error"; message: string; href?: string; hrefLabel?: string }
+  | { status: "done"; message: string; href?: string; hrefLabel?: string };
 
 export const idle: ActionState = { status: "idle" };
 
@@ -22,6 +23,16 @@ export function actionError(error: unknown): ActionState {
     error instanceof SkillOutputError
   ) {
     return { status: "error", message: error.message };
+  }
+  if (error instanceof BudgetApprovalRequiredError) {
+    return error.approvalId
+      ? {
+          status: "error",
+          message: error.message,
+          href: `/approvals/${error.approvalId}`,
+          hrefLabel: "Review the request",
+        }
+      : { status: "error", message: error.message };
   }
   if (error instanceof UnauthenticatedError)
     return { status: "error", message: "Please sign in again." };
