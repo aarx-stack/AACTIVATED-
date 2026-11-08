@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Briefcase,
   Database,
   Globe,
@@ -25,6 +26,7 @@ const ICONS: Record<ApprovalType, LucideIcon> = {
   OUTSIDE_WORK: Briefcase,
   PROJECT_LAUNCH: Rocket,
   BUDGET_CHANGE: SlidersHorizontal,
+  PUBLICATION: BookOpen,
 };
 
 /** Glowing square icon used on approval cards, like the concept's type tiles. */

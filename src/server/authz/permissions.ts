@@ -114,6 +114,11 @@ export const PERMISSIONS = {
     group: "Rep tools",
     roles: [EXECUTIVE, STAFF, PREMIUM_REP],
   },
+  "publishing.manage": {
+    label: "Write and edit articles, books and e-books",
+    group: "Knowledge",
+    roles: [EXECUTIVE, STAFF],
+  },
   "prompts.use": { label: "Prompt Generator", group: "Knowledge", roles: [EXECUTIVE, STAFF] },
   "confidential.legal": { label: "Legal records", group: "Confidential", roles: [EXECUTIVE] },
   "confidential.accounting": {

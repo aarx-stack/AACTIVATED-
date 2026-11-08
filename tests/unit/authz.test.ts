@@ -32,6 +32,7 @@ const EXPECTED: Record<Permission, Role[]> = {
   "content.create": [E, S, P],
   "content.schedule": [E, S, P],
   "email.campaigns": [E, S, P],
+  "publishing.manage": [E, S],
   "leads.manage_own": [P],
   "approvals.view": [E, S],
   "approvals.decide_standard": [E, S],

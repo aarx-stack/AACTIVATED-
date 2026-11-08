@@ -33,6 +33,22 @@ const AGENTS = [
     dept: "marketing",
     tools: ["content.draft", "compliance.check", "approval.request", "tasks.work"],
   },
+  {
+    slug: "staff-writer",
+    name: "Inkwell",
+    title: "Staff Writer",
+    kind: "DEPARTMENT" as const,
+    dept: "marketing",
+    tools: ["content.draft", "compliance.check", "tasks.work"],
+  },
+  {
+    slug: "book-author",
+    name: "Chapter",
+    title: "Book & E-book Author",
+    kind: "DEPARTMENT" as const,
+    dept: "marketing",
+    tools: ["content.draft", "knowledge.summarize", "tasks.work"],
+  },
 ];
 
 /** Idempotent: the integration database is shared across test files in one run. */

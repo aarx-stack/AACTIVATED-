@@ -104,6 +104,11 @@ export default async function ContentStudioPage({
                   <Sparkles aria-hidden /> Create with AI
                 </Link>
               </Button>
+              {can(user.role, "publishing.manage") && (
+                <Button asChild variant="secondary">
+                  <Link href="/content/publishing">Publishing</Link>
+                </Button>
+              )}
               {can(user.role, "email.campaigns") && (
                 <Button asChild variant="secondary">
                   <Link href="/content/email">Email campaigns</Link>

@@ -127,6 +127,29 @@ export function ApprovalPanel({
         ) : (
           <>
             <MessagePreview payload={request.payload} />
+            {request.type === "PUBLICATION" && (
+              <div className="tile p-4 text-sm" data-testid="publication-preview">
+                <p className="text-xs text-muted-foreground">
+                  Publication · approval covers exactly this version
+                </p>
+                <p className="mt-1 font-semibold">
+                  {String((request.payload as { title?: string }).title ?? "")}
+                </p>
+                <p className="text-muted-foreground">
+                  {String((request.payload as { parts?: number }).parts ?? 0)} parts ·{" "}
+                  {Number((request.payload as { words?: number }).words ?? 0).toLocaleString(
+                    "en-US",
+                  )}{" "}
+                  words
+                </p>
+                <Link
+                  href={`/content/publishing/${String((request.payload as { publicationId?: string }).publicationId ?? "")}`}
+                  className="mt-2 inline-block font-semibold text-primary hover:underline"
+                >
+                  Read the full text
+                </Link>
+              </div>
+            )}
             {request.type === "BUDGET_CHANGE" && readBudgetChange(request.payload) && (
               <div className="tile p-4" data-testid="budget-change">
                 <p className="mb-1 text-xs text-muted-foreground">
@@ -323,6 +346,11 @@ export function ApprovalPanel({
                     </div>
                   )
                 ))}
+              {request.status === "APPROVED" && request.type === "PUBLICATION" && (
+                <p className="mt-2 text-success">
+                  Approved to publish. The PDF and EPUB exports of this version are final.
+                </p>
+              )}
               {request.status === "APPROVED" && request.type === "BUDGET_CHANGE" && (
                 <p className="mt-2 text-success">
                   The new limit is in effect.{" "}

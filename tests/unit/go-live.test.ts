@@ -239,3 +239,45 @@ describe("email rendering", () => {
     expect(text).toMatch(/Unsubscribe: https:\/\/brain\.example\.test\/unsubscribe\?t=abc$/);
   });
 });
+
+describe("EPUB export", () => {
+  it("is a valid EPUB zip: mimetype first and uncompressed, escaped XHTML, DRAFT until final", async () => {
+    const { buildEpub, fileNameFor } = await import("@/server/publishing/epub");
+    const book = {
+      title: "Routines & <Habits>",
+      subtitle: null,
+      kind: "EBOOK" as const,
+      audience: "members",
+      author: "AACTIVATED RX",
+      final: false,
+      words: 10,
+      updatedAt: new Date("2026-11-08T10:00:00Z"),
+      sections: [{ id: "a", title: "One", body: "Hello & welcome.\n\nSecond paragraph." }],
+    };
+    const file = buildEpub(book, "pub1");
+    expect(file.readUInt32LE(0)).toBe(0x04034b50);
+    expect(file.readUInt16LE(8)).toBe(0); // stored
+    expect(file.subarray(30, 38).toString()).toBe("mimetype");
+    expect(file.subarray(38, 58).toString()).toBe("application/epub+zip");
+    const text = file.toString("latin1");
+    for (const name of [
+      "META-INF/container.xml",
+      "OEBPS/content.opf",
+      "OEBPS/nav.xhtml",
+      "OEBPS/part-1.xhtml",
+    ]) {
+      expect(text).toContain(name);
+    }
+    const { inflateRawSync } = await import("node:zlib");
+    // Find part-1 in the archive and inflate it.
+    const at = text.lastIndexOf("OEBPS/part-1.xhtml", text.indexOf("PK\x01\x02"));
+    const header = at - 30;
+    const size = file.readUInt32LE(header + 18);
+    const nameLen = file.readUInt16LE(header + 26);
+    const xhtml = inflateRawSync(file.subarray(at + nameLen, at + nameLen + size)).toString();
+    expect(xhtml).toContain("<p>Hello &amp; welcome.</p>");
+    expect(xhtml).toContain("DRAFT: not approved");
+    expect(buildEpub({ ...book, final: true }, "pub1").toString("latin1")).not.toContain("DRAFT");
+    expect(fileNameFor("Routines & <Habits>!", "epub")).toBe("routines-habits.epub");
+  });
+});

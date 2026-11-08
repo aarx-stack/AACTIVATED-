@@ -302,6 +302,11 @@ export async function decideApproval(
       await applyCampaignDecision(tx, request, decision, note ?? null);
     }
 
+    if (request.type === "PUBLICATION") {
+      const { applyPublicationDecision } = await import("@/server/publishing/service");
+      await applyPublicationDecision(tx, request, decision, note ?? null);
+    }
+
     if (request.type === "BUDGET_CHANGE") {
       const { applyBudgetChange } = await import("@/server/budgets/change-requests");
       await applyBudgetChange(tx, request, decision, actor.id, note ?? null);

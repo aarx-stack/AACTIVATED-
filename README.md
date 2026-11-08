@@ -303,6 +303,23 @@ paused (history kept) when they leave one or are suspended. Only its owner gives
 accepts its drafts; executives can look at staff assistants, never at another executive's. Its
 work stays out of the shared activity feed, and its model spend goes through the budget gate.
 
+## Publishing
+
+**Content Studio, Publishing** (`/content/publishing`, executives and staff). Articles, books and
+e-books are written part by part:
+
+- **New publication:** title, type (article, e-book, book), audience and a description. Tick
+  **Outline it with AI** and the Book & E-book Author (or the Staff Writer, for articles) proposes
+  the chapters or sections, each with a short summary to edit.
+- **Writing:** pick a part, then **Write with AI** (with an optional note for the writer) or type
+  it yourself. Parts can be added, reordered and deleted; word counts update as you go.
+- **Approval:** **Send for approval** needs every part written, runs the compliance check on the
+  whole text and asks an executive. Editing is locked while it waits. Approval covers exactly that
+  version: any later edit sends it back to drafting.
+- **Exports:** **PDF** opens a clean, printable copy (choose "Save as PDF"), and **EPUB**
+  downloads an e-book file. Both are marked DRAFT unless the exact approved text is unchanged.
+  The EPUB is built with Node's built-in compression; no extra dependencies.
+
 ## Email campaigns
 
 **Content Studio, Email campaigns** (`/content/email`). Emails go out through GoHighLevel, only

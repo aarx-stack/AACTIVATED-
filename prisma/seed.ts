@@ -25,6 +25,7 @@ import { requiredRoleFor } from "../src/server/approvals/policy";
 import { hashPayload } from "../src/server/approvals/payload";
 import { MOCK_CONTACTS } from "../src/server/integrations/mock";
 import { assistantProfile } from "../src/server/agents/assistant-profile";
+import { contentHash } from "../src/server/publishing/hash";
 import { coachPlanSkill, knowledgeSummarySkill } from "../src/server/agents/skills";
 
 const db = new PrismaClient({
@@ -1656,6 +1657,119 @@ async function main() {
         repId: users.jordan.id,
         createdAt: ago(2 * HOUR),
       },
+    });
+  }
+
+  // Publishing: an e-book in progress and an approved article.
+  {
+    const ebookChapters = [
+      ["Why routines matter", "Why a steady weekly routine matters more than any single day."],
+      ["The basics", "The core ideas in plain language, with the terms members will meet."],
+      ["Building the habit", "A simple weekly routine to start with, and how to keep it."],
+      ["Tracking progress", "What to notice, how to keep notes and when to adjust."],
+      ["Common questions", "Short answers to the questions members ask most."],
+      ["Next steps", "Where to learn more and how to talk with a professional."],
+    ] as const;
+    const written = (title: string, summary: string) =>
+      [
+        summary,
+        `In this chapter we look at ${title.toLowerCase()} for new members. The goal is simple: understand the idea, try one small step this week, and notice what changes.`,
+        "Start small. Pick one part of your routine and keep it the same for seven days. Write down what you did and how it felt. Small, steady changes are easier to keep than big ones.",
+        "If you have questions about what is right for you, talk with a qualified professional. This guide is education, not medical advice.",
+      ].join("\n\n");
+    await db.publication.create({
+      data: {
+        title: "Building Your Recovery Routine",
+        subtitle: "A practical guide for new members",
+        kind: "EBOOK",
+        audience: "new members",
+        description:
+          "A short member e-book on building a steady weekly recovery routine with the Recovery Stack, written in plain language.",
+        authorId: users.devon.id,
+        createdAt: ago(5 * DAY),
+        sections: {
+          create: ebookChapters.map(([title, summary], i) => ({
+            position: i + 1,
+            title,
+            summary,
+            body: i < 2 ? written(title, summary) : "",
+            writtenBy: i < 2 ? "Book & E-book Author (Chapter)" : null,
+          })),
+        },
+      },
+    });
+
+    const articleSections = [
+      {
+        title: "Start with sleep",
+        body: "Consistent sleep is the base of every routine. Pick a bedtime you can keep on weekdays and weekends, and protect the hour before it.\n\nSmall, steady changes are easier to keep than big ones.",
+      },
+      {
+        title: "Move a little every day",
+        body: "A short walk after meals or ten minutes of stretching counts. The habit matters more than the intensity.\n\nWrite down what you did so you can see the streak grow.",
+      },
+      {
+        title: "Plan the week ahead",
+        body: "Every Sunday, look at the week and choose two times for your routine. Put them in your calendar like any other appointment.\n\nThis guide is education, not medical advice. Talk with a qualified professional about what is right for you.",
+      },
+    ];
+    const article = await db.publication.create({
+      data: {
+        title: "Three habits for a steadier week",
+        kind: "ARTICLE",
+        audience: "members and blog readers",
+        description: "A short blog article on simple weekly habits that support recovery.",
+        status: "APPROVED",
+        authorId: users.devon.id,
+        approvedAt: ago(20 * HOUR),
+        createdAt: ago(3 * DAY),
+        sections: {
+          create: articleSections.map((x, i) => ({
+            position: i + 1,
+            title: x.title,
+            summary: "",
+            body: x.body,
+            writtenBy: "Staff Writer (Inkwell)",
+          })),
+        },
+      },
+    });
+    const hash = contentHash({ title: article.title, subtitle: null, sections: articleSections });
+    const words = articleSections.reduce((n, x) => n + x.body.split(/\s+/).length, 0);
+    const payload = {
+      kind: "publication",
+      publicationId: article.id,
+      title: article.title,
+      format: "ARTICLE",
+      parts: articleSections.length,
+      words,
+      contentHash: hash,
+    };
+    const approval = await db.approvalRequest.create({
+      data: {
+        type: "PUBLICATION",
+        title: `Publish: ${article.title}`,
+        summary: `Article for members and blog readers: 3 sections, about ${words} words.`,
+        payload,
+        payloadHash: hashPayload(payload),
+        reasoning:
+          "Devon Brooks sent this article for approval to publish outside the company. Approval covers exactly this version.",
+        sources: [
+          { title: `Manuscript: ${article.title}`, url: `/content/publishing/${article.id}` },
+        ] as Prisma.InputJsonValue,
+        risk: "LOW",
+        requiredRole: requiredRoleFor("PUBLICATION", "LOW"),
+        status: "APPROVED",
+        requestedByUserId: users.devon.id,
+        decidedById: users.guy.id,
+        decidedAt: ago(20 * HOUR),
+        decisionNote: "Good to publish on the blog.",
+        createdAt: ago(26 * HOUR),
+      },
+    });
+    await db.publication.update({
+      where: { id: article.id },
+      data: { approvalRequestId: approval.id, approvedHash: hash },
     });
   }
 

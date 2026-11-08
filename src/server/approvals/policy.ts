@@ -21,6 +21,7 @@ export const RESTRICTED_APPROVAL_TYPES: readonly ApprovalType[] = [
   ApprovalType.OUTSIDE_WORK,
   ApprovalType.PROJECT_LAUNCH,
   ApprovalType.BUDGET_CHANGE,
+  ApprovalType.PUBLICATION,
 ];
 
 const HIGH_RISK: readonly RiskLevel[] = [RiskLevel.HIGH, RiskLevel.CRITICAL];

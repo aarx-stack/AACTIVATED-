@@ -674,6 +674,104 @@ export const emailDraftSkill = defineSkill<EmailDraftInput, EmailDraftOutput>({
   },
 });
 
+// ------------------------------------------------------------- publishing --
+
+export interface OutlineInput {
+  title: string;
+  kind: string;
+  audience: string;
+  description: string;
+  sectionCount: number;
+}
+
+export const outlineOutput = z.object({
+  sections: z
+    .array(z.object({ title: z.string().min(3).max(120), summary: z.string().min(10).max(400) }))
+    .min(1)
+    .max(30),
+});
+export type OutlineOutput = z.infer<typeof outlineOutput>;
+
+/** Plans an article's sections or a book's chapters. People edit the outline before writing. */
+export const publishingOutlineSkill = defineSkill<OutlineInput, OutlineOutput>({
+  name: "publishing.outline",
+  tier: "agent",
+  requiresTool: "content.draft",
+  output: outlineOutput,
+  prompt: (i) =>
+    [
+      `Outline a ${i.kind.toLowerCase()} titled "${i.title}" for ${i.audience}.`,
+      `What it is about:\n"""${i.description}"""`,
+      `Return exactly ${i.sectionCount} ${i.kind === "ARTICLE" ? "sections" : "chapters"}, each with a working title and a one- or two-sentence summary of what it covers.`,
+      "Educational and factual. No medical or health claims; branded stack names only.",
+    ].join("\n\n"),
+  mock: (i) => {
+    const topic = firstSentence(i.description, 80).replace(/[.!?]$/, "");
+    const plan: [string, string][] = [
+      ["Why this matters", `Why ${topic.toLowerCase()} matters to ${i.audience}.`],
+      ["The basics", "The core ideas in plain language, with the terms the reader will meet."],
+      ["Building the habit", "A simple weekly routine the reader can start with."],
+      ["Tracking progress", "What to notice, how to keep notes and when to adjust."],
+      ["Common questions", "Short answers to the questions people ask most."],
+      ["Next steps", "Where to learn more and how to talk with a professional."],
+    ];
+    const n = Math.min(Math.max(i.sectionCount, 1), 30);
+    return {
+      sections: Array.from({ length: n }, (_, k) => {
+        const [title, summary] = plan[k % plan.length]!;
+        return {
+          title: k < plan.length ? title : `${title} (part ${Math.floor(k / plan.length) + 1})`,
+          summary,
+        };
+      }),
+    };
+  },
+});
+
+export interface ChapterInput {
+  publicationTitle: string;
+  kind: string;
+  audience: string;
+  sectionTitle: string;
+  sectionSummary: string;
+  otherTitles: string[];
+  note?: string;
+}
+
+export const chapterOutput = z.object({ body: z.string().min(50).max(20000) });
+export type ChapterOutput = z.infer<typeof chapterOutput>;
+
+/** Writes one chapter or section from its outline entry. Internal draft until approved. */
+export const publishingChapterSkill = defineSkill<ChapterInput, ChapterOutput>({
+  name: "publishing.chapter",
+  tier: "agent",
+  requiresTool: "content.draft",
+  output: chapterOutput,
+  prompt: (i) =>
+    [
+      `You are writing "${i.sectionTitle}", part of the ${i.kind.toLowerCase()} "${i.publicationTitle}" for ${i.audience}.`,
+      `This part should cover: ${i.sectionSummary}`,
+      i.otherTitles.length
+        ? `The other parts are: ${i.otherTitles.join("; ")}. Do not repeat them.`
+        : "",
+      i.note ? `Editor's note: ${i.note}` : "",
+      `Write the full text${i.kind === "ARTICLE" ? " (300 to 600 words)" : " (800 to 1,500 words)"} in plain text with short paragraphs separated by blank lines. Warm, clear and educational. No medical or health claims; branded stack names only.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  mock: (i) => ({
+    body: [
+      `${i.sectionSummary}`,
+      `In this ${i.kind === "ARTICLE" ? "section" : "chapter"} we look at ${i.sectionTitle.toLowerCase()} for ${i.audience}. The goal is simple: understand the idea, try one small step this week, and notice what changes.`,
+      "Start small. Pick one part of your routine and keep it the same for seven days. Write down what you did and how it felt. Small, steady changes are easier to keep than big ones.",
+      "If you have questions about what is right for you, talk with a qualified professional. This guide is education, not medical advice.",
+      i.note ? `Editor's note applied: ${i.note}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  }),
+});
+
 export const SKILLS = [
   brainPlanSkill,
   opsDelegateSkill,
@@ -685,4 +783,6 @@ export const SKILLS = [
   promptChatSkill,
   taskWorkSkill,
   emailDraftSkill,
+  publishingOutlineSkill,
+  publishingChapterSkill,
 ] as const;

@@ -133,6 +133,8 @@ enum ApprovalType {
   PROJECT_LAUNCH
   /// A change to a budget's limit, requested by staff and decided by an executive.
   BUDGET_CHANGE
+  /// Publishing an article, book or e-book outside the company. Executive decision.
+  PUBLICATION
 }
 
 enum ApprovalStatus {
@@ -320,6 +322,7 @@ model User {
   payouts            Payout[]
   scheduledContent   ContentItem[]           @relation("ContentScheduler")
   emailCampaigns     EmailCampaign[]         @relation("CampaignAuthor")
+  publications       Publication[]           @relation("PublicationAuthor")
 
   @@index([role])
 }
@@ -1048,4 +1051,62 @@ model EmailSuppression {
   emailHash  String   @unique
   campaignId String?
   createdAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Publishing: articles, books and e-books
+// ---------------------------------------------------------------------------
+
+enum PublicationKind {
+  ARTICLE
+  EBOOK
+  BOOK
+}
+
+enum PublicationStatus {
+  DRAFTING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Publication {
+  id                String            @id @default(cuid())
+  title             String
+  subtitle          String?
+  kind              PublicationKind
+  /// Who it is for (e.g. "new members", "clinic staff").
+  audience          String
+  description       String
+  status            PublicationStatus @default(DRAFTING)
+  authorId          String
+  author            User              @relation("PublicationAuthor", fields: [authorId], references: [id])
+  approvalRequestId String?           @unique
+  /// Hash of the exact text that was approved. Edits after approval show as "changed".
+  approvedHash      String?
+  approvedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  sections PublicationSection[]
+
+  @@index([status, updatedAt])
+}
+
+/// A chapter (book, e-book) or section (article), in order.
+model PublicationSection {
+  id            String      @id @default(cuid())
+  publicationId String
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  position      Int
+  title         String
+  /// What this chapter should cover (from the outline). Guides AI drafting.
+  summary       String      @default("")
+  body          String      @default("")
+  /// Who wrote the current text: a person, or which agent.
+  writtenBy     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([publicationId, position])
 }
