@@ -1391,6 +1391,42 @@ async function main() {
     });
   }
 
+  // A limit change a staff member asked for, waiting for Guy in the Approval Queue.
+  {
+    const payload = { budgetId: budgets.ads.id, fromLimitUsd: 5000, toLimitUsd: 6500 };
+    const request = await db.approvalRequest.create({
+      data: {
+        type: "BUDGET_CHANGE",
+        title: "Budget: Advertising limit $5,000.00 to $6,500.00",
+        summary:
+          "Raise the Advertising limit from $5,000.00 to $6,500.00. Spending so far is shown on the Budgets page.",
+        payload,
+        payloadHash: hashPayload(payload),
+        reasoning:
+          "Devon Brooks asked for this change: two extra member-education campaigns launch in the second half of November and need paid reach on Facebook and Instagram.",
+        sources: [
+          { title: "Advertising (Marketing)", note: "Requested from the Budgets page." },
+        ] as Prisma.InputJsonValue,
+        risk: "LOW",
+        requiredRole: requiredRoleFor("BUDGET_CHANGE", "LOW"),
+        requestedByUserId: users.devon.id,
+        budgetId: budgets.ads.id,
+        createdAt: ago(5 * HOUR),
+      },
+    });
+    await db.auditLog.create({
+      data: {
+        actorType: "USER",
+        actorUserId: users.devon.id,
+        action: "approval.requested",
+        entityType: "ApprovalRequest",
+        entityId: request.id,
+        after: { type: "BUDGET_CHANGE", risk: "LOW", requiredRole: "EXECUTIVE" },
+        createdAt: ago(5 * HOUR),
+      },
+    });
+  }
+
   // Knowledge documents (demo content; summaries come from the same skill the app uses)
   const docs: {
     title: string;

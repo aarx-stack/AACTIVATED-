@@ -93,6 +93,11 @@ export const PERMISSIONS = {
   },
   "finance.view": { label: "Finance & Budget", group: "Finance", roles: [EXECUTIVE] },
   "budget.manage": { label: "Create and change budgets", group: "Finance", roles: [EXECUTIVE] },
+  "budget.request_change": {
+    label: "See budgets and request limit changes",
+    group: "Finance",
+    roles: [EXECUTIVE, STAFF],
+  },
   "knowledge.view": { label: "Knowledge Library", group: "Knowledge", roles: ALL_ROLES },
   "knowledge.manage": {
     label: "Add documents and refresh AI summaries",

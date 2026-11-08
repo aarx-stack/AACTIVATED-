@@ -25,6 +25,7 @@ const PAGES: { path: string; heading: string; roles: Who[] }[] = [
   { path: "/back-office", heading: "Back Office — Earnings", roles: [P, F] },
   { path: "/finance", heading: "Finance & Budget", roles: [E] },
   { path: "/finance/transactions", heading: "Transactions", roles: [E] },
+  { path: "/budgets", heading: "Budgets", roles: [E, S] },
   { path: "/knowledge", heading: "Knowledge Library", roles: ALL },
   { path: "/knowledge/new", heading: "Add document", roles: [E, S] },
   { path: "/prompts", heading: "Prompt Generator", roles: [E, S] },

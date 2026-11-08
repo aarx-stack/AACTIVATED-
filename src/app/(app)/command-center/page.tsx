@@ -251,7 +251,17 @@ export default async function CommandCenterPage() {
                   {formatPercent(spendRatio)}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">Approval required at 75%</p>
+              <p className="text-xs text-muted-foreground">
+                Approval required at 75%
+                {can(user.role, "budget.request_change") && (
+                  <>
+                    {" · "}
+                    <Link href="/budgets" className="font-semibold text-primary hover:underline">
+                      Budgets
+                    </Link>
+                  </>
+                )}
+              </p>
             </KpiCard>
           </section>
 

@@ -7,7 +7,9 @@
  *                           "continue spending" approval when the budget locks
  *   recordApprovedPurchase() records an approved purchase exactly once
  *   recordManualSpend()     an executive records spend that the rule allows
- *   setBudgetLimit()        an executive changes a limit (audited)
+ *   setBudgetLimit()        an executive changes a limit directly (audited; other executives
+ *                           are notified). Staff request changes through the Approval Queue
+ *                           (change-requests.ts).
  *
  * Every model call goes through gateSpend/recordSpend (see lib/ai), so agents pause when an AI
  * budget locks and resume once an executive approves more.
@@ -428,6 +430,22 @@ export async function setBudgetLimit(
       after: { limitUsd: data.limitUsd },
       metadata: { note: data.note },
     });
+    // Other executives hear about a direct change (staff changes go through the Approval Queue).
+    const others = await tx.user.findMany({
+      where: { role: Role.EXECUTIVE, status: "ACTIVE", id: { not: actor.id } },
+      select: { id: true },
+    });
+    if (others.length) {
+      await tx.notification.createMany({
+        data: others.map((u) => ({
+          userId: u.id,
+          kind: NotificationKind.BUDGET_ALERT,
+          title: `Budget limit changed: ${before.name}`,
+          body: `${formatUsd(num(before.limitUsd))} to ${formatUsd(data.limitUsd)}. ${data.note}`,
+          href: "/finance",
+        })),
+      });
+    }
     return refreshBudget(tx, before.id);
   });
 }

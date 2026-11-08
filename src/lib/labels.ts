@@ -41,6 +41,7 @@ export const APPROVAL_TYPE: Record<ApprovalType, string> = {
   LEGAL: "Legal",
   OUTSIDE_WORK: "Outside work",
   PROJECT_LAUNCH: "Project launch",
+  BUDGET_CHANGE: "Budget change",
 };
 
 export const CHANNEL: Record<ContentChannel, string> = {

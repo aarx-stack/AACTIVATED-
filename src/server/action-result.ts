@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AgentUnavailableError, SkillOutputError } from "@/server/agents/runner";
 import { ApprovalConflictError, DispatchBlockedError } from "@/server/approvals/service";
 import { ForbiddenError, UnauthenticatedError } from "@/server/authz/permissions";
-import { BudgetApprovalRequiredError } from "@/server/budgets/errors";
+import { BudgetApprovalRequiredError, BudgetChangePendingError } from "@/server/budgets/errors";
 import { IntegrationUnavailableError } from "@/server/integrations/types";
 
 export type ActionState =
@@ -24,7 +24,7 @@ export function actionError(error: unknown): ActionState {
   ) {
     return { status: "error", message: error.message };
   }
-  if (error instanceof BudgetApprovalRequiredError) {
+  if (error instanceof BudgetApprovalRequiredError || error instanceof BudgetChangePendingError) {
     return error.approvalId
       ? {
           status: "error",

@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { APPROVAL_STATUS, APPROVAL_TYPE, CHANNEL, RISK } from "@/lib/labels";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { requirePagePermission } from "@/server/auth/session";
+import { can } from "@/server/authz/permissions";
 import { getApprovalDetail, listApprovals, type ApprovalTab } from "@/server/queries/approvals";
 
 export const metadata: Metadata = { title: "Approval & Compliance Queue" };
@@ -118,6 +119,11 @@ export default async function ApprovalsPage({
                 {complianceOnline ? "Online" : "Paused"}
               </span>
             </span>
+            {can(user.role, "budget.request_change") && (
+              <Button asChild variant="secondary">
+                <Link href="/budgets">Budgets</Link>
+              </Button>
+            )}
             <Button asChild variant="secondary">
               <Link href="/approvals/rules">
                 <ShieldCheck aria-hidden /> Compliance rules

@@ -275,6 +275,17 @@ export default async function FinancePage({
                       </Link>
                     )}
                   </div>
+                  {b.pendingLimitChange && (
+                    <p className="text-xs text-muted-foreground" data-testid="pending-limit-change">
+                      Limit change requested:{" "}
+                      <Link
+                        href={`/approvals/${b.pendingLimitChange.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {b.pendingLimitChange.title.replace(/^Budget:\s*/, "")}
+                      </Link>
+                    </p>
+                  )}
                   {b.pendingPurchases.length > 0 && (
                     <p className="text-xs text-muted-foreground">
                       Waiting for approval:{" "}

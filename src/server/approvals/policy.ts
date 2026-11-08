@@ -3,7 +3,7 @@
  *
  * Tiered model (approved for Phase 1, configurable later from Admin):
  *  - Restricted types (spend, payments, site changes, legal, outside work, launches)
- *    and anything HIGH/CRITICAL risk need an EXECUTIVE.
+ *    budget limit changes, and anything HIGH/CRITICAL risk need an EXECUTIVE.
  *  - Low/medium-risk content (posts, emails, DMs) can be decided by STAFF or EXECUTIVE.
  *  - Agents never decide. Nobody decides their own request.
  */
@@ -18,6 +18,7 @@ export const RESTRICTED_APPROVAL_TYPES: readonly ApprovalType[] = [
   ApprovalType.LEGAL,
   ApprovalType.OUTSIDE_WORK,
   ApprovalType.PROJECT_LAUNCH,
+  ApprovalType.BUDGET_CHANGE,
 ];
 
 const HIGH_RISK: readonly RiskLevel[] = [RiskLevel.HIGH, RiskLevel.CRITICAL];

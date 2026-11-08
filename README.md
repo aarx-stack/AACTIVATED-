@@ -132,6 +132,17 @@ period, company-wide or for one department. The rule lives in `src/server/budget
 The rule's arithmetic is a pure function (`rules.ts`) with unit tests; the database side is
 covered by integration tests in `tests/integration/budgets.test.ts`.
 
+### Budget limit changes
+
+Staff open **Budgets** (`/budgets`, linked from the Command Center's AI spend card and the Approval
+Queue). It shows each current budget's limit and how much is used, with no transactions or revenue,
+and no budgets of confidential departments. Staff can **request a limit change** with a reason; it
+becomes an executive request in the Approval Queue (one open request per budget). When Guy
+approves, the new limit applies at once and the budget's status is recomputed, so raising a paused
+budget's limit can let spending continue. If the limit changed after the request was made, the
+approval is refused and nothing changes. The requester is notified either way. Executives still
+change limits directly in Finance & Budget with a note; any other executives are notified.
+
 ## Knowledge Library and Prompt Generator (Phase 4)
 
 - **Knowledge Library** (`/knowledge`): search, categories, access tags (Executive Only,
@@ -156,6 +167,7 @@ covered by integration tests in `tests/integration/budgets.test.ts`.
 | Every change is audited                          | `recordAudit()` runs inside the same transaction as the change                                                                                               |
 | Every model call is costed                       | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                         |
 | Budgets lock at 75% until approved               | `src/server/budgets/`: `gateSpend()` before every model call and purchase; alerts executives and opens an approval request                                   |
+| Budget limits change through the Approval Queue  | `src/server/budgets/change-requests.ts`: staff request on `/budgets`, an executive approves; applied only if the limit has not changed since the request     |
 | Confidential documents stay on the server        | `src/server/knowledge/service.ts` filters by access level in the database query                                                                              |
 | Tokenization not launchable without an executive | `src/server/roadmap/policy.ts`: every step gated, decided with a written note; applied only by an approval or an executive decision                          |
 | Live integrations off by default                 | `src/server/integrations/index.ts`: feature flag + credentials + Admin off switch, checked on every call                                                     |

@@ -129,6 +129,8 @@ enum ApprovalType {
   LEGAL
   OUTSIDE_WORK
   PROJECT_LAUNCH
+  /// A change to a budget's limit, requested by staff and decided by an executive.
+  BUDGET_CHANGE
 }
 
 enum ApprovalStatus {

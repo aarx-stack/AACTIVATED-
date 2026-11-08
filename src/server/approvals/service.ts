@@ -276,6 +276,11 @@ export async function decideApproval(
       await applyProjectDecision(tx, request, decision, actor.id, note ?? null);
     }
 
+    if (request.type === "BUDGET_CHANGE") {
+      const { applyBudgetChange } = await import("@/server/budgets/change-requests");
+      await applyBudgetChange(tx, request, decision, actor.id, note ?? null);
+    }
+
     // Approved spend changes what the budget allows: recompute it (may lift a pause).
     if (request.budgetId && decision === "APPROVE") {
       const { refreshBudget } = await import("@/server/budgets/service");

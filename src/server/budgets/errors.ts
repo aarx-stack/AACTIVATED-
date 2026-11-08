@@ -9,3 +9,14 @@ export class BudgetApprovalRequiredError extends Error {
     super(message);
   }
 }
+
+/** A limit change for this budget is already waiting for an executive. */
+export class BudgetChangePendingError extends Error {
+  readonly status = 409;
+  constructor(
+    message: string,
+    readonly approvalId: string,
+  ) {
+    super(message);
+  }
+}

@@ -18,6 +18,7 @@ import {
 } from "@/lib/labels";
 import { formatRelativeTime, formatUsd } from "@/lib/utils";
 import { isSocialPostPayload, readSources } from "@/server/approvals/payload";
+import { readBudgetChange } from "@/server/budgets/change-requests";
 import { canDecideApproval } from "@/server/approvals/policy";
 import { can } from "@/server/authz/permissions";
 import { isContinuePayload } from "@/server/budgets/service";
@@ -127,6 +128,22 @@ export function ApprovalPanel({
         ) : (
           <>
             <MessagePreview payload={request.payload} />
+            {request.type === "BUDGET_CHANGE" && readBudgetChange(request.payload) && (
+              <div className="tile p-4" data-testid="budget-change">
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Budget limit change{request.budget ? ` · ${request.budget.name}` : ""}
+                </p>
+                <p className="text-lg font-semibold tabular-nums">
+                  {formatUsd(readBudgetChange(request.payload)!.fromLimitUsd)}
+                  <span className="mx-2 text-sm font-normal text-muted-foreground">to</span>
+                  {formatUsd(readBudgetChange(request.payload)!.toLimitUsd)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Approving sets the new limit straight away, if the limit has not changed since the
+                  request.
+                </p>
+              </div>
+            )}
             {request.amountUsd && (
               <p className="text-sm">
                 Amount{" "}
@@ -191,7 +208,9 @@ export function ApprovalPanel({
 
         {/* Reasoning + sources: always above the decision */}
         <section className="tile p-4" data-testid="agent-reasoning" aria-label="Agent reasoning">
-          <h3 className="text-sm font-semibold">Agent Reasoning</h3>
+          <h3 className="text-sm font-semibold">
+            {request.requestedByAgentId ? "Agent Reasoning" : "Reasoning"}
+          </h3>
           <ul className="mt-2 flex list-none flex-col gap-1.5 text-sm">
             {bullets(request.reasoning).map((b, i) => (
               <li key={i} className="flex gap-2">
@@ -305,6 +324,17 @@ export function ApprovalPanel({
                     </div>
                   )
                 ))}
+              {request.status === "APPROVED" && request.type === "BUDGET_CHANGE" && (
+                <p className="mt-2 text-success">
+                  The new limit is in effect.{" "}
+                  <Link
+                    href="/budgets"
+                    className="font-semibold underline-offset-4 hover:underline"
+                  >
+                    Open Budgets
+                  </Link>
+                </p>
+              )}
               {request.dispatchedAt && (
                 <p className="mt-1 text-muted-foreground">
                   {request.type === "SPEND" ? "Recorded" : "Sent"}{" "}

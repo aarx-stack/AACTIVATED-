@@ -132,6 +132,16 @@ export async function getFinance(range: FinanceRange, now = new Date()) {
     .filter((r) => r.usd > 0)
     .sort((a, b) => b.usd - a.usd);
 
+  // Limit changes staff asked for, waiting for an executive.
+  const limitChanges = await db.approvalRequest.findMany({
+    where: {
+      type: ApprovalType.BUDGET_CHANGE,
+      status: ApprovalStatus.PENDING,
+      budgetId: { in: budgets.map((b) => b.id) },
+    },
+    select: { id: true, budgetId: true, title: true },
+  });
+
   // Budgets with their live state under the 75% rule.
   const budgetRows = await Promise.all(
     budgets.map(async (b) => {
@@ -161,6 +171,7 @@ export async function getFinance(range: FinanceRange, now = new Date()) {
         pendingContinueId: pendingContinue?.id ?? null,
         pendingPurchases: pendingPurchases.map((a) => ({ id: a.id, title: a.title })),
         toRecord: toRecord.map((a) => ({ id: a.id, title: a.title, amountUsd: num(a.amountUsd) })),
+        pendingLimitChange: limitChanges.find((c) => c.budgetId === b.id) ?? null,
       };
     }),
   );

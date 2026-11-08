@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Rocket,
   Scale,
+  SlidersHorizontal,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ const ICONS: Record<ApprovalType, LucideIcon> = {
   LEGAL: Scale,
   OUTSIDE_WORK: Briefcase,
   PROJECT_LAUNCH: Rocket,
+  BUDGET_CHANGE: SlidersHorizontal,
 };
 
 /** Glowing square icon used on approval cards, like the concept's type tiles. */
