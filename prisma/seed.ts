@@ -24,6 +24,7 @@ import type {
 import { requiredRoleFor } from "../src/server/approvals/policy";
 import { hashPayload } from "../src/server/approvals/payload";
 import { MOCK_CONTACTS } from "../src/server/integrations/mock";
+import { assistantProfile } from "../src/server/agents/assistant-profile";
 import { coachPlanSkill, knowledgeSummarySkill } from "../src/server/agents/skills";
 
 const db = new PrismaClient({
@@ -140,10 +141,18 @@ const DEPARTMENTS = [
   },
   {
     slug: "sales",
-    name: "Sales & Affiliate Success",
+    name: "Sales",
+    owner: "guy",
+    confidential: false,
+    description:
+      "Clinic partnerships and member sales. Consented inbound leads only: no scraping, purchased lists, cold DMs, follows or comments.",
+  },
+  {
+    slug: "affiliate",
+    name: "Affiliate Success",
     owner: "nate",
     confidential: false,
-    description: "Onboards and supports reps and affiliates. Consented inbound leads only.",
+    description: "Onboards and supports reps and affiliates.",
   },
   {
     slug: "marketing",
@@ -151,6 +160,14 @@ const DEPARTMENTS = [
     owner: "devon",
     confidential: false,
     description: "Campaigns, brand messaging and compliant educational content.",
+  },
+  {
+    slug: "publishing",
+    name: "Publishing",
+    owner: "devon",
+    confidential: false,
+    description:
+      "Articles, books and e-books: editorial calendar, writing and editing. Nothing is published outside the company without approval.",
   },
   {
     slug: "social",
@@ -235,7 +252,7 @@ const COMPANY_AGENTS: {
     slug: "affiliate-success",
     name: "Beacon",
     title: "Affiliate Success Manager",
-    dept: "sales",
+    dept: "affiliate",
     owner: "nate",
     status: "ACTIVE",
     focus: "Preparing onboarding checklists for three new Premium reps.",
@@ -340,6 +357,78 @@ const COMPANY_AGENTS: {
     status: "IDLE",
     focus: "Quarterly contractor review prepared.",
     tools: ["report.write"],
+  },
+  // Sales: clinics and members. Consented inbound leads only.
+  {
+    slug: "clinic-partnerships",
+    name: "Mercer",
+    title: "Clinic Partnerships Manager",
+    dept: "sales",
+    owner: "guy",
+    status: "ACTIVE",
+    focus: "Preparing replies for four clinics that asked about partner accounts.",
+    tools: ["ghl.contacts.read", "report.write", "approval.request"],
+  },
+  {
+    slug: "sales-development",
+    name: "Pace",
+    title: "Sales Development Representative",
+    dept: "sales",
+    owner: "guy",
+    status: "ACTIVE",
+    focus: "Qualifying this week's inbound demo requests (opted-in contacts only).",
+    tools: ["ghl.contacts.read", "approval.request"],
+  },
+  {
+    slug: "sales-ops",
+    name: "Tally",
+    title: "Sales Operations Analyst",
+    dept: "sales",
+    owner: "guy",
+    status: "IDLE",
+    focus: "Weekly pipeline report ready for Monday.",
+    tools: ["report.write"],
+  },
+  // Publishing: articles, books and e-books.
+  {
+    slug: "managing-editor",
+    name: "Folio",
+    title: "Managing Editor",
+    dept: "publishing",
+    owner: "devon",
+    status: "ACTIVE",
+    focus: "Planning the Q1 editorial calendar: eight articles and one member e-book.",
+    tools: ["content.plan", "report.write"],
+  },
+  {
+    slug: "staff-writer",
+    name: "Inkwell",
+    title: "Staff Writer",
+    dept: "publishing",
+    owner: "devon",
+    status: "ACTIVE",
+    focus: "Drafting the recovery-routines article series.",
+    tools: ["content.draft", "compliance.check"],
+  },
+  {
+    slug: "book-author",
+    name: "Chapter",
+    title: "Book & E-book Author",
+    dept: "publishing",
+    owner: "devon",
+    status: "ACTIVE",
+    focus: "Outlining the member e-book Building Your Recovery Routine.",
+    tools: ["content.draft", "knowledge.summarize"],
+  },
+  {
+    slug: "copy-editor",
+    name: "Redline",
+    title: "Copy Editor",
+    dept: "publishing",
+    owner: "devon",
+    status: "IDLE",
+    focus: "Style and compliance pass on two finished articles.",
+    tools: ["compliance.check", "content.draft"],
   },
 ];
 
@@ -523,7 +612,7 @@ async function main() {
     ["maya", "operations"],
     ["devon", "marketing"],
     ["rosa", "social"],
-    ["nate", "sales"],
+    ["nate", "affiliate"],
     ["alicia", "support"],
     ["isaac", "technology"],
   ] as const) {
@@ -585,6 +674,25 @@ async function main() {
         ),
       },
       select: { id: true, departmentId: true },
+    });
+  }
+
+  // A personal assistant for every executive, staff member and system admin.
+  for (const u of USERS.filter((x) => ["EXECUTIVE", "STAFF", "SYSTEM_ADMIN"].includes(x.role))) {
+    const profile = assistantProfile({ name: u.name, role: u.role, title: u.title });
+    await db.agent.create({
+      data: {
+        slug: `assistant-${users[u.key].id}`,
+        name: profile.name,
+        title: profile.title,
+        kind: "PERSONAL",
+        status: "ACTIVE",
+        ownerId: users[u.key].id,
+        monthlyBudgetUsd: usd(profile.monthlyBudgetUsd),
+        currentFocus: "Ready for your next request.",
+        config: profile.config,
+        lastActiveAt: ago(between(1, 30) * HOUR),
+      },
     });
   }
 
@@ -1087,7 +1195,7 @@ async function main() {
     { description: "Membership renewals", dept: "sales" },
     { description: "Education program sales", dept: "sales" },
     { description: "Event tickets", dept: "marketing" },
-    { description: "Affiliate program fees", dept: "sales" },
+    { description: "Affiliate program fees", dept: "affiliate" },
   ] as const;
   const expenseLines = [
     { description: "Contractor invoice", category: "Contractors", dept: "development" },
@@ -1927,6 +2035,65 @@ The plan shown in the app is a placeholder until the final plan is approved.
           body: "Write one {{channel}} post about {{topic}} in our brand voice: calm, factual, encouraging. Add up to {{hashtag_count}} hashtags. Branded stack names only.",
           note: "Initial template",
           daysAgo: 10,
+        },
+      ],
+    },
+    {
+      key: "publishing.article",
+      name: "Article draft",
+      description: "A full education article for the blog or member library.",
+      dept: "publishing",
+      author: "devon",
+      versions: [
+        {
+          body: [
+            "Write a {{word_count}}-word article titled {{title}} for {{audience}}.",
+            "- Open with why the topic matters to the reader.",
+            "- Use short sections with clear headings and one practical takeaway each.",
+            "- Educational and factual. No medical or health claims; branded stack names only.",
+            "- End with {{call_to_action}}.",
+          ].join("\n"),
+          note: "Initial template",
+          daysAgo: 4,
+        },
+      ],
+    },
+    {
+      key: "publishing.ebook_outline",
+      name: "E-book outline",
+      description: "Chapter-by-chapter outline for a book or e-book.",
+      dept: "publishing",
+      author: "devon",
+      versions: [
+        {
+          body: [
+            "Outline an e-book titled {{title}} for {{audience}} in {{chapter_count}} chapters.",
+            "- For each chapter: a working title, the reader's goal and 3 to 5 key points.",
+            "- Add a short introduction and a closing chapter with next steps.",
+            "- Note where a chart, checklist or worksheet would help.",
+          ].join("\n"),
+          note: "Initial template",
+          daysAgo: 3,
+        },
+      ],
+    },
+    {
+      key: "publishing.book_chapter",
+      name: "Book chapter draft",
+      description: "One full chapter for a book or e-book, from its outline.",
+      dept: "publishing",
+      author: "devon",
+      versions: [
+        {
+          body: [
+            "Write chapter {{chapter_number}} of {{book_title}}: {{chapter_title}}.",
+            "Outline for this chapter: {{chapter_outline}}",
+            "- About {{word_count}} words in a warm, clear, educational voice.",
+            "- No medical or health claims; branded stack names only.",
+            "- End with a short summary and a bridge to the next chapter.",
+          ].join("\n"),
+          note: "Initial template",
+          daysAgo: 2,
         },
       ],
     },

@@ -284,6 +284,25 @@ again** button. The draft never leaves the company: anything meant for outside s
 the Approval Queue. Model spend goes through the budget gate like every other call. With
 `AGENT_EXECUTION=queue` the work runs in the background worker instead of during the request.
 
+## Departments and personal assistants
+
+The company has 13 departments, each with its own AI agents (20 company agents plus the Brain):
+Operations, **Sales**, Affiliate Success, Marketing, **Publishing**, Social Media, Media, Finance,
+Legal & Compliance, Support, Technology, Development and Human Resources.
+
+- **Sales**: Clinic Partnerships Manager, Sales Development Representative and Sales Operations
+  Analyst. Consented inbound leads only: no scraping, purchased lists, cold DMs, follows or
+  comments.
+- **Publishing**: Managing Editor, Staff Writer, Book & E-book Author and Copy Editor, with prompt
+  templates for an article draft, an e-book outline and a book chapter. Drafts can be article or
+  chapter length. Publishing anything outside the company still needs approval.
+
+**Personal assistants.** Every executive, staff member and system admin has one ("My assistant" on
+the Command Center). It is created when someone is invited or moved into a company role, and
+paused (history kept) when they leave one or are suspended. Only its owner gives it work and
+accepts its drafts; executives can look at staff assistants, never at another executive's. Its
+work stays out of the shared activity feed, and its model spend goes through the budget gate.
+
 ## Email campaigns
 
 **Content Studio, Email campaigns** (`/content/email`). Emails go out through GoHighLevel, only

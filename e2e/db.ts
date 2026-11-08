@@ -104,3 +104,14 @@ export function unsubscribeLinkFor(contactId: string, email: string, campaignId:
 export async function clearSuppressions() {
   await withDb((c) => c.query(`DELETE FROM "EmailSuppression"`));
 }
+
+/** The id of someone's personal assistant. */
+export async function assistantIdOf(email: string) {
+  return withDb(async (c) => {
+    const r = await c.query(
+      `SELECT a.id FROM "Agent" a JOIN "User" u ON u.id = a."ownerId" WHERE a.kind = 'PERSONAL' AND u.email = $1`,
+      [email],
+    );
+    return r.rows[0]?.id as string;
+  });
+}

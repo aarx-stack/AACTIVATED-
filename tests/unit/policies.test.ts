@@ -116,3 +116,33 @@ describe("status changes", () => {
     expect(canChangeUserStatus(staff, rep).ok).toBe(false);
   });
 });
+
+describe("personal assistants", () => {
+  const staffAssistant = {
+    kind: "PERSONAL",
+    department: null,
+    ownerId: "maya",
+    ownerRole: Role.STAFF,
+  };
+  const execAssistant = { ...staffAssistant, ownerId: "guy", ownerRole: Role.EXECUTIVE };
+
+  it("open for their owner, including a system admin", () => {
+    expect(canOpenAgentWorkspace(Role.STAFF, staffAssistant, "maya")).toBe(true);
+    expect(
+      canOpenAgentWorkspace(
+        Role.SYSTEM_ADMIN,
+        { ...staffAssistant, ownerId: "isaac", ownerRole: Role.SYSTEM_ADMIN },
+        "isaac",
+      ),
+    ).toBe(true);
+  });
+
+  it("are closed to other staff and to reps; executives see staff assistants only", () => {
+    expect(canOpenAgentWorkspace(Role.STAFF, staffAssistant, "devon")).toBe(false);
+    expect(canOpenAgentWorkspace(Role.PREMIUM_REP, staffAssistant, "jordan")).toBe(false);
+    expect(canOpenAgentWorkspace(Role.STAFF, staffAssistant)).toBe(false);
+    expect(canOpenAgentWorkspace(Role.EXECUTIVE, staffAssistant, "guy")).toBe(true);
+    expect(canOpenAgentWorkspace(Role.EXECUTIVE, execAssistant, "other-exec")).toBe(false);
+    expect(canOpenAgentWorkspace(Role.EXECUTIVE, execAssistant, "guy")).toBe(true);
+  });
+});

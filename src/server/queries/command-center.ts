@@ -43,7 +43,7 @@ export async function getCommandCenterData(role: Role, now = new Date()) {
     }),
     db.agent.groupBy({
       by: ["status"],
-      where: { kind: { not: AgentKind.REP_POD } },
+      where: { kind: { notIn: [AgentKind.REP_POD, AgentKind.PERSONAL] } },
       _count: { _all: true },
     }),
     db.task.count({ where: { status: TaskStatus.DONE, completedAt: { gte: today } } }),
@@ -68,6 +68,8 @@ export async function getCommandCenterData(role: Role, now = new Date()) {
       select: { occurredAt: true, amountUsd: true },
     }),
     db.agentActivity.findMany({
+      // Personal assistants' work is private to their owners.
+      where: { agent: { kind: { not: AgentKind.PERSONAL } } },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {

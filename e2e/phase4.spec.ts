@@ -101,6 +101,8 @@ test.describe("Knowledge Library", () => {
 
     await page.goto("/knowledge?category=BRAND");
     await docs.getByRole("link", { name: /Visual identity basics/ }).click();
+    // Wait until the panel shows this document before asking for its summary.
+    await expect(panel.getByText("Visual identity basics").first()).toBeVisible();
     await panel.getByTestId("summarize").getByRole("button").click();
     await expect(panel.getByText("Summary updated.")).toBeVisible();
     await expect(panel.getByRole("heading", { name: "Summary", exact: true })).toBeVisible();

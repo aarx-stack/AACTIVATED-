@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PauseButton } from "@/components/agents/pause-button";
 import { PerformanceChart } from "@/components/agents/performance-chart";
+import { AskAssistant } from "@/components/agents/ask-assistant";
 import { TaskReview } from "@/components/agents/task-review";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { db } from "@/lib/db";
 import { CHANNEL, CONTENT_STATUS } from "@/lib/labels";
 import { AGENT_STATUS } from "@/lib/status";
 import { cn, formatPercent, formatRelativeTime, formatUsd, humanize } from "@/lib/utils";
-import { requirePagePermission } from "@/server/auth/session";
+import { requireUser } from "@/server/auth/session";
 import { can } from "@/server/authz/permissions";
 import { canOpenAgentWorkspace } from "@/server/authz/policies";
 import { readTaskOutput } from "@/server/agents/task-work";
@@ -283,15 +284,25 @@ function WeeklyPerformance({ ws }: { ws: AgentWorkspace }) {
 }
 
 export default async function AgentWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requirePagePermission("agent.view");
+  const user = await requireUser();
   const { id } = await params;
   const gate = await db.agent.findUnique({
     where: { id },
-    select: { kind: true, department: { select: { isConfidential: true } } },
+    select: {
+      kind: true,
+      ownerId: true,
+      owner: { select: { role: true } },
+      department: { select: { isConfidential: true } },
+    },
   });
   if (!gate) notFound();
-  // Confidential departments and reps' private agents: executive only. Enforced here, not just hidden.
-  if (!canOpenAgentWorkspace(user.role, gate)) redirect("/forbidden");
+  // Confidential departments, reps' private agents and personal assistants: enforced here,
+  // not just hidden.
+  if (!canOpenAgentWorkspace(user.role, { ...gate, ownerRole: gate.owner.role }, user.id)) {
+    redirect("/forbidden");
+  }
+  const isPersonal = gate.kind === "PERSONAL";
+  const isMyAssistant = isPersonal && gate.ownerId === user.id;
 
   const ws = await getAgentWorkspace(id);
   if (!ws) notFound();
@@ -399,8 +410,21 @@ export default async function AgentWorkspacePage({ params }: { params: Promise<{
         <TabsContent value="routine">
           <TextPanel title="Daily routine" text={agent.config.dailyRoutine} />
         </TabsContent>
-        <TabsContent value="tasks">
-          <TaskBoard tasks={ws.tasks} canAct={can(user.role, "prompts.use")} />
+        <TabsContent value="tasks" className="flex flex-col gap-4">
+          {isMyAssistant && (
+            <Card className="p-5">
+              <h2 className="text-lg font-semibold">Ask your assistant</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                It writes an internal draft for you to review. Only you see your assistant&apos;s
+                work. Nothing is sent outside the company.
+              </p>
+              <AskAssistant agentId={agent.id} />
+            </Card>
+          )}
+          <TaskBoard
+            tasks={ws.tasks}
+            canAct={isPersonal ? isMyAssistant : can(user.role, "prompts.use")}
+          />
         </TabsContent>
         <TabsContent value="handoff">
           <HandoffTimeline handoffs={ws.handoffs} />

@@ -13,7 +13,10 @@ export const metadata: Metadata = { title: "Agent Workspace" };
 
 export default async function AgentsPage() {
   const user = await requirePagePermission("agent.view");
-  const agents = await listCompanyAgents(user.role);
+  // Your own assistant first.
+  const agents = (await listCompanyAgents(user.role, user.id)).sort(
+    (a, b) => Number(b.isMine) - Number(a.isMine),
+  );
 
   return (
     <>
@@ -40,6 +43,11 @@ export default async function AgentsPage() {
                     <p className="font-medium">
                       {a.title}{" "}
                       <span className="font-normal text-muted-foreground">· {a.name}</span>
+                      {a.isMine && (
+                        <Badge tone="info" className="ml-2">
+                          Yours
+                        </Badge>
+                      )}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {a.department} · owner {a.owner} · {a.openTasks} open task

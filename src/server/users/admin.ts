@@ -9,6 +9,7 @@ import { db, type Db } from "@/lib/db";
 import { recordAudit } from "@/server/audit/audit";
 import { authorize, ForbiddenError, type Actor } from "@/server/authz/permissions";
 import { canChangeRole, canChangeUserStatus } from "@/server/authz/policies";
+import { syncPersonalAssistant } from "@/server/agents/assistants";
 import { syncRepPod } from "@/server/reps/pods";
 
 export class NotFoundError extends Error {
@@ -37,6 +38,8 @@ export async function changeUserRole(
       before: { role: target.role },
       after: { role: updated.role },
     });
+    // Company roles get a personal assistant; moving to a rep role pauses it.
+    await syncPersonalAssistant(tx, updated);
     // An onboarded rep's AI pod follows their plan: upgrades add agents from the
     // current templates, downgrades pause the extras (history is kept).
     if (await tx.repPod.findUnique({ where: { repId: targetId } })) {
@@ -77,6 +80,7 @@ export async function setUserStatus(
       before: { status: target.status },
       after: { status: updated.status },
     });
+    await syncPersonalAssistant(tx, updated);
     return updated;
   });
 }
@@ -110,6 +114,7 @@ export async function inviteUser(
       entityId: user.id,
       after: { email: user.email, role: user.role },
     });
+    await syncPersonalAssistant(tx, user);
     return user;
   });
 }

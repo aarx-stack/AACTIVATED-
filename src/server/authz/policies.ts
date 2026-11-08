@@ -41,12 +41,24 @@ export function canViewDepartmentDetail(
 
 /**
  * Company agent workspaces. Confidential departments (Legal, Finance, HR) and
- * reps' private pod agents open for executives only.
+ * reps' private pod agents open for executives only. A personal assistant opens for its
+ * owner, and executives may look at staff assistants (never another executive's).
  */
 export function canOpenAgentWorkspace(
   role: Role | null | undefined,
-  agent: { department: { isConfidential: boolean } | null; kind?: string },
+  agent: {
+    department: { isConfidential: boolean } | null;
+    kind?: string;
+    ownerId?: string;
+    ownerRole?: Role | null;
+  },
+  viewerId?: string | null,
 ): boolean {
+  if (agent.kind === "PERSONAL") {
+    if (!can(role, "assistant.use") || !viewerId) return false;
+    if (agent.ownerId === viewerId) return true;
+    return role === Role.EXECUTIVE && agent.ownerRole !== Role.EXECUTIVE;
+  }
   if (!can(role, "agent.view")) return false;
   if (agent.kind === "REP_POD") return role === Role.EXECUTIVE;
   if (agent.department?.isConfidential) return role === Role.EXECUTIVE;

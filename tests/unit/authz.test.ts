@@ -23,6 +23,7 @@ const EXPECTED: Record<Permission, Role[]> = {
   "workflow.request": [E, S],
   "company_team.view": [E, S, A],
   "agent.view": [E, S],
+  "assistant.use": [E, S, A],
   "agent.manage": [E],
   "rep_pod.full": [P],
   "rep_pod.coach": [P, F],

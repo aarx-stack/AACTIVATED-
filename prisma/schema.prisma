@@ -41,6 +41,8 @@ enum AgentKind {
   BRAIN
   DEPARTMENT
   REP_POD
+  /// One per executive, staff member and system admin. Only its owner works with it.
+  PERSONAL
 }
 
 enum AgentStatus {

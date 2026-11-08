@@ -39,6 +39,11 @@ export const PERMISSIONS = {
   },
   "company_team.view": { label: "View Company Team", group: "Agents", roles: COMPANY },
   "agent.view": { label: "Open agent workspaces", group: "Agents", roles: [EXECUTIVE, STAFF] },
+  "assistant.use": {
+    label: "Own personal AI assistant",
+    group: "Agents",
+    roles: [EXECUTIVE, STAFF, SYSTEM_ADMIN],
+  },
   "agent.manage": {
     label: "Pause, resume and configure agents",
     group: "Agents",

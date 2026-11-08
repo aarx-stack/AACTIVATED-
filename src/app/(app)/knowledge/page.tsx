@@ -303,6 +303,8 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
                 </Button>
                 {manage && (
                   <SummarizeButton
+                    // A new document gets a fresh form: no message left over from another one.
+                    key={selected.id}
                     documentId={selected.id}
                     label={selected.summary ? "Refresh summary" : "Generate summary"}
                   />

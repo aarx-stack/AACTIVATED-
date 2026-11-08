@@ -588,7 +588,8 @@ export interface TaskWorkInput {
 
 export const taskWorkOutput = z.object({
   summary: z.string().min(10).max(400),
-  deliverable: z.string().min(20).max(6000),
+  // Long enough for an article or a book chapter.
+  deliverable: z.string().min(20).max(20000),
   nextSteps: z.array(z.string().min(3).max(200)).max(5),
 });
 export type TaskWorkOutput = z.infer<typeof taskWorkOutput>;
@@ -623,7 +624,7 @@ export const taskWorkSkill = defineSkill<TaskWorkInput, TaskWorkOutput>({
           : []),
       ]
         .join("\n")
-        .slice(0, 6000),
+        .slice(0, 20000),
       nextSteps: [
         "Review the draft and edit anything that does not sound like AACTIVATED.",
         "If any of it will be shared outside the company, send it through the Approval Queue.",

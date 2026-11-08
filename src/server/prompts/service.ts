@@ -228,7 +228,12 @@ export const sendSchema = z.object({
 export async function assignableAgents(actor: Actor, client: Db = db) {
   authorize(actor, "prompts.use");
   const agents = await client.agent.findMany({
-    where: { kind: { in: [AgentKind.BRAIN, AgentKind.DEPARTMENT] } },
+    where: {
+      OR: [
+        { kind: { in: [AgentKind.BRAIN, AgentKind.DEPARTMENT] } },
+        { kind: AgentKind.PERSONAL, ownerId: actor.id },
+      ],
+    },
     orderBy: [{ kind: "asc" }, { title: "asc" }],
     select: {
       id: true,
@@ -237,11 +242,14 @@ export async function assignableAgents(actor: Actor, client: Db = db) {
       kind: true,
       status: true,
       config: true,
+      ownerId: true,
       department: { select: { name: true, isConfidential: true } },
     },
   });
   return agents
-    .filter((a) => canOpenAgentWorkspace(actor.role, a) && hasTool(a.config, "tasks.work"))
+    .filter(
+      (a) => canOpenAgentWorkspace(actor.role, a, actor.id) && hasTool(a.config, "tasks.work"),
+    )
     .map(({ config: _config, ...a }) => a);
 }
 
@@ -260,7 +268,12 @@ export async function sendToAgent(
     where: { id: data.agentId },
     include: { department: { select: { isConfidential: true } } },
   });
-  if (!agent || agent.kind === AgentKind.REP_POD || !canOpenAgentWorkspace(actor.role, agent)) {
+  if (
+    !agent ||
+    agent.kind === AgentKind.REP_POD ||
+    (agent.kind === AgentKind.PERSONAL && agent.ownerId !== actor.id) ||
+    !canOpenAgentWorkspace(actor.role, agent, actor.id)
+  ) {
     throw new ForbiddenError("You cannot assign work to that agent.");
   }
   if (!WORKING_STATUSES.includes(agent.status)) {

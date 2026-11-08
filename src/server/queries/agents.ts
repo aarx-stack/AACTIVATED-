@@ -7,13 +7,26 @@ import { canOpenAgentWorkspace } from "@/server/authz/policies";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-export async function listCompanyAgents(role: Role) {
+export async function listCompanyAgents(role: Role, viewerId?: string) {
   const agents = await db.agent.findMany({
-    where: { kind: { in: [AgentKind.BRAIN, AgentKind.DEPARTMENT] } },
+    where: {
+      OR: [
+        { kind: { in: [AgentKind.BRAIN, AgentKind.DEPARTMENT] } },
+        // Personal assistants: your own; executives also see staff assistants.
+        {
+          kind: AgentKind.PERSONAL,
+          ownerId: viewerId ?? "",
+          status: { not: "PAUSED" },
+        },
+        ...(role === "EXECUTIVE"
+          ? [{ kind: AgentKind.PERSONAL, owner: { role: { not: "EXECUTIVE" as Role } } }]
+          : []),
+      ],
+    },
     orderBy: [{ kind: "asc" }, { department: { sortOrder: "asc" } }, { name: "asc" }],
     include: {
       department: { select: { name: true, isConfidential: true } },
-      owner: { select: { name: true } },
+      owner: { select: { name: true, role: true } },
       _count: {
         select: {
           tasks: {
@@ -38,11 +51,17 @@ export async function listCompanyAgents(role: Role) {
     title: a.title,
     kind: a.kind,
     status: a.status,
-    department: a.department?.name ?? "Executive",
+    department:
+      a.kind === AgentKind.PERSONAL ? "Personal assistant" : (a.department?.name ?? "Executive"),
     isConfidential: a.department?.isConfidential ?? false,
     owner: a.owner.name,
+    isMine: a.kind === AgentKind.PERSONAL && a.ownerId === viewerId,
     openTasks: a._count.tasks,
-    canOpen: canOpenAgentWorkspace(role, a),
+    canOpen: canOpenAgentWorkspace(
+      role,
+      { ...a, ownerId: a.ownerId, ownerRole: a.owner.role },
+      viewerId,
+    ),
   }));
 }
 

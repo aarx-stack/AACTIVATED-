@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpen,
   CircleCheck,
   Clapperboard,
   Clock3,
@@ -13,6 +14,8 @@ import {
   Megaphone,
   Scale,
   Share2,
+  Sparkles,
+  Handshake,
   Users,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -22,11 +25,13 @@ import { ContentRequest } from "@/components/command-center/content-request";
 import { KpiCard } from "@/components/command-center/kpi-card";
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Meter } from "@/components/ui/meter";
 import type { ActivityKind } from "@/generated/prisma/enums";
 import { cn, formatPercent, formatUsd } from "@/lib/utils";
 import { requirePagePermission } from "@/server/auth/session";
+import { getMyAssistant } from "@/server/agents/assistants";
 import { can } from "@/server/authz/permissions";
 import { getCommandCenterData } from "@/server/queries/command-center";
 import type { HealthBand } from "@/server/queries/department-health";
@@ -36,6 +41,8 @@ export const metadata: Metadata = { title: "Brain Command Center" };
 const DEPT_ICON: Record<string, LucideIcon> = {
   operations: Layers,
   sales: BarChart3,
+  affiliate: Handshake,
+  publishing: BookOpen,
   marketing: Megaphone,
   social: Share2,
   media: Clapperboard,
@@ -78,7 +85,10 @@ function healthWord(score: number) {
 
 export default async function CommandCenterPage() {
   const user = await requirePagePermission("command_center.view");
-  const data = await getCommandCenterData(user.role);
+  const [data, assistant] = await Promise.all([
+    getCommandCenterData(user.role),
+    getMyAssistant(user),
+  ]);
   const { kpis, brain, execution } = data;
 
   const spendRatio = kpis.aiBudgetUsd > 0 ? kpis.aiSpendUsd / kpis.aiBudgetUsd : 0;
@@ -127,6 +137,15 @@ export default async function CommandCenterPage() {
       <PageHeader
         title="Brain Command Center"
         description="Your AI company operating system: plan, delegate, execute and grow with a team of AI agents. Anything that leaves the company waits for a human."
+        actions={
+          assistant && (
+            <Button asChild variant="secondary">
+              <Link href={`/agents/${assistant.id}`}>
+                <Sparkles aria-hidden /> My assistant
+              </Link>
+            </Button>
+          )
+        }
       />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">

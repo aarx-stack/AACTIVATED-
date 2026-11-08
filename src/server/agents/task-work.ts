@@ -125,12 +125,21 @@ export async function runPromptTask(
 // ------------------------------------------------------------ people's side --
 
 async function loadForPerson(actor: Actor, taskId: string, client: Db) {
-  authorize(actor, "prompts.use");
   const task = await client.task.findUnique({
     where: { id: taskId },
     include: { agent: { include: { department: { select: { isConfidential: true } } } } },
   });
-  if (!task?.agent || !canOpenAgentWorkspace(actor.role, task.agent)) {
+  if (!task?.agent) throw new ForbiddenError("That task is not available to you.");
+  // A personal assistant's work is its owner's alone.
+  if (task.agent.kind === "PERSONAL") {
+    authorize(actor, "assistant.use");
+    if (task.agent.ownerId !== actor.id) {
+      throw new ForbiddenError("That task is not available to you.");
+    }
+    return task;
+  }
+  authorize(actor, "prompts.use");
+  if (!canOpenAgentWorkspace(actor.role, task.agent, actor.id)) {
     throw new ForbiddenError("That task is not available to you.");
   }
   return task;
