@@ -23,6 +23,14 @@ const schema = z
     INTEGRATION_GOHIGHLEVEL: z.enum(["mock", "live"]).default("mock"),
     INTEGRATION_QUICKBOOKS: z.enum(["mock", "live"]).default("mock"),
     INTEGRATION_SLACK: z.enum(["mock", "live"]).default("mock"),
+    // Live credentials (secrets: set in the environment, never committed).
+    GOHIGHLEVEL_API_KEY: z.string().optional(),
+    GOHIGHLEVEL_LOCATION_ID: z.string().optional(),
+    GOHIGHLEVEL_COMPANY_ID: z.string().optional(),
+    QUICKBOOKS_REALM_ID: z.string().optional(),
+    QUICKBOOKS_ACCESS_TOKEN: z.string().optional(),
+    QUICKBOOKS_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+    SLACK_WEBHOOK_URL: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.APP_ENV === "production" && env.DEMO_LOGIN_ENABLED) {

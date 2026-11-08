@@ -618,7 +618,13 @@ export async function sendFollowUp(actor: Actor, approvalId: string, client: Db 
   if (!profile?.ghlSubAccountId)
     throw new DispatchBlockedError("Your GoHighLevel sub-account is not set up.");
 
-  const sent = await getGoHighLevel().sendMessage({
+  const ghl = getGoHighLevel();
+  if (ghl.mode === "live" && !approval.contact.ghlContactId) {
+    throw new DispatchBlockedError(
+      "This contact is not linked to GoHighLevel yet. Nothing was sent.",
+    );
+  }
+  const sent = await ghl.sendMessage({
     subAccountId: profile.ghlSubAccountId,
     contactId: approval.contact.ghlContactId ?? approval.contact.id,
     channel: payload.channel,

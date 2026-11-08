@@ -4,12 +4,12 @@ The internal operating system for AACTIVATED RX. An AI CEO ("the Brain") runs a 
 AI agents across departments and gives every Premium rep a private AI team. **Humans approve
 anything that leaves the building.**
 
-> Status: **Phase 4 complete.** Phase 1 delivered setup, design tokens, auth and roles, demo data,
-> and pages 1 (Command Center), 2 (Company Team) and 12 (Admin). Phase 2 added the first end-to-end
-> agent workflow, page 3 (Agent Workspace) and page 5 (Approval & Compliance Queue). Phase 3 added
-> rep onboarding, page 4 (My AI Team), page 6 (Content Studio) and page 8 (Back Office). Phase 4
-> added the 75% budget rule, page 7 (Finance & Budget), page 9 (Knowledge Library) and page 10
-> (Prompt Generator). Page 11 (Development Map) is a permission-guarded placeholder until Phase 5.
+> Status: **Phase 5 complete. All 12 pages are built.** Phase 1: setup, design tokens, auth and
+> roles, demo data, Command Center, Company Team, Admin. Phase 2: the first end-to-end agent
+> workflow, Agent Workspace, Approval & Compliance Queue. Phase 3: rep onboarding, My AI Team,
+> Content Studio, Back Office. Phase 4: the 75% budget rule, Finance & Budget, Knowledge Library,
+> Prompt Generator. Phase 5: the Development & Tokenization Map, live integration adapters behind
+> feature flags (off by default), and browser tests for every page and role in both themes.
 
 ## The Phase 2 workflow
 
@@ -95,15 +95,15 @@ Invite a user** before go-live.
 
 ## Scripts
 
-| Command             | What it does                                                     |
-| ------------------- | ---------------------------------------------------------------- |
-| `npm run dev`       | Development server                                               |
-| `npm run worker`    | Background worker (pg-boss): heartbeat and health checks         |
-| `npm run check`     | Type-check, lint, format check and all Vitest suites             |
-| `npm test`          | Unit and integration tests (integration needs the test database) |
-| `npm run test:unit` | Unit tests only (no database)                                    |
-| `npm run test:e2e`  | Playwright against a production build (`npm run build` first)    |
-| `npm run db:reset`  | Drop, re-migrate and re-seed the **dev** database                |
+| Command             | What it does                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| `npm run dev`       | Development server                                                                                 |
+| `npm run worker`    | Background worker (pg-boss): heartbeat and health checks                                           |
+| `npm run check`     | Type-check, lint, format check and all Vitest suites                                               |
+| `npm test`          | Unit and integration tests (integration needs the test database)                                   |
+| `npm run test:unit` | Unit tests only (no database)                                                                      |
+| `npm run test:e2e`  | Playwright against a production build (`npm run build` first): every page, every role, both themes |
+| `npm run db:reset`  | Drop, re-migrate and re-seed the **dev** database                                                  |
 
 Integration tests rebuild the database in `TEST_DATABASE_URL` from migrations on every run. They
 refuse to touch any database whose name doesn't end in `_test`.
@@ -142,18 +142,20 @@ covered by integration tests in `tests/integration/budgets.test.ts`.
 
 ## How the rules are enforced
 
-| Rule                                      | Where                                                                                                                                                        |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Role-based access, enforced on the server | `src/server/authz/permissions.ts`: one matrix used by every page, action and the Admin matrix                                                                |
-| Legal, accounting and HR executive-only   | Permissions plus `policies.ts`. Confidential agents and activity are redacted server-side                                                                    |
-| Free reps get Coach and earnings only     | `rep_pod.coach` and `back_office.view_own`; asserted cell by cell in `tests/unit/authz.test.ts`                                                              |
-| Who can approve what                      | `src/server/approvals/policy.ts`: staff decide low/medium content; executives decide spend, legal, launches and high risk; nobody approves their own request |
-| Audit log is append-only                  | A database trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` (see the init migration)                                                                        |
-| Every change is audited                   | `recordAudit()` runs inside the same transaction as the change                                                                                               |
-| Every model call is costed                | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                         |
-| Budgets lock at 75% until approved        | `src/server/budgets/`: `gateSpend()` before every model call and purchase; alerts executives and opens an approval request                                   |
-| Confidential documents stay on the server | `src/server/knowledge/service.ts` filters by access level in the database query                                                                              |
-| Always-on                                 | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                           |
+| Rule                                             | Where                                                                                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Role-based access, enforced on the server        | `src/server/authz/permissions.ts`: one matrix used by every page, action and the Admin matrix                                                                |
+| Legal, accounting and HR executive-only          | Permissions plus `policies.ts`. Confidential agents and activity are redacted server-side                                                                    |
+| Free reps get Coach and earnings only            | `rep_pod.coach` and `back_office.view_own`; asserted cell by cell in `tests/unit/authz.test.ts`                                                              |
+| Who can approve what                             | `src/server/approvals/policy.ts`: staff decide low/medium content; executives decide spend, legal, launches and high risk; nobody approves their own request |
+| Audit log is append-only                         | A database trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` (see the init migration)                                                                        |
+| Every change is audited                          | `recordAudit()` runs inside the same transaction as the change                                                                                               |
+| Every model call is costed                       | `runModel()` writes a `SpendEvent` with agent, model, tokens and USD                                                                                         |
+| Budgets lock at 75% until approved               | `src/server/budgets/`: `gateSpend()` before every model call and purchase; alerts executives and opens an approval request                                   |
+| Confidential documents stay on the server        | `src/server/knowledge/service.ts` filters by access level in the database query                                                                              |
+| Tokenization not launchable without an executive | `src/server/roadmap/policy.ts`: every step gated, decided with a written note; applied only by an approval or an executive decision                          |
+| Live integrations off by default                 | `src/server/integrations/index.ts`: feature flag + credentials + Admin off switch, checked on every call                                                     |
+| Always-on                                        | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                           |
 
 The outbound gate, `assertDispatchable()` in `src/server/approvals/service.ts`, is the only path
 out of the building. It refuses anything that isn't approved, or whose content fingerprint
@@ -174,12 +176,57 @@ ANTHROPIC_MODEL_AGENT=claude-sonnet-5-5  # department and rep agents
 The Claude adapter uses adaptive thinking with an explicit effort level, and has server-side
 refusal fallbacks enabled. Prices per million tokens are in `src/lib/ai/pricing.ts`.
 
+## Development & Tokenization Map (Phase 5)
+
+`/roadmap` shows each project as a row moving through **Idea, Build, Review, Launch**, with an
+ideas backlog, key metrics and overall progress. The rules are in `src/server/roadmap/policy.ts`:
+
+- Staff add ideas, put them on the map and move ungated projects forward.
+- A move is **gated** when the project is locked, when it is the tokenization platform, or when
+  it goes to Launch and needs executive approval. Staff request it; the request appears in the
+  Approval Queue and the card shows **Pending Approval**. Approving needs a written note and
+  applies the move; rejecting clears it.
+- Executives can decide a gated move from the map, again only with a written note.
+- **The tokenization platform is mapped but not launchable without executive approval.** It stays
+  locked after every step, so each step needs a new executive decision, and the note asks for the
+  legal review.
+
 ## Integrations
 
-GoHighLevel, QuickBooks and Slack sit behind interfaces in `src/server/integrations` and use
-mock adapters by default. QuickBooks is read-only: the Finance page's **Sync now** only reads. Setting an `INTEGRATION_*` flag to `live` currently reports the
-integration as down instead of calling anything; live adapters arrive in Phase 5 and need your
-approval. To simulate an outage, set `MOCK_INTEGRATIONS_DOWN=SLACK,QUICKBOOKS`.
+GoHighLevel, QuickBooks and Slack sit behind interfaces in `src/server/integrations`. **Mock
+adapters are the default and make no external calls.** Live adapters are in
+`src/server/integrations/live` and use plain `fetch` (no extra dependencies):
+
+| Integration | Live adapter does                                                                 | Needs                                                                      |
+| ----------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| GoHighLevel | Schedules approved posts (Social Planner) and sends approved follow-ups           | `GOHIGHLEVEL_API_KEY`, `GOHIGHLEVEL_LOCATION_ID` (+ `_COMPANY_ID`)         |
+| QuickBooks  | **Read-only**: imports purchases, sales receipts, payments and refunds            | `QUICKBOOKS_REALM_ID`, `QUICKBOOKS_ACCESS_TOKEN`, `QUICKBOOKS_ENVIRONMENT` |
+| Slack       | Posts internal alerts (for example, a budget reaching 75%) to an incoming webhook | `SLACK_WEBHOOK_URL`                                                        |
+
+Three switches protect every call:
+
+1. **Feature flag**: `INTEGRATION_<NAME>=live` in the server environment. Default is `mock`.
+2. **Credentials**: live mode without its credentials reports DOWN and refuses every call.
+3. **Admin off switch**: a system admin can turn any integration off in Admin; every call is then
+   refused before anything is sent. Turning it off or on is audited.
+
+Outbound actions still pass the approval gate first: nothing is posted or sent unless an approved,
+unchanged request exists. Failures (timeouts, refused credentials, rate limits) show a readable
+message and never take the portal down. The adapters are tested against a simulated HTTP layer in
+`tests/unit/integrations-live.test.ts`; nothing in the test suite contacts a real service.
+
+**Before switching any integration to live** (needs your approval):
+
+- Use a sandbox first: a GoHighLevel test location and a QuickBooks sandbox company.
+- GoHighLevel: confirm the Social Planner and Conversations request fields in
+  `live/gohighlevel.ts` against the current HighLevel API reference, connect the social accounts
+  in each rep's sub-account, and link contacts to their GoHighLevel ids (live sends refuse
+  contacts without one).
+- QuickBooks: access tokens last about an hour. The "Connect QuickBooks" OAuth step that refreshes
+  them (and stores a rotating refresh token) is not built yet.
+- Keep secrets in the hosting environment's secret store, never in the repository.
+
+To simulate an outage with the mocks, set `MOCK_INTEGRATIONS_DOWN=SLACK,QUICKBOOKS`.
 
 ## Project layout
 

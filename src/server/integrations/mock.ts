@@ -59,6 +59,15 @@ export const mockQuickBooks: QuickBooksAdapter = {
     }
     return { syncedAt: new Date(), transactionCount: 128 };
   },
+  // Mock data is seeded directly; the mock sync has nothing new to import.
+  fetchTransactions: async () => {
+    if (isSimulatedDown("QUICKBOOKS")) {
+      throw new IntegrationUnavailableError(
+        "QuickBooks is unavailable. Showing the last synced data.",
+      );
+    }
+    return [];
+  },
 };
 
 export const mockSlack: SlackAdapter = {

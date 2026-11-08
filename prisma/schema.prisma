@@ -775,6 +775,12 @@ model Project {
   locked                    Boolean          @default(false)
   requiresExecutiveApproval Boolean          @default(false)
   isTokenization            Boolean          @default(false)
+  /// Progress (0-100) within the current phase.
+  progress                  Int              @default(0)
+  /// False while the project is still an idea in the backlog, not yet on the map.
+  onMap                     Boolean          @default(true)
+  /// Short note per phase shown on its card: { IDEA?: string, BUILD?: string, ... }.
+  stageNotes                Json             @default("{}")
   ownerId                   String?
   owner                     User?            @relation(fields: [ownerId], references: [id])
   approvalRequestId         String?

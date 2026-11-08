@@ -1240,14 +1240,17 @@ async function main() {
     },
     {
       type: "PROJECT_LAUNCH",
-      title: "Unlock: Tokenization platform discovery",
-      summary: "Move the tokenization project from Review to Build.",
+      title: "Advance: Tokenization platform to Review",
+      summary: 'Move "Tokenization platform" from Build to Review.',
       risk: "CRITICAL",
       agent: "product-developer",
-      payload: { project: "Tokenization platform", from: "REVIEW", to: "BUILD" },
+      payload: { project: "Tokenization platform", from: "BUILD", to: "REVIEW" },
       reasoning:
-        "Scope document is ready. This project is locked and cannot advance without an executive decision. Legal review is recommended first.",
-      sources: [{ title: "Tokenization scope draft" }],
+        "The scope document and wallet prototype are ready for review. The tokenization platform is mapped only: every step needs an executive decision, and legal review comes first.",
+      sources: [
+        { title: "Tokenization scope draft" },
+        { title: "Tokenization legal considerations (executive only)" },
+      ],
       createdHoursAgo: 48,
     },
   ];
@@ -1773,64 +1776,117 @@ The plan shown in the app is a placeholder until the final plan is approved.
     });
   }
 
-  // Projects
-  await db.project.createMany({
-    data: [
-      {
-        name: "Rep onboarding flow",
-        description: "Guided onboarding for new reps.",
-        phase: "BUILD",
-        ownerId: users.isaac.id,
-        sortOrder: 1,
-        targetDate: ahead(21 * DAY),
+  // Projects on the Development & Tokenization Map, plus the ideas backlog
+  const projects: Prisma.ProjectCreateManyInput[] = [
+    {
+      name: "AI Brain portal",
+      description: "The internal operating system for staff, agents and reps.",
+      phase: "LAUNCH",
+      progress: 100,
+      ownerId: users.isaac.id,
+      sortOrder: 1,
+      stageNotes: {
+        IDEA: "One place for the company's AI team.",
+        BUILD: "Command Center, agents and approvals.",
+        REVIEW: "Security, access and compliance review.",
+        LAUNCH: "Live for staff and reps.",
       },
-      {
-        name: "GoHighLevel live integration",
-        description: "Contacts and Social Planner, one sub-account per Premium rep.",
-        phase: "REVIEW",
-        ownerId: users.isaac.id,
-        sortOrder: 2,
-        requiresExecutiveApproval: true,
+    },
+    {
+      name: "Rep onboarding flow",
+      description: "Guided onboarding for new reps.",
+      phase: "BUILD",
+      progress: 72,
+      ownerId: users.isaac.id,
+      sortOrder: 2,
+      targetDate: ahead(21 * DAY),
+      stageNotes: {
+        IDEA: "First 30 days for new reps.",
+        BUILD: "Rules, AI team setup and weekly plan.",
       },
-      {
-        name: "QuickBooks read-only sync",
-        description: "Nightly transaction import.",
-        phase: "IDEA",
-        ownerId: users.isaac.id,
-        sortOrder: 3,
+    },
+    {
+      name: "GoHighLevel live integration",
+      description: "Contacts and Social Planner, one sub-account per Premium rep.",
+      phase: "REVIEW",
+      progress: 40,
+      requiresExecutiveApproval: true,
+      ownerId: users.isaac.id,
+      sortOrder: 3,
+      stageNotes: {
+        IDEA: "Replace the mock with the real account.",
+        BUILD: "Adapter behind a feature flag.",
+        REVIEW: "Credentials, consent and send limits.",
       },
-      {
-        name: "Rep mobile view",
-        description: "Phone-first My AI Team.",
-        phase: "IDEA",
-        ownerId: users.isaac.id,
-        sortOrder: 4,
+    },
+    {
+      name: "QuickBooks read-only sync",
+      description: "Import transactions into Finance & Budget. Nothing written back.",
+      phase: "BUILD",
+      progress: 55,
+      ownerId: users.isaac.id,
+      sortOrder: 4,
+      stageNotes: {
+        IDEA: "Real figures on the Finance page.",
+        BUILD: "Read-only adapter and import.",
       },
-      {
-        name: "Tokenization platform",
-        description: "Mapped only. Not launchable without executive approval.",
-        phase: "REVIEW",
-        locked: true,
-        requiresExecutiveApproval: true,
-        isTokenization: true,
-        ownerId: users.guy.id,
-        sortOrder: 5,
+    },
+    {
+      name: "Tokenization platform",
+      description: "Mapped only. Not launchable without executive approval.",
+      phase: "BUILD",
+      progress: 35,
+      locked: true,
+      requiresExecutiveApproval: true,
+      isTokenization: true,
+      ownerId: users.guy.id,
+      sortOrder: 5,
+      stageNotes: {
+        IDEA: "Explore tokenized member rewards.",
+        BUILD: "Scope, wallet prototype and legal questions.",
       },
-      {
-        name: "Knowledge library AI search",
-        description: "Semantic search with access-level filtering.",
-        phase: "BUILD",
-        ownerId: users.isaac.id,
-        sortOrder: 6,
-      },
-      {
-        name: "Status page",
-        description: "Public uptime page.",
-        phase: "LAUNCH",
-        ownerId: users.isaac.id,
-        sortOrder: 7,
-      },
-    ],
+    },
+    {
+      name: "Knowledge library AI search",
+      description: "Semantic search with access-level filtering.",
+      phase: "IDEA",
+      progress: 20,
+      ownerId: users.isaac.id,
+      sortOrder: 6,
+      stageNotes: { IDEA: "Ask questions across documents you can read." },
+    },
+    {
+      name: "Status page",
+      description: "Public uptime page.",
+      phase: "LAUNCH",
+      progress: 100,
+      ownerId: users.isaac.id,
+      sortOrder: 7,
+      stageNotes: { LAUNCH: "Live at /status." },
+    },
+    ...[
+      ["Rep mobile app", "Phone-first My AI Team for reps."],
+      ["Affiliate leaderboard", "Weekly recognition for consistent reps."],
+      ["AI governance assistant", "Policy, risk and compliance checks for new agents."],
+      ["Member education portal", "Self-serve courses for the education program."],
+    ].map(([name, description], i): Prisma.ProjectCreateManyInput => ({
+      name: name!,
+      description: description!,
+      phase: "IDEA",
+      onMap: false,
+      ownerId: users.maya.id,
+      sortOrder: 20 + i,
+      createdAt: ago((4 - i) * 3 * DAY),
+    })),
+  ];
+  await db.project.createMany({ data: projects });
+  // The tokenization platform's pending step is the PROJECT_LAUNCH request seeded above.
+  const tokenRequest = await db.approvalRequest.findFirstOrThrow({
+    where: { type: "PROJECT_LAUNCH", title: "Advance: Tokenization platform to Review" },
+  });
+  await db.project.updateMany({
+    where: { isTokenization: true },
+    data: { approvalRequestId: tokenRequest.id },
   });
 
   // Integrations

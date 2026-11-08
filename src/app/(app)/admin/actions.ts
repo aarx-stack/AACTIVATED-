@@ -7,6 +7,7 @@ import { recordAudit } from "@/server/audit/audit";
 import { requireActionPermission } from "@/server/auth/session";
 import { ForbiddenError } from "@/server/authz/permissions";
 import { getSystemHealth } from "@/server/health/health";
+import { setIntegrationEnabled } from "@/server/integrations/controls";
 import { changeUserRole, inviteUser, NotFoundError, setUserStatus } from "@/server/users/admin";
 import { db } from "@/lib/db";
 
@@ -80,6 +81,24 @@ export async function runHealthCheckAction(): Promise<ActionResult> {
     });
     revalidatePath("/admin");
     return { ok: true, message: `System is ${health.status.toLowerCase()}.` };
+  } catch (error) {
+    return toResult(error);
+  }
+}
+
+export async function setIntegrationEnabledAction(
+  provider: "GOHIGHLEVEL" | "QUICKBOOKS" | "SLACK",
+  enabled: boolean,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActionPermission("integrations.manage");
+    await setIntegrationEnabled(
+      actor,
+      z.enum(["GOHIGHLEVEL", "QUICKBOOKS", "SLACK"]).parse(provider),
+      z.boolean().parse(enabled),
+    );
+    revalidatePath("/admin");
+    return { ok: true, message: enabled ? "Turned on." : "Turned off." };
   } catch (error) {
     return toResult(error);
   }

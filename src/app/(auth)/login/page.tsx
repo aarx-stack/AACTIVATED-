@@ -44,8 +44,7 @@ export default async function LoginPage({
       </div>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <p className="text-lg font-semibold tracking-[0.22em]">AACTIVATED</p>
-          <p className="text-sm font-medium tracking-[0.3em] text-primary">AI BRAIN</p>
+          <p className="text-xl font-extrabold tracking-[0.02em]">AACTIVATED AI BRAIN</p>
         </div>
 
         <Card>

@@ -1,7 +1,7 @@
 /**
  * Every external system sits behind an interface. Mock adapters are the default;
- * live adapters are switched on per integration with an env flag and stay
- * read-only/off until executive approval (Phase 5).
+ * live adapters (src/server/integrations/live) are switched on per integration with an
+ * INTEGRATION_* env flag plus credentials, and can be turned off from Admin at any time.
  *
  * Outbound actions (posting, messaging, paying) are added in Phase 2 and will
  * require an approved ApprovalRequest — see src/server/approvals.
@@ -51,10 +51,22 @@ export class IntegrationUnavailableError extends Error {
   readonly status = 503;
 }
 
+/** A transaction read from the accounting system (never written back). */
+export interface ImportedTransaction {
+  externalId: string;
+  occurredAt: Date;
+  description: string;
+  category: string;
+  type: "REVENUE" | "EXPENSE" | "REFUND";
+  amountUsd: number;
+}
+
 export interface QuickBooksAdapter extends IntegrationAdapter {
   key: "QUICKBOOKS";
   /** Read-only sync status. */
   lastSync(): Promise<{ syncedAt: Date | null; transactionCount: number }>;
+  /** Read-only: transactions dated on or after `since`. */
+  fetchTransactions(since: Date): Promise<ImportedTransaction[]>;
 }
 
 export interface SlackAdapter extends IntegrationAdapter {

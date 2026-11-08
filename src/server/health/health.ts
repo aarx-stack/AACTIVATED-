@@ -191,6 +191,7 @@ async function persistHealth(components: ComponentHealth[]) {
     await db.integration.updateMany({
       where: { provider },
       data: {
+        mode: c.label.endsWith("(live)") ? "LIVE" : "MOCK",
         status: c.status,
         lastCheckedAt: now,
         lastError: c.status === "OPERATIONAL" ? null : c.message,

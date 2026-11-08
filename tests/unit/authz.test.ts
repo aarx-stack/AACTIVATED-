@@ -44,6 +44,7 @@ const EXPECTED: Record<Permission, Role[]> = {
   "confidential.accounting": [E],
   "confidential.hr": [E],
   "roadmap.view": [E, S, A],
+  "roadmap.manage": [E, S],
   "roadmap.approve_launch": [E],
   "admin.view": [E, A],
   "users.manage": [E, A],

@@ -10,6 +10,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HealthCheckButton } from "@/components/admin/health-check-button";
+import { IntegrationToggle } from "@/components/admin/integration-toggle";
 import { InviteForm } from "@/components/admin/invite-form";
 import { UsersTable, type AdminUserRow } from "@/components/admin/users-table";
 import { PageHeader } from "@/components/shell/page-header";
@@ -30,6 +31,7 @@ import {
 } from "@/server/authz/permissions";
 import { canChangeRole, canChangeUserStatus } from "@/server/authz/policies";
 import { getSystemHealth } from "@/server/health/health";
+import { getIntegrations, missingCredentials } from "@/server/integrations";
 import { getAdminData } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: "Admin & Access Control" };
@@ -47,6 +49,11 @@ export default async function AdminPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const actor = await requirePagePermission("admin.view");
+  const modes = Object.fromEntries(getIntegrations().map((a) => [a.key, a.mode])) as Partial<
+    Record<string, "mock" | "live">
+  >;
+  const liveCount = Object.values(modes).filter((m) => m === "live").length;
+  const canManageIntegrations = can(actor.role, "integrations.manage");
   const { q = "" } = await searchParams;
   const [{ users, totalUsers, integrations, uptime }, health] = await Promise.all([
     getAdminData(q),
@@ -253,11 +260,16 @@ export default async function AdminPage({
           <Card className="p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-xl font-semibold">Integrations</h2>
-              <Badge tone="info">Mock mode</Badge>
+              <Badge tone={liveCount > 0 ? "warning" : "info"}>
+                {liveCount > 0 ? `${liveCount} live` : "Mock mode"}
+              </Badge>
             </div>
             <ul className="mt-3 flex flex-col divide-y divide-border">
               {integrations.map((i) => {
                 const tone = HEALTH_STATUS[i.status];
+                const key = i.provider as "GOHIGHLEVEL" | "QUICKBOOKS" | "SLACK";
+                const adapterMode = modes[key];
+                const missing = adapterMode === "live" ? missingCredentials(key) : [];
                 return (
                   <li
                     key={i.id}
@@ -271,21 +283,34 @@ export default async function AdminPage({
                         INTEGRATION_MARK[i.provider] ?? "bg-primary",
                       )}
                     />
-                    <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <p className="font-semibold">{i.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{i.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {missing.length > 0 ? `Live, missing ${missing.join(", ")}` : i.description}
+                      </p>
+                      <div>
+                        {!i.enabled ? (
+                          <Badge tone="danger">Off</Badge>
+                        ) : (
+                          <Badge tone={tone.tone}>
+                            {adapterMode === "live" ? "Live" : "Mock"} · {tone.label}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <Badge tone={tone.tone}>
-                      {i.mode === "MOCK" ? "Mock" : "Live"} · {tone.label}
-                    </Badge>
-                    <ChevronRight className="size-4 text-subtle-foreground" aria-hidden />
+                    {adapterMode && canManageIntegrations ? (
+                      <IntegrationToggle provider={key} name={i.name} enabled={i.enabled} />
+                    ) : (
+                      <ChevronRight className="size-4 text-subtle-foreground" aria-hidden />
+                    )}
                   </li>
                 );
               })}
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
-              Live connections are switched on per integration and need executive approval. No real
-              credentials are stored in the app.
+              Live connections are switched on per integration with an environment flag and
+              credentials, after approval. Credentials live in the server environment, never in the
+              app. Turning an integration off stops every call to it immediately.
             </p>
           </Card>
 

@@ -47,3 +47,25 @@ export async function retireTestBudget(id: string) {
     ),
   );
 }
+
+/** A project on the map that needs executive approval to launch, sitting in Review. */
+export async function createGatedProject() {
+  const id = `e2e_${randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  const name = `E2E launch ${id.slice(4, 10)}`;
+  await withDb((db) =>
+    db.query(
+      `INSERT INTO "Project" (id, name, description, phase, progress, "requiresExecutiveApproval", "sortOrder", "updatedAt")
+       VALUES ($1, $2, 'Test project', 'REVIEW', 90, true, 900, now())`,
+      [id, name],
+    ),
+  );
+  return { id, name };
+}
+
+export async function removeProject(id: string) {
+  await withDb((db) => db.query(`DELETE FROM "Project" WHERE id = $1`, [id]));
+}
+
+export async function removeProjectByName(name: string) {
+  await withDb((db) => db.query(`DELETE FROM "Project" WHERE name = $1`, [name]));
+}

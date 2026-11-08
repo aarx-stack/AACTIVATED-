@@ -163,6 +163,15 @@ export async function decideApproval(
       );
     }
 
+    // Project moves (launches, unlocks, every tokenization step) are recorded with a reason.
+    if (
+      decision === "APPROVE" &&
+      request.type === "PROJECT_LAUNCH" &&
+      (note?.length ?? 0) < MIN_OVERRIDE_NOTE
+    ) {
+      throw new ForbiddenError("Add a short note recording why this project may move forward.");
+    }
+
     const status = decision === "APPROVE" ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED;
     // Guarded update: if someone else decided first, nothing changes.
     const updated = await tx.approvalRequest.updateMany({
@@ -262,6 +271,11 @@ export async function decideApproval(
       }
     }
 
+    if (request.type === "PROJECT_LAUNCH") {
+      const { applyProjectDecision } = await import("@/server/roadmap/service");
+      await applyProjectDecision(tx, request, decision, actor.id, note ?? null);
+    }
+
     // Approved spend changes what the budget allows: recompute it (may lift a pause).
     if (request.budgetId && decision === "APPROVE") {
       const { refreshBudget } = await import("@/server/budgets/service");
@@ -278,7 +292,9 @@ export async function decideApproval(
             decision === "APPROVE"
               ? isSpend
                 ? `"${request.title}" was approved and can be recorded.`
-                : `"${request.title}" was approved and is ready to schedule.`
+                : content
+                  ? `"${request.title}" was approved and is ready to schedule.`
+                  : `"${request.title}" was approved.`
               : `"${request.title}" was rejected by a reviewer.`,
           taskId: content?.taskId ?? null,
         },

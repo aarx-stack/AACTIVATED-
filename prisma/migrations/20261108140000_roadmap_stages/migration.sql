@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Project" ADD COLUMN     "onMap" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "progress" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "stageNotes" JSONB NOT NULL DEFAULT '{}';
+

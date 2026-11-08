@@ -108,6 +108,11 @@ export const PERMISSIONS = {
   },
   "confidential.hr": { label: "HR records", group: "Confidential", roles: [EXECUTIVE] },
   "roadmap.view": { label: "Development & Tokenization Map", group: "Platform", roles: COMPANY },
+  "roadmap.manage": {
+    label: "Add ideas and move projects on the map",
+    group: "Platform",
+    roles: [EXECUTIVE, STAFF],
+  },
   "roadmap.approve_launch": {
     label: "Unlock and launch projects",
     group: "Platform",
