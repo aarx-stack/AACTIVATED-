@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { Client } from "pg";
 
 /** Direct database access for test setup only (the app is always driven through the UI). */
@@ -89,4 +89,18 @@ export async function exhaustSignInLimit(ip: string, hits = 20) {
 
 export async function clearSignInLimit(ip: string) {
   await withDb((c) => c.query(`DELETE FROM "RateLimitHit" WHERE key = $1`, [ipKey(ip)]));
+}
+
+/** A real unsubscribe link for a demo clinic contact (same signing as the app). */
+export function unsubscribeLinkFor(contactId: string, email: string, campaignId: string) {
+  const key = process.env.AUTH_SECRET || `dev-only:${process.env.DATABASE_URL}`;
+  const body = Buffer.from(JSON.stringify({ k: contactId, e: email, c: campaignId })).toString(
+    "base64url",
+  );
+  const sig = createHmac("sha256", key).update(body).digest("base64url");
+  return `/unsubscribe?t=${body}.${sig}`;
+}
+
+export async function clearSuppressions() {
+  await withDb((c) => c.query(`DELETE FROM "EmailSuppression"`));
 }

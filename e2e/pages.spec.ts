@@ -21,6 +21,8 @@ const PAGES: { path: string; heading: string; roles: Who[] }[] = [
   { path: "/approvals/rules", heading: "Content rules", roles: [E, S] },
   { path: "/content", heading: "Content Studio", roles: [E, S, P] },
   { path: "/content/new", heading: "New post", roles: [E, S, P] },
+  { path: "/content/email", heading: "Email campaigns", roles: [E, S, P] },
+  { path: "/content/email/new", heading: "New campaign", roles: [E, S, P] },
   { path: "/my-team", heading: "My AI Team", roles: [P, F] },
   { path: "/back-office", heading: "Back Office — Earnings", roles: [P, F] },
   { path: "/finance", heading: "Finance & Budget", roles: [E] },
@@ -41,6 +43,11 @@ const DETAILS: { list: string; link: string; roles: Who[] }[] = [
   { list: "/agents", link: "a[href^='/agents/']", roles: [E, S] },
   { list: "/approvals?tab=all", link: "a[href*='selected=']", roles: [E, S] },
   { list: "/knowledge", link: "a[href^='/knowledge/']:not([href='/knowledge/new'])", roles: ALL },
+  {
+    list: "/content/email",
+    link: "a[href^='/content/email/']:not([href='/content/email/new'])",
+    roles: [E, S, P],
+  },
 ];
 
 async function expectHealthyPage(page: Page, heading: string, errors: string[]) {
@@ -112,6 +119,8 @@ test.describe("public and signed-out pages", () => {
     await expect(page.getByRole("heading", { level: 1, name: "System status" })).toBeVisible();
     await page.goto("/login");
     await expect(page.getByText("AACTIVATED AI BRAIN").first()).toBeVisible();
+    await page.goto("/unsubscribe?t=forged.token");
+    await expect(page.getByText("This unsubscribe link is not valid.")).toBeVisible();
     for (const p of PAGES) {
       await page.goto(p.path);
       await expect(page, `${p.path} without signing in`).toHaveURL(/\/login/);

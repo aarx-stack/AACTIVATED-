@@ -126,13 +126,62 @@ export function createLiveGoHighLevel(config: GoHighLevelConfig): GoHighLevelAda
             type,
             contactId: input.contactId,
             message: input.message,
-            ...(type === "Email" ? { subject: input.subject ?? "", html: input.message } : {}),
+            ...(type === "Email"
+              ? { subject: input.subject ?? "", html: input.html ?? input.message }
+              : {}),
           }),
         },
       );
       if (!sent.messageId)
         throw new IntegrationUnavailableError("GoHighLevel did not confirm the message.");
       return { externalId: sent.messageId };
+    },
+
+    async listContacts(input) {
+      const pageSize = Math.min(Math.max(input.pageSize ?? 100, 1), 100);
+      const page = Math.max(input.page ?? 1, 1);
+      const data = await call<{
+        contacts?: {
+          id: string;
+          contactName?: string | null;
+          firstName?: string | null;
+          lastName?: string | null;
+          email?: string | null;
+          dnd?: boolean;
+          dndSettings?: { Email?: { status?: string } };
+        }[];
+        total?: number;
+      }>("/contacts/search", {
+        method: "POST",
+        body: JSON.stringify({
+          locationId: config.locationId,
+          page,
+          pageLimit: pageSize,
+          filters: [{ field: "tags", operator: "contains", value: [input.tag] }],
+        }),
+      });
+      const contacts = (data.contacts ?? []).map((c) => ({
+        id: c.id,
+        name:
+          c.contactName?.trim() ||
+          [c.firstName, c.lastName].filter(Boolean).join(" ").trim() ||
+          null,
+        email: c.email?.trim() || null,
+        emailDnd: Boolean(c.dnd) || c.dndSettings?.Email?.status === "active",
+      }));
+      const total = data.total ?? 0;
+      return { contacts, hasMore: page * pageSize < total };
+    },
+
+    async setEmailDoNotDisturb(input) {
+      await call(`/contacts/${encodeURIComponent(input.contactId)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          dndSettings: {
+            Email: { status: "active", message: "Unsubscribed from an AACTIVATED email." },
+          },
+        }),
+      });
     },
   };
 }

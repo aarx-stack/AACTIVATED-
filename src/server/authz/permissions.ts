@@ -104,6 +104,11 @@ export const PERMISSIONS = {
     group: "Knowledge",
     roles: [EXECUTIVE, STAFF],
   },
+  "email.campaigns": {
+    label: "Email campaigns (staff: clinics, members, reps; Premium reps: own contacts)",
+    group: "Rep tools",
+    roles: [EXECUTIVE, STAFF, PREMIUM_REP],
+  },
   "prompts.use": { label: "Prompt Generator", group: "Knowledge", roles: [EXECUTIVE, STAFF] },
   "confidential.legal": { label: "Legal records", group: "Confidential", roles: [EXECUTIVE] },
   "confidential.accounting": {

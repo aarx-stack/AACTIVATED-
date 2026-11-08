@@ -224,3 +224,18 @@ describe("production safety checks", () => {
     ).toThrow(/set APP_ENV/);
   });
 });
+
+describe("email rendering", () => {
+  it("escapes the body, keeps paragraphs and always adds the unsubscribe footer", async () => {
+    const { renderEmail } = await import("@/server/email/campaigns");
+    const { text, html } = renderEmail(
+      "Hello <b>team</b>,\n\nSecond line & more",
+      "https://brain.example.test/unsubscribe?t=abc",
+    );
+    expect(html).toContain("<p>Hello &lt;b&gt;team&lt;/b&gt;,</p><p>Second line &amp; more</p>");
+    expect(html).toContain(
+      '<a href="https://brain.example.test/unsubscribe?t=abc">Unsubscribe</a>',
+    );
+    expect(text).toMatch(/Unsubscribe: https:\/\/brain\.example\.test\/unsubscribe\?t=abc$/);
+  });
+});

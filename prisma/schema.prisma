@@ -317,6 +317,7 @@ model User {
   earnings           Earning[]
   payouts            Payout[]
   scheduledContent   ContentItem[]           @relation("ContentScheduler")
+  emailCampaigns     EmailCampaign[]         @relation("CampaignAuthor")
 
   @@index([role])
 }
@@ -964,4 +965,85 @@ model Payout {
   createdAt DateTime @default(now())
 
   @@index([repId, paidAt])
+}
+
+// ---------------------------------------------------------------------------
+// Email campaigns (sent through GoHighLevel, after approval)
+// ---------------------------------------------------------------------------
+
+/// Who a campaign goes to. Company audiences are GoHighLevel contacts with a tag; MY_CONTACTS
+/// is a Premium rep's own consented contacts.
+enum EmailAudience {
+  CLINICS
+  MEMBERS
+  REPS
+  MY_CONTACTS
+}
+
+enum CampaignStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SENDING
+  SENT
+  REJECTED
+}
+
+enum EmailSendStatus {
+  SENT
+  SKIPPED
+  FAILED
+}
+
+model EmailCampaign {
+  id                String         @id @default(cuid())
+  name              String
+  audience          EmailAudience
+  subject           String
+  /// Plain text; paragraphs separated by blank lines. The unsubscribe footer is added on send.
+  body              String
+  status            CampaignStatus @default(DRAFT)
+  createdById       String
+  createdBy         User           @relation("CampaignAuthor", fields: [createdById], references: [id])
+  /// Set for a rep's campaign to their own contacts.
+  repId             String?
+  approvalRequestId String?        @unique
+  recipientEstimate Int?
+  sentAt            DateTime?
+  sentCount         Int            @default(0)
+  skippedCount      Int            @default(0)
+  failedCount       Int            @default(0)
+  lastError         String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  sends EmailSend[]
+
+  @@index([status, createdAt])
+  @@index([repId])
+}
+
+/// One row per recipient per campaign: makes sending exactly-once per person.
+model EmailSend {
+  id           String          @id @default(cuid())
+  campaignId   String
+  campaign     EmailCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  /// GoHighLevel contact id (company audiences) or the app's contact id (a rep's contacts).
+  recipientKey String
+  name         String?
+  email        String?
+  status       EmailSendStatus
+  reason       String?
+  externalId   String?
+  createdAt    DateTime        @default(now())
+
+  @@unique([campaignId, recipientKey])
+}
+
+/// People who unsubscribed. Checked before every send. Stores a hash, not the address.
+model EmailSuppression {
+  id         String   @id @default(cuid())
+  emailHash  String   @unique
+  campaignId String?
+  createdAt  DateTime @default(now())
 }

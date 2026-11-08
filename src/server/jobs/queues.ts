@@ -4,4 +4,5 @@ export const QUEUES = {
   heartbeat: "system.worker-heartbeat",
   contentWorkflow: "agents.content-workflow",
   promptTask: "agents.prompt-task",
+  emailCampaign: "email.send-campaign",
 } as const;

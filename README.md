@@ -284,6 +284,31 @@ again** button. The draft never leaves the company: anything meant for outside s
 the Approval Queue. Model spend goes through the budget gate like every other call. With
 `AGENT_EXECUTION=queue` the work runs in the background worker instead of during the request.
 
+## Email campaigns
+
+**Content Studio, Email campaigns** (`/content/email`). Emails go out through GoHighLevel, only
+after approval, and only to people who agreed to receive email.
+
+- **Who:** staff and executives email **Clinics**, **Members** or **Reps**: GoHighLevel contacts
+  with the tag `clinic`, `member` or `rep` in the company location. Premium reps email **their own
+  consented contacts** through their own GoHighLevel sub-account. Free reps cannot send email.
+- **Writing:** write it, or click **Draft with AI** and the Content Specialist (or the rep's
+  Content Creator) drafts it from a sentence. Nothing is sent from a draft.
+- **Approval:** **Send for approval** runs the compliance check and puts it in the Approval Queue.
+  Someone other than the author decides. More than 250 recipients, or a high-risk finding, needs
+  an executive. Changing an approved email afterwards blocks sending.
+- **Sending:** **Send now** sends once per person (a second click or a retry never sends twice).
+  It skips anyone who unsubscribed, is marked do-not-disturb in GoHighLevel, has no email address
+  or (for a rep) has opted out, and lists each recipient with the result.
+- **Unsubscribe:** every email ends with a signed unsubscribe link to `/unsubscribe` (no sign-in).
+  It is honored before every later send, marks the contact do-not-disturb in GoHighLevel (or opted
+  out, for a rep's contact), and is audited without storing the address.
+- With `AGENT_EXECUTION=queue`, sending runs in the background worker.
+
+Before going live: confirm the contact search (`POST /contacts/search`, tag filter) and
+do-not-disturb fields in `live/gohighlevel.ts` against the HighLevel API reference with a test
+location, and tag your clinic, member and rep contacts in GoHighLevel.
+
 ## Production checklist
 
 - `APP_ENV=production`, a long random `AUTH_SECRET` (`npm run secret`), `APP_URL` on HTTPS and

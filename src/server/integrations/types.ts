@@ -44,7 +44,25 @@ export interface GoHighLevelAdapter extends IntegrationAdapter {
     channel: string;
     subject?: string;
     message: string;
+    /** Email only: the HTML version (the plain text is `message`). */
+    html?: string;
   }): Promise<{ externalId: string }>;
+  /** Read: the company location's contacts carrying a tag (e.g. "clinic"), one page at a time. */
+  listContacts(input: {
+    tag: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ contacts: GhlContact[]; hasMore: boolean }>;
+  /** Honors an unsubscribe: turns on email do-not-disturb for the contact. */
+  setEmailDoNotDisturb(input: { subAccountId: string; contactId: string }): Promise<void>;
+}
+
+export interface GhlContact {
+  id: string;
+  name: string | null;
+  email: string | null;
+  /** Email do-not-disturb (unsubscribed or blocked in GoHighLevel). Never emailed. */
+  emailDnd: boolean;
 }
 
 export class IntegrationUnavailableError extends Error {

@@ -632,6 +632,47 @@ export const taskWorkSkill = defineSkill<TaskWorkInput, TaskWorkOutput>({
   },
 });
 
+// ------------------------------------------------------------ email drafts --
+
+export interface EmailDraftInput {
+  brief: string;
+  audienceLabel: string;
+  senderName: string;
+}
+
+export const emailDraftOutput = z.object({
+  subject: z.string().min(5).max(120),
+  body: z.string().min(40).max(4000),
+});
+export type EmailDraftOutput = z.infer<typeof emailDraftOutput>;
+
+/** Drafts an email to a consented audience. A person reviews it and it goes to the Approval Queue. */
+export const emailDraftSkill = defineSkill<EmailDraftInput, EmailDraftOutput>({
+  name: "email.draft",
+  tier: "agent",
+  requiresTool: "content.draft",
+  output: emailDraftOutput,
+  prompt: (i) =>
+    [
+      `Write an email from ${i.senderName} at AACTIVATED RX to ${i.audienceLabel}.`,
+      `Brief:\n"""${i.brief}"""`,
+      "Return a short subject line and a plain-text body with short paragraphs separated by blank lines.",
+      "Educational and factual. Never make medical or health claims and never name specific peptides; use branded stack names. Do not add an unsubscribe line: the system adds it.",
+    ].join("\n\n"),
+  mock: (i) => {
+    const topic = firstSentence(i.brief, 90).replace(/[.!?]$/, "");
+    return {
+      subject: `${topic.charAt(0).toUpperCase()}${topic.slice(1)}`.slice(0, 120).padEnd(5, "."),
+      body: [
+        "Hello,",
+        `${topic.charAt(0).toUpperCase()}${topic.slice(1)}. Here is what you need to know this month.`,
+        "We put together a short update with the details and the next steps. If you have questions, reply to this email and our team will get back to you.",
+        `Thank you,\n${i.senderName}\nAACTIVATED RX`,
+      ].join("\n\n"),
+    };
+  },
+});
+
 export const SKILLS = [
   brainPlanSkill,
   opsDelegateSkill,
@@ -642,4 +683,5 @@ export const SKILLS = [
   knowledgeSummarySkill,
   promptChatSkill,
   taskWorkSkill,
+  emailDraftSkill,
 ] as const;

@@ -15,6 +15,7 @@ import {
   type ContentChannel,
   ContentStatus,
   NotificationKind,
+  Role,
   TaskStatus,
 } from "@/generated/prisma/enums";
 import { db, type Db, type DbClient } from "@/lib/db";
@@ -68,6 +69,8 @@ export interface SubmitApprovalInput {
   budgetId?: string | null;
   amountUsd?: number | null;
   correlationId?: string | null;
+  /** Raise the approver level (e.g. a very large email send needs an executive). */
+  minimumRole?: Role | null;
 }
 
 /** Call inside the caller's transaction. Reasoning and sources are mandatory: no bare approvals. */
@@ -76,7 +79,8 @@ export async function submitApproval(tx: DbClient, input: SubmitApprovalInput) {
     throw new Error("Approval requests need the agent's reasoning.");
   if (input.sources.length === 0) throw new Error("Approval requests need at least one source.");
 
-  const requiredRole = requiredRoleFor(input.type, input.risk);
+  const requiredRole =
+    input.minimumRole === Role.EXECUTIVE ? Role.EXECUTIVE : requiredRoleFor(input.type, input.risk);
   const request = await tx.approvalRequest.create({
     data: {
       type: input.type,
@@ -291,6 +295,11 @@ export async function decideApproval(
     if (request.type === "PROJECT_LAUNCH") {
       const { applyProjectDecision } = await import("@/server/roadmap/service");
       await applyProjectDecision(tx, request, decision, actor.id, note ?? null);
+    }
+
+    if (request.type === "EMAIL") {
+      const { applyCampaignDecision } = await import("@/server/email/campaigns");
+      await applyCampaignDecision(tx, request, decision, note ?? null);
     }
 
     if (request.type === "BUDGET_CHANGE") {

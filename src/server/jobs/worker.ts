@@ -9,6 +9,7 @@ import { getEnv } from "@/lib/env";
 import type { ContentChannel } from "@/generated/prisma/enums";
 import { runContentWorkflow } from "@/server/agents/content-workflow";
 import { runPromptTask } from "@/server/agents/task-work";
+import { sendCampaign } from "@/server/email/campaigns";
 import { getSystemHealth } from "@/server/health/health";
 import { QUEUES } from "./queues";
 
@@ -45,6 +46,20 @@ async function main() {
     for (const job of jobs) {
       const result = await runPromptTask(job.data.taskId);
       console.info(`[worker] prompt task ${job.data.taskId}: ${result.status}`);
+    }
+  });
+
+  await boss.work<{ campaignId: string; actorId: string }>(QUEUES.emailCampaign, async (jobs) => {
+    for (const job of jobs) {
+      const actor = await db.user.findUnique({
+        where: { id: job.data.actorId },
+        select: { id: true, role: true, status: true },
+      });
+      if (!actor) continue;
+      const result = await sendCampaign(actor, job.data.campaignId);
+      console.info(
+        `[worker] email ${job.data.campaignId}: ${result.sent} sent, ${result.skipped} skipped`,
+      );
     }
   });
 

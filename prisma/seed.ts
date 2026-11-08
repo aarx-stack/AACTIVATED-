@@ -23,6 +23,7 @@ import type {
 } from "../src/generated/prisma/enums";
 import { requiredRoleFor } from "../src/server/approvals/policy";
 import { hashPayload } from "../src/server/approvals/payload";
+import { MOCK_CONTACTS } from "../src/server/integrations/mock";
 import { coachPlanSkill, knowledgeSummarySkill } from "../src/server/agents/skills";
 
 const db = new PrismaClient({
@@ -1388,6 +1389,165 @@ async function main() {
           createdAt: ago(26 * HOUR),
         },
       ],
+    });
+  }
+
+  // Email campaigns: one sent to clinics, one waiting for approval, one rep draft.
+  {
+    const clinicBody = [
+      "Hello,",
+      "Thank you for partnering with AACTIVATED RX this year. Our December education webinar for clinic teams is on December 10 at 1 pm Eastern.",
+      "We will cover the new member onboarding guide, ordering and the updated education materials for your front desk.",
+      "Reply to this email to save a seat for your team.",
+      "Thank you,\nMaya Torres\nAACTIVATED RX",
+    ].join("\n\n");
+    const sent = await db.emailCampaign.create({
+      data: {
+        name: "December clinic webinar",
+        audience: "CLINICS",
+        subject: "Your invitation: December education webinar",
+        body: clinicBody,
+        status: "SENT",
+        createdById: users.maya.id,
+        recipientEstimate: 7,
+        sentAt: ago(30 * HOUR),
+        sentCount: 7,
+        skippedCount: 1,
+        createdAt: ago(3 * DAY),
+      },
+    });
+    const sentPayload = {
+      kind: "email_campaign",
+      campaignId: sent.id,
+      audience: "CLINICS",
+      channel: "EMAIL",
+      to: "Clinics (about 7)",
+      subject: "Your invitation: December education webinar",
+      message: clinicBody,
+    };
+    const sentApproval = await db.approvalRequest.create({
+      data: {
+        type: "EMAIL",
+        title: "Email: December clinic webinar",
+        summary: '"Your invitation: December education webinar" to clinics (about 7 people).',
+        payload: sentPayload,
+        payloadHash: hashPayload(sentPayload),
+        reasoning:
+          "Maya Torres wrote this email for clinics. It goes only to contacts who agreed to receive email, through GoHighLevel, with an unsubscribe link.",
+        sources: [
+          { title: "Audience: Clinics", note: "7 can be emailed; 1 skipped (no address)." },
+        ] as Prisma.InputJsonValue,
+        risk: "LOW",
+        requiredRole: requiredRoleFor("EMAIL", "LOW"),
+        status: "APPROVED",
+        requestedByUserId: users.maya.id,
+        decidedById: users.devon.id,
+        decidedAt: ago(32 * HOUR),
+        dispatchedAt: ago(30 * HOUR),
+        createdAt: ago(2 * DAY),
+      },
+    });
+    await db.emailCampaign.update({
+      where: { id: sent.id },
+      data: { approvalRequestId: sentApproval.id },
+    });
+    await db.complianceCheck.create({
+      data: {
+        approvalRequestId: sentApproval.id,
+        outcome: "PASS",
+        risk: "LOW",
+        violations: [] as Prisma.InputJsonValue,
+        checkedAt: ago(2 * DAY),
+      },
+    });
+    await db.emailSend.createMany({
+      data: MOCK_CONTACTS.clinic!.map((c) => ({
+        campaignId: sent.id,
+        recipientKey: c.id,
+        name: c.name,
+        email: c.email,
+        status: c.email ? ("SENT" as const) : ("SKIPPED" as const),
+        reason: c.email ? null : "No email address",
+        externalId: c.email ? `mock-msg-${c.id.slice(-3)}` : null,
+        createdAt: ago(30 * HOUR),
+      })),
+    });
+
+    const memberBody = [
+      "Hello,",
+      "Here is your December update from AACTIVATED RX: new education videos in the member library, the holiday shipping schedule and a reminder about our community Q&A on December 14.",
+      "As always, talk with your healthcare provider about what is right for you.",
+      "Thank you for being part of the community,\nDevon Brooks\nAACTIVATED RX",
+    ].join("\n\n");
+    const pending = await db.emailCampaign.create({
+      data: {
+        name: "December member newsletter",
+        audience: "MEMBERS",
+        subject: "Your December update from AACTIVATED",
+        body: memberBody,
+        status: "IN_REVIEW",
+        createdById: users.devon.id,
+        recipientEstimate: 21,
+        createdAt: ago(8 * HOUR),
+      },
+    });
+    const pendingPayload = {
+      kind: "email_campaign",
+      campaignId: pending.id,
+      audience: "MEMBERS",
+      channel: "EMAIL",
+      to: "Members (about 21)",
+      subject: "Your December update from AACTIVATED",
+      message: memberBody,
+    };
+    const pendingApproval = await db.approvalRequest.create({
+      data: {
+        type: "EMAIL",
+        title: "Email: December member newsletter",
+        summary: '"Your December update from AACTIVATED" to members (about 21 people).',
+        payload: pendingPayload,
+        payloadHash: hashPayload(pendingPayload),
+        reasoning:
+          "Devon Brooks wrote this email for members. It goes only to contacts who agreed to receive email, through GoHighLevel, with an unsubscribe link.",
+        sources: [
+          { title: "Audience: Members", note: "21 can be emailed; 3 skipped (do-not-disturb)." },
+        ] as Prisma.InputJsonValue,
+        risk: "LOW",
+        requiredRole: requiredRoleFor("EMAIL", "LOW"),
+        requestedByUserId: users.devon.id,
+        createdAt: ago(6 * HOUR),
+      },
+    });
+    await db.emailCampaign.update({
+      where: { id: pending.id },
+      data: { approvalRequestId: pendingApproval.id },
+    });
+    await db.complianceCheck.create({
+      data: {
+        approvalRequestId: pendingApproval.id,
+        outcome: "PASS",
+        risk: "LOW",
+        violations: [] as Prisma.InputJsonValue,
+        checkedAt: ago(6 * HOUR),
+      },
+    });
+
+    await db.emailCampaign.create({
+      data: {
+        name: "Welcome to the Recovery challenge",
+        audience: "MY_CONTACTS",
+        subject: "Thanks for joining the Recovery challenge",
+        body: [
+          "Hi there,",
+          "Thanks for signing up for the 30-day Recovery challenge. Each week I will share one simple habit and a short video from the AACTIVATED education library.",
+          "Reply any time with questions.",
+          "Talk soon,\nJordan",
+        ].join("\n\n"),
+        status: "DRAFT",
+        createdById: users.jordan.id,
+        repId: users.jordan.id,
+        createdAt: ago(2 * HOUR),
+      },
     });
   }
 

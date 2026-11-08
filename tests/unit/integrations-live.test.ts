@@ -301,3 +301,74 @@ describe("feature flags", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("GoHighLevel contacts (live)", () => {
+  const config = { token: SECRET, locationId: "loc_1" };
+
+  it("searches the company location by tag and marks do-not-disturb", async () => {
+    const { fn, calls } = fakeFetch(
+      json({
+        contacts: [
+          { id: "c1", firstName: "Ann", lastName: "Lee", email: "ann@example.test" },
+          { id: "c2", contactName: "Bay Clinic", email: "bay@example.test", dnd: true },
+          {
+            id: "c3",
+            contactName: "Cove",
+            email: "cove@example.test",
+            dndSettings: { Email: { status: "active" } },
+          },
+          { id: "c4", contactName: "No Mail" },
+        ],
+        total: 104,
+      }),
+    );
+    const out = await createLiveGoHighLevel({ ...config, fetch: fn }).listContacts({
+      tag: "clinic",
+      page: 1,
+      pageSize: 100,
+    });
+    expect(calls[0]).toMatchObject({
+      url: "https://services.leadconnectorhq.com/contacts/search",
+      method: "POST",
+      body: {
+        locationId: "loc_1",
+        page: 1,
+        pageLimit: 100,
+        filters: [{ field: "tags", operator: "contains", value: ["clinic"] }],
+      },
+    });
+    expect(out.hasMore).toBe(true);
+    expect(out.contacts).toEqual([
+      { id: "c1", name: "Ann Lee", email: "ann@example.test", emailDnd: false },
+      { id: "c2", name: "Bay Clinic", email: "bay@example.test", emailDnd: true },
+      { id: "c3", name: "Cove", email: "cove@example.test", emailDnd: true },
+      { id: "c4", name: "No Mail", email: null, emailDnd: false },
+    ]);
+  });
+
+  it("an unsubscribe turns on email do-not-disturb for the contact", async () => {
+    const { fn, calls } = fakeFetch(json({}));
+    await createLiveGoHighLevel({ ...config, fetch: fn }).setEmailDoNotDisturb({
+      subAccountId: "company",
+      contactId: "c9",
+    });
+    expect(calls[0]).toMatchObject({
+      url: "https://services.leadconnectorhq.com/contacts/c9",
+      method: "PUT",
+      body: { dndSettings: { Email: { status: "active" } } },
+    });
+  });
+
+  it("emails carry the HTML version when there is one", async () => {
+    const { fn, calls } = fakeFetch(json({ messageId: "m1" }));
+    await createLiveGoHighLevel({ ...config, fetch: fn }).sendMessage({
+      subAccountId: "company",
+      contactId: "c1",
+      channel: "EMAIL",
+      subject: "Hi",
+      message: "Plain",
+      html: "<p>Rich</p>",
+    });
+    expect(calls[0]!.body).toMatchObject({ type: "Email", message: "Plain", html: "<p>Rich</p>" });
+  });
+});
