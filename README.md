@@ -106,6 +106,7 @@ Invite a user** before go-live.
 | `npm run test:unit`        | Unit tests only (no database)                                                                      |
 | `npm run test:e2e`         | Playwright against a production build (`npm run build` first): every page, every role, both themes |
 | `npm run quickbooks:check` | Offline check that "Connect QuickBooks" is set up; prints the redirect address to register         |
+| `npm run setup:production` | Sets up the real company in an empty database: no demo data (see docs/GO_LIVE.md)                  |
 | `npm run secret`           | Prints a new random 32-byte key (for `AUTH_SECRET` or `TOKEN_ENCRYPTION_KEY`)                      |
 | `npm run db:reset`         | Drop, re-migrate and re-seed the **dev** database                                                  |
 
@@ -346,6 +347,9 @@ do-not-disturb fields in `live/gohighlevel.ts` against the HighLevel API referen
 location, and tag your clinic, member and rep contacts in GoHighLevel.
 
 ## Production checklist
+
+The full, ordered guide is [docs/GO_LIVE.md](docs/GO_LIVE.md). For a new production database run
+`npm run setup:production` (the real company, no demo data) instead of the demo seed.
 
 - `APP_ENV=production`, a long random `AUTH_SECRET` (`npm run secret`), `APP_URL` on HTTPS and
   `EMAIL_TRANSPORT=smtp`. The app refuses to start in production without these, with demo login

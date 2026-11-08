@@ -5,4 +5,5 @@ export const QUEUES = {
   contentWorkflow: "agents.content-workflow",
   promptTask: "agents.prompt-task",
   emailCampaign: "email.send-campaign",
+  budgetRollover: "budgets.monthly-rollover",
 } as const;

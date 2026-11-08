@@ -27,7 +27,7 @@ import { authorize, ForbiddenError, type Actor } from "@/server/authz/permission
 import { notifyUser } from "@/server/notifications";
 import { BudgetChangePendingError } from "./errors";
 import { budgetState } from "./rules";
-import { budgetFigures, refreshBudget } from "./service";
+import { budgetFigures, ensureMonthlyBudgets, refreshBudget } from "./service";
 
 const num = (d: Prisma.Decimal | number | null | undefined) => (d == null ? 0 : Number(d));
 const toCents = (n: number) => Math.round(n * 100);
@@ -54,6 +54,7 @@ function visibleTo(role: Role, budget: { department: { isConfidential: boolean }
 
 export async function listBudgetsForRequests(actor: Actor, client: Db = db, now = new Date()) {
   authorize(actor, "budget.request_change");
+  await ensureMonthlyBudgets(client, now);
   const budgets = await client.budget.findMany({
     where: { periodStart: { lte: now }, periodEnd: { gte: now } },
     orderBy: { name: "asc" },

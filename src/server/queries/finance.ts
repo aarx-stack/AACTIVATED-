@@ -2,7 +2,7 @@ import "server-only";
 import { ApprovalStatus, ApprovalType, SpendKind, TransactionType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { startOfDay } from "@/lib/utils";
-import { budgetFigures, isContinuePayload } from "@/server/budgets/service";
+import { budgetFigures, ensureMonthlyBudgets, isContinuePayload } from "@/server/budgets/service";
 import { budgetState } from "@/server/budgets/rules";
 
 const DAY = 86_400_000;
@@ -41,6 +41,7 @@ export function shortDepartment(name: string) {
 const change = (now: number, before: number) => (before > 0 ? (now - before) / before : null);
 
 export async function getFinance(range: FinanceRange, now = new Date()) {
+  await ensureMonthlyBudgets(db, now);
   const end = now;
   const start = new Date(startOfDay(now).getTime() - (range - 1) * DAY);
   const prevStart = new Date(start.getTime() - range * DAY);

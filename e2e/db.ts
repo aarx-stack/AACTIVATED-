@@ -115,3 +115,12 @@ export async function assistantIdOf(email: string) {
     return r.rows[0]?.id as string;
   });
 }
+
+export async function retireBudgetByName(name: string) {
+  await withDb((c) =>
+    c.query(
+      `UPDATE "Budget" SET "periodEnd" = now() - interval '1 day', "updatedAt" = now() WHERE name = $1`,
+      [name],
+    ),
+  );
+}

@@ -16,7 +16,7 @@
  */
 import { z } from "zod";
 import { Prisma, type Budget } from "@/generated/prisma/client";
-import type { SpendKind } from "@/generated/prisma/enums";
+import { SpendKind as SpendKindEnum, type SpendKind } from "@/generated/prisma/enums";
 import {
   ApprovalStatus,
   ApprovalType,
@@ -51,6 +51,71 @@ function rootOf(client: DbClient): Db {
   return "$transaction" in client ? (client as Db) : db;
 }
 
+// ---------------------------------------------------------------- periods --
+
+export function monthPeriod(at: Date) {
+  return {
+    start: new Date(at.getFullYear(), at.getMonth(), 1),
+    end: new Date(at.getFullYear(), at.getMonth() + 1, 0, 23, 59, 59, 999),
+  };
+}
+
+const budgetKey = (b: { kind: SpendKind; departmentId: string | null; name: string }) =>
+  `${b.kind}|${b.departmentId ?? ""}|${b.name}`;
+
+/**
+ * Budgets are monthly. On the first use in a new month, every budget that ran to the end of last
+ * month starts again for this month with the same limit and threshold (the 75% rule keeps
+ * working). Budgets that were ended early, or skipped a month, are not brought back.
+ * Safe to call often and from several places at once.
+ */
+export async function ensureMonthlyBudgets(client: Db = db, at = new Date()) {
+  const { start, end } = monthPeriod(at);
+  const lastMonthEnd = new Date(start.getTime() - 1);
+  const lastDayStart = new Date(
+    lastMonthEnd.getFullYear(),
+    lastMonthEnd.getMonth(),
+    lastMonthEnd.getDate(),
+  );
+  return client.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('budget-month-rollover'))`;
+    const current = await tx.budget.findMany({
+      where: { periodStart: { lte: at }, periodEnd: { gte: at } },
+      select: { kind: true, departmentId: true, name: true },
+    });
+    const have = new Set(current.map(budgetKey));
+    const lastMonth = await tx.budget.findMany({
+      where: { periodEnd: { gte: lastDayStart, lt: start } },
+    });
+    const created: string[] = [];
+    for (const b of lastMonth) {
+      if (have.has(budgetKey(b))) continue;
+      have.add(budgetKey(b));
+      const next = await tx.budget.create({
+        data: {
+          name: b.name,
+          kind: b.kind,
+          departmentId: b.departmentId,
+          periodStart: start,
+          periodEnd: end,
+          limitUsd: b.limitUsd,
+          threshold: b.threshold,
+        },
+      });
+      created.push(next.id);
+      await recordAudit(tx, {
+        actor: { type: "SYSTEM" },
+        action: "budget.rolled_over",
+        entityType: "Budget",
+        entityId: next.id,
+        before: { budgetId: b.id, periodStart: b.periodStart },
+        after: { periodStart: start, limitUsd: num(b.limitUsd) },
+      });
+    }
+    return created;
+  });
+}
+
 // ------------------------------------------------------------------ lookup --
 
 /** The most specific budget that covers this spend right now: the department's, else company-wide. */
@@ -60,14 +125,20 @@ export async function findBudgetFor(
   departmentId: string | null | undefined,
   at = new Date(),
 ) {
-  const candidates = await client.budget.findMany({
-    where: {
-      kind,
-      periodStart: { lte: at },
-      periodEnd: { gte: at },
-      OR: departmentId ? [{ departmentId }, { departmentId: null }] : [{ departmentId: null }],
-    },
-  });
+  const find = () =>
+    client.budget.findMany({
+      where: {
+        kind,
+        periodStart: { lte: at },
+        periodEnd: { gte: at },
+        OR: departmentId ? [{ departmentId }, { departmentId: null }] : [{ departmentId: null }],
+      },
+    });
+  let candidates = await find();
+  if (candidates.length === 0) {
+    // A new month: carry last month's budgets over before deciding there is none.
+    if ((await ensureMonthlyBudgets(rootOf(client), at)).length > 0) candidates = await find();
+  }
   return candidates.find((b) => b.departmentId === departmentId) ?? candidates[0] ?? null;
 }
 
@@ -394,6 +465,62 @@ export async function recordApprovedPurchase(actor: Actor, approvalId: string, c
       },
     });
     return event;
+  });
+}
+
+export const newBudgetSchema = z.object({
+  name: z.string().trim().min(3, "Give the budget a name.").max(80),
+  kind: z.nativeEnum(SpendKindEnum),
+  departmentId: z.string().optional(),
+  limitUsd: z.coerce
+    .number({ message: "Enter a limit." })
+    .positive("The limit must be above zero.")
+    .max(10_000_000, "That limit is too large."),
+});
+
+/** A new monthly budget, starting this month. It carries over every month until ended. */
+export async function createBudget(
+  actor: Actor,
+  input: z.input<typeof newBudgetSchema>,
+  client: Db = db,
+  at = new Date(),
+) {
+  authorize(actor, "budget.manage");
+  const data = newBudgetSchema.parse(input);
+  const departmentId = data.departmentId || null;
+  const { start, end } = monthPeriod(at);
+  return client.$transaction(async (tx) => {
+    const clash = await tx.budget.findFirst({
+      where: {
+        name: data.name,
+        kind: data.kind,
+        departmentId,
+        periodStart: { lte: at },
+        periodEnd: { gte: at },
+      },
+    });
+    if (clash) throw new ForbiddenError("A budget with that name already exists this month.");
+    if (departmentId && !(await tx.department.findUnique({ where: { id: departmentId } }))) {
+      throw new ForbiddenError("That department does not exist.");
+    }
+    const budget = await tx.budget.create({
+      data: {
+        name: data.name,
+        kind: data.kind,
+        departmentId,
+        periodStart: start,
+        periodEnd: end,
+        limitUsd: new Prisma.Decimal(data.limitUsd.toFixed(2)),
+      },
+    });
+    await recordAudit(tx, {
+      actor: { type: "USER", userId: actor.id },
+      action: "budget.created",
+      entityType: "Budget",
+      entityId: budget.id,
+      after: { name: data.name, kind: data.kind, departmentId, limitUsd: data.limitUsd },
+    });
+    return budget;
   });
 }
 

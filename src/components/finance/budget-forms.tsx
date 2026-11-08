@@ -4,6 +4,7 @@ import { ActionForm, selectClass } from "@/components/forms/action-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  createBudgetAction,
   recordPurchaseAction,
   recordSpendAction,
   setLimitAction,
@@ -123,5 +124,75 @@ export function SyncNowButton() {
       className="items-end gap-1 text-right"
       testId="quickbooks-sync"
     />
+  );
+}
+
+const SPEND_KINDS = [
+  ["AI_MODEL", "AI models"],
+  ["ADVERTISING", "Advertising"],
+  ["SOFTWARE", "Software"],
+  ["CONTRACTOR", "Contractors"],
+  ["OTHER", "Other"],
+] as const;
+
+/** A new monthly budget. It starts this month and carries over each month. */
+export function NewBudgetForm({ departments }: { departments: { id: string; name: string }[] }) {
+  return (
+    <ActionForm
+      action={createBudgetAction}
+      submitLabel="Create budget"
+      buttonVariant="secondary"
+      testId="new-budget"
+      resetOnSuccess
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="budget-name">Name</Label>
+          <Input id="budget-name" name="name" required minLength={3} maxLength={80} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="budget-kind">Covers</Label>
+          <select id="budget-kind" name="kind" className={selectClass} defaultValue="AI_MODEL">
+            {SPEND_KINDS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="budget-department">Department</Label>
+          <select
+            id="budget-department"
+            name="departmentId"
+            className={selectClass}
+            defaultValue=""
+          >
+            <option value="">Company-wide</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="budget-limit">Monthly limit (USD)</Label>
+          <Input
+            id="budget-limit"
+            name="limitUsd"
+            type="number"
+            min="1"
+            step="0.01"
+            inputMode="decimal"
+            required
+          />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Starts this month and carries over every month with the same limit. Spending pauses at 75%
+        until an executive approves more.
+      </p>
+    </ActionForm>
   );
 }

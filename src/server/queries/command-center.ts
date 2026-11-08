@@ -8,6 +8,7 @@ import {
   TaskStatus,
 } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { ensureMonthlyBudgets } from "@/server/budgets/service";
 import { startOfDay, startOfMonth } from "@/lib/utils";
 import { scoreDepartment } from "./department-health";
 import { redactFeedItem } from "./redaction";
@@ -16,6 +17,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const CHART_DAYS = 14;
 
 export async function getCommandCenterData(role: Role, now = new Date()) {
+  // A new month starts with last month's budgets carried over.
+  await ensureMonthlyBudgets(db, now);
   const today = startOfDay(now);
   const monthStart = startOfMonth(now);
   const chartStart = new Date(today.getTime() - (CHART_DAYS - 1) * DAY);

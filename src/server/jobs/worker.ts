@@ -9,6 +9,7 @@ import { getEnv } from "@/lib/env";
 import type { ContentChannel } from "@/generated/prisma/enums";
 import { runContentWorkflow } from "@/server/agents/content-workflow";
 import { runPromptTask } from "@/server/agents/task-work";
+import { ensureMonthlyBudgets } from "@/server/budgets/service";
 import { sendCampaign } from "@/server/email/campaigns";
 import { getSystemHealth } from "@/server/health/health";
 import { QUEUES } from "./queues";
@@ -63,6 +64,13 @@ async function main() {
     }
   });
 
+  await boss.work(QUEUES.budgetRollover, async () => {
+    const created = await ensureMonthlyBudgets();
+    if (created.length)
+      console.info(`[worker] started ${created.length} budgets for the new month`);
+  });
+
+  await boss.schedule(QUEUES.budgetRollover, "5 0 * * *");
   await boss.schedule(QUEUES.heartbeat, "* * * * *");
   await boss.schedule(QUEUES.healthCheck, "*/5 * * * *");
   await boss.send(QUEUES.heartbeat, {});

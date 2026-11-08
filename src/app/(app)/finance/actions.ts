@@ -5,6 +5,7 @@ import { z } from "zod";
 import { actionError, type ActionState } from "@/server/action-result";
 import { requireActionPermission } from "@/server/auth/session";
 import {
+  createBudget,
   recordApprovedPurchase,
   recordManualSpend,
   setBudgetLimit,
@@ -84,6 +85,26 @@ export async function syncQuickBooksAction(
     return { status: "done", message: "Synced with QuickBooks (read-only)." };
   } catch (error) {
     revalidatePath("/finance");
+    return actionError(error);
+  }
+}
+
+export async function createBudgetAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const actor = await requireActionPermission("budget.manage");
+    const budget = await createBudget(actor, {
+      name: String(form.get("name") ?? ""),
+      kind: String(form.get("kind") ?? "") as never,
+      departmentId: String(form.get("departmentId") ?? "") || undefined,
+      limitUsd: String(form.get("limitUsd") ?? ""),
+    });
+    refresh();
+    revalidatePath("/budgets");
+    return {
+      status: "done",
+      message: `${budget.name} created at ${formatUsd(budget.limitUsd.toNumber())} a month.`,
+    };
+  } catch (error) {
     return actionError(error);
   }
 }

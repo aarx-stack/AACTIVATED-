@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "next start",
     "worker": "tsx --conditions=react-server src/server/jobs/worker.ts",
+    "setup:production": "tsx --conditions=react-server scripts/setup-production.ts",
     "quickbooks:check": "tsx --conditions=react-server scripts/quickbooks-check.ts",
     "secret": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64'))\"",
     "typecheck": "tsc --noEmit",

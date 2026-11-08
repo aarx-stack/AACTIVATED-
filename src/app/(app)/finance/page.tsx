@@ -14,6 +14,7 @@ import { DeltaChip } from "@/components/command-center/kpi-card";
 import { DeptSpendChart } from "@/components/finance/dept-spend-chart";
 import {
   LimitForm,
+  NewBudgetForm,
   RecordPurchaseButton,
   RecordSpendForm,
   SyncNowButton,
@@ -26,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { can } from "@/server/authz/permissions";
 import { cn, formatPercent, formatRelativeTime, formatUsd } from "@/lib/utils";
+import { db } from "@/lib/db";
 import { requirePagePermission } from "@/server/auth/session";
 import { getFinance, parseRange } from "@/server/queries/finance";
 
@@ -134,6 +136,10 @@ export default async function FinancePage({
   const { kpis, budgetTotals } = data;
   const usage = budgetTotals.limit > 0 ? budgetTotals.spent / budgetTotals.limit : 0;
   const budgetOptions = data.budgets.map((b) => ({ id: b.id, name: b.name }));
+  const departmentOptions = await db.department.findMany({
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, name: true },
+  });
   const qb = data.quickbooks;
   const qbOk = qb?.status === "OPERATIONAL";
 
@@ -330,6 +336,17 @@ export default async function FinancePage({
               <div className="mt-4 grid gap-6 lg:grid-cols-2">
                 <RecordSpendForm budgets={budgetOptions} />
                 <LimitForm budgets={budgetOptions} />
+              </div>
+            </details>
+          )}
+          {manage && (
+            <details
+              className="tile p-4 [&_summary::-webkit-details-marker]:hidden"
+              open={data.budgets.length === 0}
+            >
+              <summary className="cursor-pointer text-sm font-semibold">New budget</summary>
+              <div className="mt-4">
+                <NewBudgetForm departments={departmentOptions} />
               </div>
             </details>
           )}
