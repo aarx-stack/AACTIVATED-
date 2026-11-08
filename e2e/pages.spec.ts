@@ -31,7 +31,7 @@ const PAGES: { path: string; heading: string; roles: Who[] }[] = [
   { path: "/prompts", heading: "Prompt Generator", roles: [E, S] },
   { path: "/roadmap", heading: "Development & Tokenization Map", roles: [E, S, A] },
   { path: "/admin", heading: "Admin & Access Control", roles: [E, A] },
-  { path: "/admin/audit", heading: "Audit Log", roles: [E, A] },
+  { path: "/admin/audit", heading: "Audit Log", roles: [E] },
   { path: "/notifications", heading: "Notifications", roles: ALL },
   { path: "/settings", heading: "Settings", roles: ALL },
 ];
