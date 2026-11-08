@@ -97,15 +97,17 @@ Invite a user** before go-live.
 
 ## Scripts
 
-| Command             | What it does                                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------- |
-| `npm run dev`       | Development server                                                                                 |
-| `npm run worker`    | Background worker (pg-boss): heartbeat, health checks, queued agent work                           |
-| `npm run check`     | Type-check, lint, format check and all Vitest suites                                               |
-| `npm test`          | Unit and integration tests (integration needs the test database)                                   |
-| `npm run test:unit` | Unit tests only (no database)                                                                      |
-| `npm run test:e2e`  | Playwright against a production build (`npm run build` first): every page, every role, both themes |
-| `npm run db:reset`  | Drop, re-migrate and re-seed the **dev** database                                                  |
+| Command                    | What it does                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `npm run dev`              | Development server                                                                                 |
+| `npm run worker`           | Background worker (pg-boss): heartbeat, health checks, queued agent work                           |
+| `npm run check`            | Type-check, lint, format check and all Vitest suites                                               |
+| `npm test`                 | Unit and integration tests (integration needs the test database)                                   |
+| `npm run test:unit`        | Unit tests only (no database)                                                                      |
+| `npm run test:e2e`         | Playwright against a production build (`npm run build` first): every page, every role, both themes |
+| `npm run quickbooks:check` | Offline check that "Connect QuickBooks" is set up; prints the redirect address to register         |
+| `npm run secret`           | Prints a new random 32-byte key (for `AUTH_SECRET` or `TOKEN_ENCRYPTION_KEY`)                      |
+| `npm run db:reset`         | Drop, re-migrate and re-seed the **dev** database                                                  |
 
 Integration tests rebuild the database in `TEST_DATABASE_URL` from migrations on every run. They
 refuse to touch any database whose name doesn't end in `_test`.
@@ -251,6 +253,10 @@ executives and system admins. It sends them to Intuit to approve, and back to th
 **Disconnect** revokes the token at Intuit and deletes it here (it is deleted here even if Intuit
 cannot be reached). Intuit has no read-only permission scope, so read-only is enforced in code: the
 adapter only issues GET requests, and tests check that.
+
+Step-by-step test with Intuit's sample company on your own computer:
+[docs/quickbooks-test-company.md](docs/quickbooks-test-company.md). `npm run quickbooks:check`
+checks the setup without contacting Intuit.
 
 For a quick sandbox test without the app, `QUICKBOOKS_REALM_ID` and `QUICKBOOKS_ACCESS_TOKEN` still
 work, but nothing renews that token.
