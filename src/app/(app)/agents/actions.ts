@@ -72,10 +72,7 @@ export async function retryTaskAction(taskId: string) {
   }
 }
 
-export async function askAssistantAction(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
+export async function askAssistantAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   try {
     const actor = await requireActionPermission("assistant.use");
     const agentId = String(form.get("agentId") ?? "");
