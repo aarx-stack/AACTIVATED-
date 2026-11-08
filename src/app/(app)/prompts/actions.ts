@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { actionError, type ActionState } from "@/server/action-result";
+import { getEnv } from "@/lib/env";
+import { runPromptTask } from "@/server/agents/task-work";
 import { requireActionPermission } from "@/server/auth/session";
+import { enqueue } from "@/server/jobs/client";
+import { QUEUES } from "@/server/jobs/queues";
 import { chatWithBrain, restoreVersion, saveTemplate, sendToAgent } from "@/server/prompts/service";
 
 export type ChatResult =
@@ -78,17 +82,35 @@ export async function sendToAgentAction(_prev: ActionState, form: FormData): Pro
     for (const [key, value] of form.entries()) {
       if (key.startsWith("var_")) values[key.slice(4)] = String(value);
     }
-    const { agent } = await sendToAgent(actor, {
+    const { agent, task } = await sendToAgent(actor, {
       templateId: String(form.get("templateId") ?? ""),
       agentId: String(form.get("agentId") ?? ""),
       values,
     });
+    const link = { href: `/agents/${agent.id}`, hrefLabel: "Open workspace" };
+    const who = `${agent.title} (${agent.name})`;
+    if (getEnv().AGENT_EXECUTION === "queue") {
+      await enqueue(QUEUES.promptTask, { taskId: task.id });
+      revalidatePath(`/agents/${agent.id}`);
+      return {
+        status: "done",
+        message: `Sent to ${who}. It will start shortly and the draft will appear on their task board.`,
+        ...link,
+      };
+    }
+    const result = await runPromptTask(task.id);
     revalidatePath(`/agents/${agent.id}`);
+    if (result.status === "blocked") {
+      return {
+        status: "error",
+        message: `Sent to ${who}, but it could not finish: ${result.message}`,
+        ...link,
+      };
+    }
     return {
       status: "done",
-      message: `Sent to ${agent.title} (${agent.name}). It is on their task board.`,
-      href: `/agents/${agent.id}`,
-      hrefLabel: "Open workspace",
+      message: `${who} finished a draft. Review it on their task board.`,
+      ...link,
     };
   } catch (error) {
     return actionError(error);

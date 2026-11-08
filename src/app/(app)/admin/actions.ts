@@ -8,6 +8,7 @@ import { requireActionPermission } from "@/server/auth/session";
 import { ForbiddenError } from "@/server/authz/permissions";
 import { getSystemHealth } from "@/server/health/health";
 import { setIntegrationEnabled } from "@/server/integrations/controls";
+import { disconnectQuickBooks } from "@/server/integrations/quickbooks-connection";
 import { changeUserRole, inviteUser, NotFoundError, setUserStatus } from "@/server/users/admin";
 import { db } from "@/lib/db";
 
@@ -99,6 +100,23 @@ export async function setIntegrationEnabledAction(
     );
     revalidatePath("/admin");
     return { ok: true, message: enabled ? "Turned on." : "Turned off." };
+  } catch (error) {
+    return toResult(error);
+  }
+}
+
+export async function disconnectQuickBooksAction(): Promise<ActionResult> {
+  try {
+    const actor = await requireActionPermission("integrations.connect_accounting");
+    const result = await disconnectQuickBooks(actor);
+    revalidatePath("/admin");
+    if (!result.wasConnected) return { ok: true, message: "QuickBooks was not connected." };
+    return {
+      ok: true,
+      message: result.revoked
+        ? "Disconnected. QuickBooks access was revoked."
+        : "Disconnected here. QuickBooks could not be reached to revoke access; remove the app in QuickBooks too.",
+    };
   } catch (error) {
     return toResult(error);
   }

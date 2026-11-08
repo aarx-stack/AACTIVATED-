@@ -49,6 +49,7 @@ const EXPECTED: Record<Permission, Role[]> = {
   "admin.view": [E, A],
   "users.manage": [E, A],
   "integrations.manage": [A],
+  "integrations.connect_accounting": [E, A],
   "audit_log.view": [E, A],
   "system_status.view": [E, S, A],
   "account.manage_own": [E, S, P, F, A],

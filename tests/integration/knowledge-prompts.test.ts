@@ -237,7 +237,7 @@ describe("Prompt Generator", () => {
         kind: "DEPARTMENT",
         status: "ACTIVE",
         departmentId: legal.id,
-        config: {},
+        config: { role: "r", context: "c", dailyRoutine: "d", toolsAllowed: ["tasks.work"] },
         ownerId: staff.id,
       },
     });

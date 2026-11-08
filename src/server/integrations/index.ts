@@ -15,6 +15,7 @@ import { createLiveGoHighLevel } from "./live/gohighlevel";
 import type { FetchLike } from "./live/http";
 import { createLiveQuickBooks } from "./live/quickbooks";
 import { createLiveSlack } from "./live/slack";
+import { getQuickBooksAccess, oauthConfigured, oauthMissing } from "./quickbooks-connection";
 import { mockGoHighLevel, mockQuickBooks, mockSlack } from "./mock";
 import {
   type GoHighLevelAdapter,
@@ -31,11 +32,19 @@ const LABEL: Record<IntegrationKey, string> = {
   SLACK: "Slack",
 };
 
+/** QuickBooks with a fixed token from the environment (sandbox testing only). */
+function quickBooksStaticToken(env: Env) {
+  return Boolean(env.QUICKBOOKS_REALM_ID && env.QUICKBOOKS_ACCESS_TOKEN);
+}
+
 /** Which credentials are missing for live mode (names only, never values). */
 export function missingCredentials(key: IntegrationKey, env: Env = getEnv()): string[] {
-  const need: Record<IntegrationKey, (keyof Env)[]> = {
+  if (key === "QUICKBOOKS") {
+    // Either the OAuth app ("Connect QuickBooks", recommended) or a fixed sandbox token.
+    return oauthConfigured(env) || quickBooksStaticToken(env) ? [] : oauthMissing(env);
+  }
+  const need: Record<Exclude<IntegrationKey, "QUICKBOOKS">, (keyof Env)[]> = {
     GOHIGHLEVEL: ["GOHIGHLEVEL_API_KEY", "GOHIGHLEVEL_LOCATION_ID"],
-    QUICKBOOKS: ["QUICKBOOKS_REALM_ID", "QUICKBOOKS_ACCESS_TOKEN"],
     SLACK: ["SLACK_WEBHOOK_URL"],
   };
   return need[key].filter((name) => !env[name]);
@@ -102,8 +111,12 @@ export function buildAdapters(env: Env = getEnv(), fetchImpl?: FetchLike) {
       : qbMissing.length
         ? unconfigured(mockQuickBooks, qbMissing)
         : createLiveQuickBooks({
-            realmId: env.QUICKBOOKS_REALM_ID!,
-            accessToken: env.QUICKBOOKS_ACCESS_TOKEN!,
+            auth: oauthConfigured(env)
+              ? () => getQuickBooksAccess({ env, fetch: fetchImpl })
+              : async () => ({
+                  realmId: env.QUICKBOOKS_REALM_ID!,
+                  accessToken: env.QUICKBOOKS_ACCESS_TOKEN!,
+                }),
             environment: env.QUICKBOOKS_ENVIRONMENT,
             fetch: fetchImpl,
           });

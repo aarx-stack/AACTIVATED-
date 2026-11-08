@@ -502,6 +502,11 @@ model Task {
   contentItems  ContentItem[]
   /// Groups every record created by one workflow run.
   correlationId String?
+  /// What the agent produced for a prompt task: { summary, deliverable, nextSteps }. Internal only.
+  output        Json?
+  outputAt      DateTime?
+  /// Why the agent could not finish, in plain words.
+  lastError     String?
 
   @@index([status, completedAt])
   @@index([agentId])
@@ -809,6 +814,32 @@ model Integration {
   config        Json                @default("{}")
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
+}
+
+/// OAuth connection to an integration (QuickBooks). Tokens are encrypted at rest with
+/// TOKEN_ENCRYPTION_KEY; they are never shown in the app or written to the audit log.
+model IntegrationConnection {
+  id               String              @id @default(cuid())
+  provider         IntegrationProvider @unique
+  /// The connected account (QuickBooks company / realm id). Not secret.
+  accountId        String
+  accessTokenEnc   String
+  accessExpiresAt  DateTime
+  refreshTokenEnc  String
+  refreshExpiresAt DateTime
+  connectedById    String?
+  connectedAt      DateTime            @default(now())
+  lastRefreshedAt  DateTime?
+  updatedAt        DateTime            @updatedAt
+}
+
+/// Sliding-window rate limiting (sign-in requests). Old rows are pruned as new ones arrive.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
 }
 
 model HealthCheck {

@@ -30,6 +30,12 @@ const schema = z
     QUICKBOOKS_REALM_ID: z.string().optional(),
     QUICKBOOKS_ACCESS_TOKEN: z.string().optional(),
     QUICKBOOKS_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+    // "Connect QuickBooks" (OAuth 2.0): the Intuit app's client id and secret. With these set,
+    // a system admin or executive connects once in Admin and access renews automatically.
+    QUICKBOOKS_CLIENT_ID: z.string().optional(),
+    QUICKBOOKS_CLIENT_SECRET: z.string().optional(),
+    /** 32 random bytes, base64: encrypts stored OAuth tokens. */
+    TOKEN_ENCRYPTION_KEY: z.string().optional(),
     SLACK_WEBHOOK_URL: z.string().optional(),
   })
   .superRefine((env, ctx) => {
@@ -38,6 +44,13 @@ const schema = z
         code: "custom",
         path: ["DEMO_LOGIN_ENABLED"],
         message: "Demo login must never be enabled in production.",
+      });
+    }
+    if (env.QUICKBOOKS_CLIENT_ID && !env.TOKEN_ENCRYPTION_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["TOKEN_ENCRYPTION_KEY"],
+        message: "TOKEN_ENCRYPTION_KEY is required to store the QuickBooks connection.",
       });
     }
     if (env.EMAIL_TRANSPORT === "smtp" && !env.EMAIL_SERVER) {

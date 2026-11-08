@@ -77,6 +77,8 @@ export async function getAgentWorkspace(id: string, now = new Date()) {
           priority: true,
           dueAt: true,
           completedAt: true,
+          output: true,
+          lastError: true,
         },
       }),
       db.handoff.findMany({

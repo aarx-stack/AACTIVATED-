@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { HealthCheckButton } from "@/components/admin/health-check-button";
 import { IntegrationToggle } from "@/components/admin/integration-toggle";
+import { QuickBooksConnect } from "@/components/admin/quickbooks-connect";
 import { InviteForm } from "@/components/admin/invite-form";
 import { UsersTable, type AdminUserRow } from "@/components/admin/users-table";
 import { PageHeader } from "@/components/shell/page-header";
@@ -32,6 +33,7 @@ import {
 import { canChangeRole, canChangeUserStatus } from "@/server/authz/policies";
 import { getSystemHealth } from "@/server/health/health";
 import { getIntegrations, missingCredentials } from "@/server/integrations";
+import { getConnectionInfo, oauthConfigured } from "@/server/integrations/quickbooks-connection";
 import { getAdminData } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: "Admin & Access Control" };
@@ -43,10 +45,24 @@ const INTEGRATION_MARK: Record<string, string> = {
   ANTHROPIC: "bg-[linear-gradient(135deg,#d97757,#f0c8a8)]",
 };
 
+const QB_OUTCOME: Record<string, { ok: boolean; text: string }> = {
+  connected: {
+    ok: true,
+    text: "QuickBooks is connected (read-only). Access renews automatically.",
+  },
+  denied: { ok: false, text: "QuickBooks was not connected: access was declined in QuickBooks." },
+  expired: { ok: false, text: "The QuickBooks sign-in expired or did not match. Try again." },
+  error: { ok: false, text: "QuickBooks could not be connected. Nothing was stored. Try again." },
+  not_configured: {
+    ok: false,
+    text: "QuickBooks connect is not set up: it needs live mode and the Intuit app settings in the server environment.",
+  },
+};
+
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; qb?: string }>;
 }) {
   const actor = await requirePagePermission("admin.view");
   const modes = Object.fromEntries(getIntegrations().map((a) => [a.key, a.mode])) as Partial<
@@ -54,10 +70,13 @@ export default async function AdminPage({
   >;
   const liveCount = Object.values(modes).filter((m) => m === "live").length;
   const canManageIntegrations = can(actor.role, "integrations.manage");
-  const { q = "" } = await searchParams;
-  const [{ users, totalUsers, integrations, uptime }, health] = await Promise.all([
+  const { q = "", qb } = await searchParams;
+  const qbOAuth = modes.QUICKBOOKS === "live" && oauthConfigured();
+  const canConnectQuickBooks = can(actor.role, "integrations.connect_accounting");
+  const [{ users, totalUsers, integrations, uptime }, health, qbConnection] = await Promise.all([
     getAdminData(q),
     getSystemHealth(),
+    qbOAuth ? getConnectionInfo() : Promise.resolve(null),
   ]);
   const canManage = can(actor.role, "users.manage");
 
@@ -89,6 +108,20 @@ export default async function AdminPage({
         title="Admin & Access Control"
         description="Manage users, roles, permissions, system access and integrations. Every change is audited."
       />
+
+      {qb && QB_OUTCOME[qb] && (
+        <p
+          role={QB_OUTCOME[qb].ok ? "status" : "alert"}
+          className={cn(
+            "mb-4 rounded-card border px-4 py-3 text-sm",
+            QB_OUTCOME[qb].ok
+              ? "border-success-line bg-success-soft text-success"
+              : "border-danger-line bg-danger-soft text-danger",
+          )}
+        >
+          {QB_OUTCOME[qb].text}
+        </p>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -288,9 +321,23 @@ export default async function AdminPage({
                       <p className="text-xs text-muted-foreground">
                         {missing.length > 0 ? `Live, missing ${missing.join(", ")}` : i.description}
                       </p>
+                      {key === "QUICKBOOKS" && qbOAuth && (
+                        <p className="text-xs text-muted-foreground" data-testid="qb-connection">
+                          {qbConnection
+                            ? `Connected to company ${qbConnection.accountId}${qbConnection.connectedByName ? ` by ${qbConnection.connectedByName}` : ""}. Access renews automatically.`
+                            : "Not connected yet."}
+                        </p>
+                      )}
+                      {key === "QUICKBOOKS" && qbOAuth && canConnectQuickBooks && (
+                        <div>
+                          <QuickBooksConnect connected={Boolean(qbConnection)} />
+                        </div>
+                      )}
                       <div>
                         {!i.enabled ? (
                           <Badge tone="danger">Off</Badge>
+                        ) : key === "QUICKBOOKS" && qbOAuth && !qbConnection ? (
+                          <Badge tone="warning">Live · Not connected</Badge>
                         ) : (
                           <Badge tone={tone.tone}>
                             {adapterMode === "live" ? "Live" : "Mock"} · {tone.label}

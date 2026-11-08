@@ -133,6 +133,11 @@ export const PERMISSIONS = {
     group: "Platform",
     roles: [SYSTEM_ADMIN],
   },
+  "integrations.connect_accounting": {
+    label: "Connect or disconnect QuickBooks",
+    group: "Platform",
+    roles: [EXECUTIVE, SYSTEM_ADMIN],
+  },
   "audit_log.view": {
     label: "Read the audit log",
     group: "Platform",

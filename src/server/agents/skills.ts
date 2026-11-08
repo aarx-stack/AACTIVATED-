@@ -578,6 +578,60 @@ export const promptChatSkill = defineSkill<PromptChatInput, PromptChatOutput>({
   },
 });
 
+// ----------------------------------------------------------- prompt tasks --
+
+export interface TaskWorkInput {
+  title: string;
+  prompt: string;
+  agentTitle: string;
+}
+
+export const taskWorkOutput = z.object({
+  summary: z.string().min(10).max(400),
+  deliverable: z.string().min(20).max(6000),
+  nextSteps: z.array(z.string().min(3).max(200)).max(5),
+});
+export type TaskWorkOutput = z.infer<typeof taskWorkOutput>;
+
+/** An agent works a prompt sent from the Prompt Generator. The result is an internal draft. */
+export const taskWorkSkill = defineSkill<TaskWorkInput, TaskWorkOutput>({
+  name: "tasks.work",
+  tier: "agent",
+  requiresTool: "tasks.work",
+  output: taskWorkOutput,
+  prompt: (i) =>
+    [
+      `A team member assigned you this task: "${i.title}".`,
+      `Instructions:\n"""${i.prompt}"""`,
+      "Do the work and return: a one-sentence summary, the deliverable itself (plain text, ready for a person to review), and up to five short next steps.",
+      "This is an internal draft. Do not contact anyone. If the result is meant for people outside the company, say in the next steps that it must go through the Approval Queue.",
+    ].join("\n\n"),
+  mock: (i) => {
+    const lines = i.prompt
+      .split(/\n+/)
+      .map((l) => l.replace(/^[-*\d.\s]+/, "").trim())
+      .filter((l) => l.length > 3);
+    const points = lines.slice(1, 6);
+    return {
+      summary: `${i.agentTitle} completed a first draft for "${firstSentence(i.title, 120)}".`,
+      deliverable: [
+        `Draft: ${i.title}`,
+        "",
+        firstSentence(lines[0] ?? i.prompt, 200),
+        ...(points.length
+          ? ["", ...points.map((p, n) => `${n + 1}. ${firstSentence(p, 180)}`)]
+          : []),
+      ]
+        .join("\n")
+        .slice(0, 6000),
+      nextSteps: [
+        "Review the draft and edit anything that does not sound like AACTIVATED.",
+        "If any of it will be shared outside the company, send it through the Approval Queue.",
+      ],
+    };
+  },
+});
+
 export const SKILLS = [
   brainPlanSkill,
   opsDelegateSkill,
@@ -587,4 +641,5 @@ export const SKILLS = [
   rewriteSkill,
   knowledgeSummarySkill,
   promptChatSkill,
+  taskWorkSkill,
 ] as const;

@@ -14,6 +14,7 @@ const AGENTS = [
       "approval.request",
       "knowledge.summarize",
       "prompts.write",
+      "tasks.work",
     ],
   },
   {
@@ -22,7 +23,7 @@ const AGENTS = [
     title: "Operations Manager",
     kind: "DEPARTMENT" as const,
     dept: "operations",
-    tools: ["tasks.create", "handoff.create"],
+    tools: ["tasks.create", "handoff.create", "tasks.work"],
   },
   {
     slug: "content-specialist",
@@ -30,7 +31,7 @@ const AGENTS = [
     title: "Content Specialist",
     kind: "DEPARTMENT" as const,
     dept: "marketing",
-    tools: ["content.draft", "compliance.check", "approval.request"],
+    tools: ["content.draft", "compliance.check", "approval.request", "tasks.work"],
   },
 ];
 
@@ -76,7 +77,15 @@ export async function ensureWorkflowFixtures() {
           toolsAllowed: a.tools,
         },
       },
-      update: { status: "ACTIVE" },
+      update: {
+        status: "ACTIVE",
+        config: {
+          role: a.title,
+          context: "Test context.",
+          dailyRoutine: "Test routine.",
+          toolsAllowed: a.tools,
+        },
+      },
     });
   }
   if ((await db.complianceRule.count()) === 0) {

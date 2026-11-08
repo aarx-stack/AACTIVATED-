@@ -2,9 +2,10 @@
  * Live QuickBooks Online adapter: READ-ONLY. It only issues GET requests (company info and
  * queries); nothing is ever written to QuickBooks.
  *
- * Authentication uses an OAuth 2.0 access token (QUICKBOOKS_ACCESS_TOKEN). Access tokens last
- * about an hour; the "Connect QuickBooks" OAuth step that refreshes them is not built yet and
- * needs approval (it stores a rotating refresh token).
+ * Authentication: `auth()` supplies the company id and a current OAuth access token. With
+ * "Connect QuickBooks" that comes from the encrypted connection, renewed automatically
+ * (quickbooks-connection.ts); for a quick sandbox test it can be a fixed token from the
+ * environment.
  */
 import { HealthStatus } from "@/generated/prisma/enums";
 import type { ImportedTransaction, QuickBooksAdapter } from "../types";
@@ -17,8 +18,7 @@ export const QB_BASE_URL = {
 const MINOR_VERSION = "75";
 
 export interface QuickBooksConfig {
-  realmId: string;
-  accessToken: string;
+  auth: () => Promise<{ realmId: string; accessToken: string }>;
   environment: keyof typeof QB_BASE_URL;
   fetch?: FetchLike;
 }
@@ -64,17 +64,21 @@ export function toImported(
 }
 
 export function createLiveQuickBooks(config: QuickBooksConfig): QuickBooksAdapter {
-  const base = `${QB_BASE_URL[config.environment]}/v3/company/${encodeURIComponent(config.realmId)}`;
-  const get = <T>(path: string) =>
-    callJson<T>(
+  // The only request this adapter can make: a GET. There is no write path to QuickBooks.
+  const get = async <T>(path: (realmId: string) => string) => {
+    const { realmId, accessToken } = await config.auth();
+    const base = `${QB_BASE_URL[config.environment]}/v3/company/${encodeURIComponent(realmId)}`;
+    const rel = path(realmId);
+    return callJson<T>(
       "QuickBooks",
-      `${base}${path}${path.includes("?") ? "&" : "?"}minorversion=${MINOR_VERSION}`,
+      `${base}${rel}${rel.includes("?") ? "&" : "?"}minorversion=${MINOR_VERSION}`,
       {
         method: "GET",
-        headers: { Authorization: `Bearer ${config.accessToken}`, Accept: "application/json" },
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       },
       config.fetch,
     );
+  };
 
   return {
     key: "QUICKBOOKS",
@@ -82,7 +86,9 @@ export function createLiveQuickBooks(config: QuickBooksConfig): QuickBooksAdapte
 
     async healthCheck() {
       try {
-        const [, ms] = await timed(() => get(`/companyinfo/${encodeURIComponent(config.realmId)}`));
+        const [, ms] = await timed(() =>
+          get((realmId) => `/companyinfo/${encodeURIComponent(realmId)}`),
+        );
         return {
           status: HealthStatus.OPERATIONAL,
           latencyMs: ms,
@@ -108,7 +114,7 @@ export function createLiveQuickBooks(config: QuickBooksConfig): QuickBooksAdapte
       for (const { entity, type } of ENTITIES) {
         const query = `select * from ${entity} where TxnDate >= '${day}' maxresults 1000`;
         const data = await get<{ QueryResponse?: Record<string, QbTxn[] | undefined> }>(
-          `/query?query=${encodeURIComponent(query)}`,
+          () => `/query?query=${encodeURIComponent(query)}`,
         );
         for (const t of data.QueryResponse?.[entity] ?? [])
           results.push(toImported(entity, type, t));

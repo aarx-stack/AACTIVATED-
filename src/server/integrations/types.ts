@@ -49,6 +49,13 @@ export interface GoHighLevelAdapter extends IntegrationAdapter {
 
 export class IntegrationUnavailableError extends Error {
   readonly status = 503;
+  /** The upstream HTTP status, when there was one (never shown to users). */
+  constructor(
+    message: string,
+    readonly httpStatus?: number,
+  ) {
+    super(message);
+  }
 }
 
 /** A transaction read from the accounting system (never written back). */

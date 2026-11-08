@@ -4,12 +4,14 @@ The internal operating system for AACTIVATED RX. An AI CEO ("the Brain") runs a 
 AI agents across departments and gives every Premium rep a private AI team. **Humans approve
 anything that leaves the building.**
 
-> Status: **Phase 5 complete. All 12 pages are built.** Phase 1: setup, design tokens, auth and
+> Status: **Phase 6 complete. All 12 pages are built.** Phase 1: setup, design tokens, auth and
 > roles, demo data, Command Center, Company Team, Admin. Phase 2: the first end-to-end agent
 > workflow, Agent Workspace, Approval & Compliance Queue. Phase 3: rep onboarding, My AI Team,
 > Content Studio, Back Office. Phase 4: the 75% budget rule, Finance & Budget, Knowledge Library,
 > Prompt Generator. Phase 5: the Development & Tokenization Map, live integration adapters behind
 > feature flags (off by default), and browser tests for every page and role in both themes.
+> Phase 6: go-live readiness: "Connect QuickBooks" with automatic renewal and encrypted tokens,
+> agents that work prompt tasks, sign-in rate limits and production security headers.
 
 ## The Phase 2 workflow
 
@@ -98,7 +100,7 @@ Invite a user** before go-live.
 | Command             | What it does                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------------- |
 | `npm run dev`       | Development server                                                                                 |
-| `npm run worker`    | Background worker (pg-boss): heartbeat and health checks                                           |
+| `npm run worker`    | Background worker (pg-boss): heartbeat, health checks, queued agent work                           |
 | `npm run check`     | Type-check, lint, format check and all Vitest suites                                               |
 | `npm test`          | Unit and integration tests (integration needs the test database)                                   |
 | `npm run test:unit` | Unit tests only (no database)                                                                      |
@@ -155,6 +157,8 @@ covered by integration tests in `tests/integration/budgets.test.ts`.
 | Confidential documents stay on the server        | `src/server/knowledge/service.ts` filters by access level in the database query                                                                              |
 | Tokenization not launchable without an executive | `src/server/roadmap/policy.ts`: every step gated, decided with a written note; applied only by an approval or an executive decision                          |
 | Live integrations off by default                 | `src/server/integrations/index.ts`: feature flag + credentials + Admin off switch, checked on every call                                                     |
+| Stored credentials are encrypted                 | `src/server/crypto/secrets.ts`: AES-256-GCM with `TOKEN_ENCRYPTION_KEY`; tokens never appear in the UI or the audit log                                      |
+| Sign-in emails are rate limited                  | `src/server/security/rate-limit.ts`: 5 emails per address and 20 requests per network address every 15 minutes, same answer for every address                |
 | Always-on                                        | `/api/health`, public `/status`, and error boundaries. A failing integration degrades, never takes the portal down                                           |
 
 The outbound gate, `assertDispatchable()` in `src/server/approvals/service.ts`, is the only path
@@ -197,11 +201,11 @@ GoHighLevel, QuickBooks and Slack sit behind interfaces in `src/server/integrati
 adapters are the default and make no external calls.** Live adapters are in
 `src/server/integrations/live` and use plain `fetch` (no extra dependencies):
 
-| Integration | Live adapter does                                                                 | Needs                                                                      |
-| ----------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| GoHighLevel | Schedules approved posts (Social Planner) and sends approved follow-ups           | `GOHIGHLEVEL_API_KEY`, `GOHIGHLEVEL_LOCATION_ID` (+ `_COMPANY_ID`)         |
-| QuickBooks  | **Read-only**: imports purchases, sales receipts, payments and refunds            | `QUICKBOOKS_REALM_ID`, `QUICKBOOKS_ACCESS_TOKEN`, `QUICKBOOKS_ENVIRONMENT` |
-| Slack       | Posts internal alerts (for example, a budget reaching 75%) to an incoming webhook | `SLACK_WEBHOOK_URL`                                                        |
+| Integration | Live adapter does                                                                 | Needs                                                                          |
+| ----------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| GoHighLevel | Schedules approved posts (Social Planner) and sends approved follow-ups           | `GOHIGHLEVEL_API_KEY`, `GOHIGHLEVEL_LOCATION_ID` (+ `_COMPANY_ID`)             |
+| QuickBooks  | **Read-only**: imports purchases, sales receipts, payments and refunds            | `QUICKBOOKS_CLIENT_ID`, `_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, then Connect |
+| Slack       | Posts internal alerts (for example, a budget reaching 75%) to an incoming webhook | `SLACK_WEBHOOK_URL`                                                            |
 
 Three switches protect every call:
 
@@ -222,11 +226,57 @@ message and never take the portal down. The adapters are tested against a simula
   `live/gohighlevel.ts` against the current HighLevel API reference, connect the social accounts
   in each rep's sub-account, and link contacts to their GoHighLevel ids (live sends refuse
   contacts without one).
-- QuickBooks: access tokens last about an hour. The "Connect QuickBooks" OAuth step that refreshes
-  them (and stores a rotating refresh token) is not built yet.
+- QuickBooks: create an app in the Intuit developer portal, register the redirect URI
+  `<APP_URL>/api/integrations/quickbooks/callback`, and set `QUICKBOOKS_CLIENT_ID`,
+  `QUICKBOOKS_CLIENT_SECRET` and `TOKEN_ENCRYPTION_KEY`. Then a system admin or executive clicks
+  **Connect QuickBooks** in Admin (see below).
 - Keep secrets in the hosting environment's secret store, never in the repository.
 
 To simulate an outage with the mocks, set `MOCK_INTEGRATIONS_DOWN=SLACK,QUICKBOOKS`.
+
+### Connect QuickBooks (Phase 6)
+
+With QuickBooks in live mode and the Intuit app configured, Admin shows **Connect QuickBooks** to
+executives and system admins. It sends them to Intuit to approve, and back to the app, which:
+
+- checks a one-time state value tied to that browser and that user (forged or replayed callbacks
+  are refused and nothing is stored);
+- stores the access and refresh tokens **encrypted** (AES-256-GCM, `TOKEN_ENCRYPTION_KEY`). They
+  are never shown in the app or written to the audit log; the audit records only which company
+  was connected, and executives are notified;
+- renews access automatically a few minutes before it expires. Refresh tokens rotate, so renewal
+  runs under a database row lock and two requests never spend the same one. If QuickBooks refuses
+  the renewal, the app says to connect again.
+
+**Disconnect** revokes the token at Intuit and deletes it here (it is deleted here even if Intuit
+cannot be reached). Intuit has no read-only permission scope, so read-only is enforced in code: the
+adapter only issues GET requests, and tests check that.
+
+For a quick sandbox test without the app, `QUICKBOOKS_REALM_ID` and `QUICKBOOKS_ACCESS_TOKEN` still
+work, but nothing renews that token.
+
+## Prompt tasks (Phase 6)
+
+**Send to agent** in the Prompt Generator now has the agent do the work. It writes an internal
+draft (summary, the draft itself, next steps), the task moves to **In Review** on the agent's task
+board, and a person opens **View draft** and clicks **Mark done**. If the agent cannot finish (it
+is paused, or its budget is locked at 75%), the task is **Blocked** with the reason and a **Try
+again** button. The draft never leaves the company: anything meant for outside still goes through
+the Approval Queue. Model spend goes through the budget gate like every other call. With
+`AGENT_EXECUTION=queue` the work runs in the background worker instead of during the request.
+
+## Production checklist
+
+- `APP_ENV=production`, a long random `AUTH_SECRET`, `APP_URL` on HTTPS, `EMAIL_TRANSPORT=smtp`.
+  Demo login is refused at startup in production.
+- Run `npm run build` and `npm start` for the web app, `npm run worker` for the background worker
+  (set `AGENT_EXECUTION=queue`), and `npx prisma migrate deploy` before each release.
+- Put the app behind a proxy that sets `X-Forwarded-For`; the sign-in limit per network address
+  reads it.
+- Security headers are sent on every page: no framing, no plugins, forms only to this site, and
+  HSTS in production.
+- Secrets (`AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, API keys) go in the host's secret store. Changing
+  `TOKEN_ENCRYPTION_KEY` makes stored connections unreadable; connect QuickBooks again afterwards.
 
 ## Project layout
 

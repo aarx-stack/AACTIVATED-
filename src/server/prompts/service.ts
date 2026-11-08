@@ -10,6 +10,7 @@ import { ActivityKind, AgentKind, Role, TaskPriority, TaskStatus } from "@/gener
 import { db, type Db } from "@/lib/db";
 import { recordAudit } from "@/server/audit/audit";
 import { AgentUnavailableError, runSkill, WORKING_STATUSES } from "@/server/agents/runner";
+import { hasTool } from "@/server/agents/config";
 import { promptChatSkill, templateVariables } from "@/server/agents/skills";
 import { authorize, ForbiddenError, type Actor } from "@/server/authz/permissions";
 import { canOpenAgentWorkspace } from "@/server/authz/policies";
@@ -235,10 +236,13 @@ export async function assignableAgents(actor: Actor, client: Db = db) {
       title: true,
       kind: true,
       status: true,
+      config: true,
       department: { select: { name: true, isConfidential: true } },
     },
   });
-  return agents.filter((a) => canOpenAgentWorkspace(actor.role, a));
+  return agents
+    .filter((a) => canOpenAgentWorkspace(actor.role, a) && hasTool(a.config, "tasks.work"))
+    .map(({ config: _config, ...a }) => a);
 }
 
 export async function sendToAgent(
@@ -263,6 +267,9 @@ export async function sendToAgent(
     throw new AgentUnavailableError(
       `${agent.title} (${agent.name}) is ${agent.status.toLowerCase()} and cannot take work.`,
     );
+  }
+  if (!hasTool(agent.config, "tasks.work")) {
+    throw new AgentUnavailableError(`${agent.title} is not set up to work prompt tasks.`);
   }
 
   const correlationId = randomUUID();

@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import type { ContentChannel } from "@/generated/prisma/enums";
 import { runContentWorkflow } from "@/server/agents/content-workflow";
+import { runPromptTask } from "@/server/agents/task-work";
 import { getSystemHealth } from "@/server/health/health";
 import { QUEUES } from "./queues";
 
@@ -39,6 +40,13 @@ async function main() {
       }
     },
   );
+
+  await boss.work<{ taskId: string }>(QUEUES.promptTask, async (jobs) => {
+    for (const job of jobs) {
+      const result = await runPromptTask(job.data.taskId);
+      console.info(`[worker] prompt task ${job.data.taskId}: ${result.status}`);
+    }
+  });
 
   await boss.schedule(QUEUES.heartbeat, "* * * * *");
   await boss.schedule(QUEUES.healthCheck, "*/5 * * * *");

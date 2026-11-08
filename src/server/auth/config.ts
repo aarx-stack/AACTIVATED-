@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { recordAudit } from "@/server/audit/audit";
+import { consume, limitKey, SIGN_IN_LIMITS } from "@/server/security/rate-limit";
 import { sendMagicLink } from "./email";
 
 const env = getEnv();
@@ -56,8 +57,17 @@ export const authConfig = {
   pages: { signIn: "/login", verifyRequest: "/login/check-email", error: "/login" },
   callbacks: {
     // Runs on both the magic-link request and the link click.
-    async signIn({ user }) {
-      return isAllowedEmail(user.email);
+    async signIn({ user, email }) {
+      if (!(await isAllowedEmail(user.email))) return false;
+      if (email?.verificationRequest && user.email) {
+        // At most a few sign-in emails per address, however the request arrives.
+        const { allowed } = await consume(
+          limitKey("signin-email", user.email),
+          SIGN_IN_LIMITS.perEmail,
+        );
+        if (!allowed) return false;
+      }
+      return true;
     },
     async jwt({ token, user }) {
       if (user?.id) token.sub = user.id;

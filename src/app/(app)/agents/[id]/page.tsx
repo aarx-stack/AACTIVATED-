@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PauseButton } from "@/components/agents/pause-button";
 import { PerformanceChart } from "@/components/agents/performance-chart";
+import { TaskReview } from "@/components/agents/task-review";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +16,7 @@ import { cn, formatPercent, formatRelativeTime, formatUsd, humanize } from "@/li
 import { requirePagePermission } from "@/server/auth/session";
 import { can } from "@/server/authz/permissions";
 import { canOpenAgentWorkspace } from "@/server/authz/policies";
+import { readTaskOutput } from "@/server/agents/task-work";
 import { getAgentWorkspace, type AgentWorkspace } from "@/server/queries/agents";
 
 export const metadata: Metadata = { title: "Agent Workspace" };
@@ -61,7 +63,7 @@ function TextPanel({ title, text }: { title: string; text: string }) {
   );
 }
 
-function TaskBoard({ tasks }: { tasks: AgentWorkspace["tasks"] }) {
+function TaskBoard({ tasks, canAct }: { tasks: AgentWorkspace["tasks"]; canAct: boolean }) {
   const now = new Date();
   return (
     <Card className="p-5">
@@ -129,6 +131,16 @@ function TaskBoard({ tasks }: { tasks: AgentWorkspace["tasks"] }) {
                             <span className="text-danger"> · overdue</span>
                           )}
                         </p>
+                        {(t.output !== null || t.lastError) && (
+                          <TaskReview
+                            taskId={t.id}
+                            title={t.title}
+                            status={t.status}
+                            draft={readTaskOutput(t.output)}
+                            lastError={t.lastError}
+                            canAct={canAct}
+                          />
+                        )}
                       </div>
                       <Badge tone={done ? "success" : p.tone} className="shrink-0 px-2">
                         {done ? "Done" : p.label}
@@ -388,7 +400,7 @@ export default async function AgentWorkspacePage({ params }: { params: Promise<{
           <TextPanel title="Daily routine" text={agent.config.dailyRoutine} />
         </TabsContent>
         <TabsContent value="tasks">
-          <TaskBoard tasks={ws.tasks} />
+          <TaskBoard tasks={ws.tasks} canAct={can(user.role, "prompts.use")} />
         </TabsContent>
         <TabsContent value="handoff">
           <HandoffTimeline handoffs={ws.handoffs} />

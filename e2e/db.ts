@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Client } from "pg";
 
 /** Direct database access for test setup only (the app is always driven through the UI). */
@@ -68,4 +68,25 @@ export async function removeProject(id: string) {
 
 export async function removeProjectByName(name: string) {
   await withDb((db) => db.query(`DELETE FROM "Project" WHERE name = $1`, [name]));
+}
+
+/** The rate-limit key the app uses for a client address (same hashing as the app). */
+function ipKey(ip: string) {
+  return `signin-ip:${createHash("sha256").update(ip.trim().toLowerCase()).digest("hex").slice(0, 32)}`;
+}
+
+/** Fills a client address's sign-in allowance, so the next request is refused. */
+export async function exhaustSignInLimit(ip: string, hits = 20) {
+  await withDb(async (c) => {
+    for (let i = 0; i < hits; i++) {
+      await c.query(`INSERT INTO "RateLimitHit" (id, key, "createdAt") VALUES ($1, $2, now())`, [
+        randomUUID(),
+        ipKey(ip),
+      ]);
+    }
+  });
+}
+
+export async function clearSignInLimit(ip: string) {
+  await withDb((c) => c.query(`DELETE FROM "RateLimitHit" WHERE key = $1`, [ipKey(ip)]));
 }

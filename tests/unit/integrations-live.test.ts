@@ -153,7 +153,10 @@ describe("GoHighLevel (live)", () => {
 });
 
 describe("QuickBooks (live, read-only)", () => {
-  const config = { realmId: "123", accessToken: SECRET, environment: "sandbox" as const };
+  const config = {
+    auth: async () => ({ realmId: "123", accessToken: SECRET }),
+    environment: "sandbox" as const,
+  };
 
   it("only ever issues GET requests, and maps each kind of transaction", async () => {
     const { fn, calls } = fakeFetch(

@@ -199,7 +199,7 @@ test.describe("Prompt Generator", () => {
     await editor.getByLabel("Hashtag count").fill("3");
     await expect(editor.getByTestId("prompt-preview")).toContainText("Our weekly Q&A");
     await send.getByRole("button", { name: "Send to agent" }).click();
-    await expect(send.getByRole("status")).toContainText("Sent to Social Media Manager");
+    await expect(send.getByRole("status")).toContainText("Social Media Manager");
 
     // A save adds a version; history keeps the old one.
     const body = editor.getByLabel("Prompt template");

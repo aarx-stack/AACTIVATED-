@@ -29,15 +29,20 @@ export async function callJson<T>(
   if (response.status === 401 || response.status === 403) {
     throw new IntegrationUnavailableError(
       `${service} refused the credentials (${response.status}).`,
+      response.status,
     );
   }
   if (response.status === 429) {
     throw new IntegrationUnavailableError(
       `${service} is rate limiting requests. Try again shortly.`,
+      response.status,
     );
   }
   if (!response.ok) {
-    throw new IntegrationUnavailableError(`${service} returned an error (${response.status}).`);
+    throw new IntegrationUnavailableError(
+      `${service} returned an error (${response.status}).`,
+      response.status,
+    );
   }
   const text = await response.text();
   if (!text) return {} as T;
