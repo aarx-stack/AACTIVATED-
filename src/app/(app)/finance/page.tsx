@@ -27,6 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { can } from "@/server/authz/permissions";
 import { cn, formatPercent, formatRelativeTime, formatUsd } from "@/lib/utils";
+import { Meter } from "@/components/ui/meter";
+import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { requirePagePermission } from "@/server/auth/session";
 import { getFinance, parseRange } from "@/server/queries/finance";
@@ -136,6 +138,10 @@ export default async function FinancePage({
   const { kpis, budgetTotals } = data;
   const usage = budgetTotals.limit > 0 ? budgetTotals.spent / budgetTotals.limit : 0;
   const budgetOptions = data.budgets.map((b) => ({ id: b.id, name: b.name }));
+  const [creditDone, creditTotal] = await Promise.all([
+    db.creditMilestone.count({ where: { status: "DONE" } }),
+    db.creditMilestone.count(),
+  ]);
   const departmentOptions = await db.department.findMany({
     orderBy: { sortOrder: "asc" },
     select: { id: true, name: true },
@@ -353,6 +359,26 @@ export default async function FinancePage({
         </Card>
 
         <div className="flex flex-col gap-5">
+          <Card className="flex flex-col gap-3 p-5" data-testid="credit-builder-card">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">Credit Builder</h2>
+              <Badge tone="info">Division</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Building the company&apos;s credit and business profile: {creditDone} of {creditTotal}{" "}
+              plan steps done.
+            </p>
+            <Meter
+              value={creditDone}
+              max={creditTotal || 1}
+              label="Credit Builder plan progress"
+              tone="primary"
+            />
+            <Button asChild variant="secondary" size="sm" className="self-start">
+              <Link href="/finance/credit">Open Credit Builder</Link>
+            </Button>
+          </Card>
+
           <Card className="flex flex-col gap-4 p-5" data-testid="quickbooks">
             <h2 className="text-base font-semibold">QuickBooks Sync</h2>
             {qb ? (

@@ -40,6 +40,7 @@ const EXPECTED: Record<Permission, Role[]> = {
   "compliance_rules.manage": [E],
   "finance.view": [E],
   "budget.manage": [E],
+  "credit.manage": [E],
   "budget.request_change": [E, S],
   "knowledge.view": [E, S, P, F, A],
   "knowledge.manage": [E, S],

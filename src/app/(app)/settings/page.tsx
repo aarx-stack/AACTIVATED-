@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { InstallApp } from "@/components/shell/install-app";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { PageHeader } from "@/components/shell/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,15 @@ export default async function SettingsPage() {
             </div>
             <ThemeToggle />
           </CardHeader>
+        </Card>
+        <Card id="install">
+          <CardHeader className="flex-col items-stretch">
+            <CardTitle>Install on your phone</CardTitle>
+            <CardDescription>Use the AI Brain as an app on your home screen.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InstallApp />
+          </CardContent>
         </Card>
         <Card className="lg:col-span-2">
           <CardHeader className="flex-col items-stretch">

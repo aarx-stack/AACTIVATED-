@@ -92,7 +92,7 @@ function DepartmentCard({ d }: { d: Department }) {
   return (
     <OrgCard
       testId={`dept-${d.name}`}
-      title={d.name}
+      title={d.divisionOf ? `${d.name} (${d.divisionOf} division)` : d.name}
       href={lead?.canOpen ? `/agents/${lead.id}` : undefined}
       locked={d.isConfidential}
       rows={[

@@ -11,6 +11,12 @@ export const metadata: Metadata = {
   title: { default: "AACTIVATED AI Brain", template: "%s | AACTIVATED AI Brain" },
   description: "Internal operating system for AACTIVATED RX.",
   robots: { index: false, follow: false },
+  icons: {
+    icon: [{ url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  // Opens full screen from the iPhone home screen.
+  appleWebApp: { capable: true, title: "AI Brain", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {

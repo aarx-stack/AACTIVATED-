@@ -98,6 +98,11 @@ export const PERMISSIONS = {
   },
   "finance.view": { label: "Finance & Budget", group: "Finance", roles: [EXECUTIVE] },
   "budget.manage": { label: "Create and change budgets", group: "Finance", roles: [EXECUTIVE] },
+  "credit.manage": {
+    label: "Credit Builder (company credit and business profile)",
+    group: "Finance",
+    roles: [EXECUTIVE],
+  },
   "budget.request_change": {
     label: "See budgets and request limit changes",
     group: "Finance",

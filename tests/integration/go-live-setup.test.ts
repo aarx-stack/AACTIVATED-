@@ -50,7 +50,13 @@ const people = {
 describe("production setup", () => {
   it("builds the company in an empty database, with no demo data, and is safe to rerun", async () => {
     const first = await setupProduction(fresh, people);
-    expect(first.created).toMatchObject({ people: 2, departments: 13, agents: 20, budgets: 1 });
+    expect(first.created).toMatchObject({ people: 2, departments: 14, agents: 23, budgets: 1 });
+    const credit = await fresh.department.findUniqueOrThrow({
+      where: { slug: "credit-builder" },
+      include: { parent: true },
+    });
+    expect(credit.parent?.slug).toBe("finance");
+    expect(credit.isConfidential).toBe(true);
 
     const users = await fresh.user.findMany({ orderBy: { email: "asc" } });
     expect(users.map((u) => [u.email, u.role, u.status])).toEqual([
@@ -69,7 +75,7 @@ describe("production setup", () => {
 
     const again = await setupProduction(fresh, people);
     expect(again.created).toEqual({});
-    expect(await fresh.agent.count()).toBe(22); // the Brain, 19 department agents, 2 assistants
+    expect(await fresh.agent.count()).toBe(25); // the Brain, 22 department agents, 2 assistants
   });
 
   it("refuses a database that holds the demo company", async () => {

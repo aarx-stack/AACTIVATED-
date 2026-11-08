@@ -25,6 +25,7 @@ import { hashPayload } from "../src/server/approvals/payload";
 import { MOCK_CONTACTS } from "../src/server/integrations/mock";
 import { assistantProfile } from "../src/server/agents/assistant-profile";
 import { contentHash } from "../src/server/publishing/hash";
+import { CREDIT_PLAN } from "../src/server/finance/credit-plan";
 import { coachPlanSkill, knowledgeSummarySkill } from "../src/server/agents/skills";
 import {
   agentConfig,
@@ -232,6 +233,15 @@ async function main() {
         ownerId: users[d.owner].id,
       },
     });
+  }
+  // Divisions (Credit Builder sits under Finance).
+  for (const d of DEPARTMENTS) {
+    if ("parent" in d) {
+      await db.department.update({
+        where: { id: depts[d.slug].id },
+        data: { parentId: depts[d.parent].id },
+      });
+    }
   }
   for (const [key, dept] of [
     ["maya", "operations"],
@@ -1306,6 +1316,97 @@ async function main() {
       where: { id: article.id },
       data: { approvalRequestId: approval.id, approvedHash: hash },
     });
+  }
+
+  // Credit Builder: the plan part-way done, a few reporting accounts and monthly scores.
+  {
+    const done = new Set([
+      "entity",
+      "ein",
+      "bank",
+      "address-phone",
+      "web",
+      "licenses",
+      "duns",
+      "vendors",
+    ]);
+    const inProgress = new Set(["experian", "consistency", "pay-early", "monitor", "scores"]);
+    await db.creditMilestone.createMany({
+      data: CREDIT_PLAN.map((m, i) => ({
+        ...m,
+        sortOrder: i,
+        status: done.has(m.key) ? "DONE" : inProgress.has(m.key) ? "IN_PROGRESS" : "NOT_STARTED",
+        completedAt: done.has(m.key) ? ago((40 - i) * DAY) : null,
+        notes:
+          m.key === "duns"
+            ? "Number received; filed with the corporate records."
+            : m.key === "vendors"
+              ? "Three vendor accounts open; adding a fourth next month."
+              : "",
+        updatedById: users.guy.id,
+      })),
+    });
+    const tradelines = [
+      {
+        vendor: "Office supplies vendor",
+        reportsTo: ["Dun & Bradstreet", "Experian"],
+        limitUsd: 1500,
+        months: 5,
+      },
+      {
+        vendor: "Shipping supplies vendor",
+        reportsTo: ["Dun & Bradstreet", "Experian", "Equifax"],
+        limitUsd: 2500,
+        months: 4,
+      },
+      {
+        vendor: "Industrial supplies vendor",
+        reportsTo: ["Dun & Bradstreet"],
+        limitUsd: 1000,
+        months: 3,
+      },
+    ];
+    for (const t of tradelines) {
+      await db.tradeline.create({
+        data: {
+          vendor: t.vendor,
+          kind: "VENDOR_NET30",
+          reportsTo: t.reportsTo,
+          limitUsd: usd(t.limitUsd),
+          openedAt: ago(t.months * 30 * DAY),
+          status: "OPEN",
+          notes: "Net-30. Paid early every month.",
+          createdById: users.guy.id,
+        },
+      });
+    }
+    await db.tradeline.create({
+      data: {
+        vendor: "Business credit card",
+        kind: "CREDIT_CARD",
+        reportsTo: ["Experian", "Equifax"],
+        status: "APPLIED",
+        notes: "Application sent; decision expected this week.",
+        createdById: users.guy.id,
+      },
+    });
+    const history: [string, number[]][] = [
+      ["DNB_PAYDEX", [70, 75, 78, 80]],
+      ["EXPERIAN_INTELLISCORE", [41, 45, 52]],
+      ["EQUIFAX_BUSINESS", [480, 512]],
+    ];
+    for (const [bureau, values] of history) {
+      for (const [i, score] of values.entries()) {
+        await db.creditScore.create({
+          data: {
+            bureau: bureau as "DNB_PAYDEX",
+            score,
+            recordedAt: ago((values.length - 1 - i) * 30 * DAY + 2 * DAY),
+            recordedById: users.guy.id,
+          },
+        });
+      }
+    }
   }
 
   // A limit change a staff member asked for, waiting for Guy in the Approval Queue.

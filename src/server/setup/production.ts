@@ -86,6 +86,15 @@ export async function setupProduction(client: Db, input: z.input<typeof setupSch
           }));
       }
 
+      for (const d of DEPARTMENTS) {
+        if ("parent" in d) {
+          await tx.department.update({
+            where: { id: depts[d.slug]!.id },
+            data: { parentId: depts[d.parent]!.id },
+          });
+        }
+      }
+
       if (!(await tx.agent.findUnique({ where: { slug: BRAIN.slug } }))) {
         count("agents");
         await tx.agent.create({

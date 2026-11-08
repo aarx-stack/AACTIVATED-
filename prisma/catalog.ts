@@ -133,6 +133,16 @@ export const DEPARTMENTS = [
     description: "Budgets, spend tracking and reporting. Corporate accounting is executive-only.",
   },
   {
+    slug: "credit-builder",
+    name: "Credit Builder",
+    owner: "guy",
+    confidential: true,
+    /** A division of Finance. */
+    parent: "finance",
+    description:
+      "A division of Finance dedicated to building the company's credit and business profile: bureau files, reporting accounts and monthly score tracking.",
+  },
+  {
     slug: "legal",
     name: "Legal & Compliance",
     owner: "guy",
@@ -298,6 +308,37 @@ export const COMPANY_AGENTS: {
     owner: "guy",
     status: "IDLE",
     focus: "Quarterly contractor review prepared.",
+    tools: ["report.write"],
+  },
+  // Credit Builder (a division of Finance): the company's credit and business profile.
+  {
+    slug: "business-credit-manager",
+    name: "Vault",
+    title: "Business Credit Manager",
+    dept: "credit-builder",
+    owner: "guy",
+    status: "ACTIVE",
+    focus: "Planning the next vendor accounts that report to the business credit bureaus.",
+    tools: ["report.write", "tasks.create"],
+  },
+  {
+    slug: "business-profile-specialist",
+    name: "Charter",
+    title: "Business Profile Specialist",
+    dept: "credit-builder",
+    owner: "guy",
+    status: "ACTIVE",
+    focus: "Checking that the company name, address and phone match across every listing.",
+    tools: ["report.write", "knowledge.summarize"],
+  },
+  {
+    slug: "credit-monitoring-analyst",
+    name: "Gauge",
+    title: "Credit Monitoring Analyst",
+    dept: "credit-builder",
+    owner: "guy",
+    status: "IDLE",
+    focus: "Monthly business credit score summary ready for review.",
     tools: ["report.write"],
   },
   // Sales: clinics and members. Consented inbound leads only.

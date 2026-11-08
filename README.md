@@ -304,6 +304,32 @@ paused (history kept) when they leave one or are suspended. Only its owner gives
 accepts its drafts; executives can look at staff assistants, never at another executive's. Its
 work stays out of the shared activity feed, and its model spend goes through the budget gate.
 
+## Credit Builder (a division of Finance)
+
+**Finance & Budget, Credit Builder** (`/finance/credit`, executives only, like the rest of
+Finance). Departments can now have divisions; Credit Builder sits under Finance with three agents:
+Business Credit Manager, Business Profile Specialist and Credit Monitoring Analyst.
+
+- **The plan:** 18 standard business-credit steps in four groups (business foundation, credit
+  bureau profiles, accounts that report, monitoring), each with a status, a date when done and
+  notes. General guidance, not financial or legal advice.
+- **Accounts that report:** vendor (Net-30) accounts, cards and credit lines in the company's name,
+  which bureaus they report to, limits and status.
+- **Scores:** D&B Paydex, Experian Intelliscore Plus, Equifax Business Credit Risk and FICO SBSS,
+  entered by hand from each report, with the change since last time. Ranges are checked.
+- Nothing connects to a credit bureau, and long digit runs (account numbers, the EIN) are refused
+  in notes.
+
+## The phone app
+
+The AI Brain installs on a phone's home screen and opens full screen like an app, with no app
+store: on iPhone, Safari > Share > Add to Home Screen; on Android, Chrome > Install app (Settings
+
+> Install on your phone explains it, with a one-tap button where the phone offers one). Every page
+> is checked at phone size in the browser tests. The icon is a plain text placeholder
+> (`public/icons`) until the company logo is supplied. Installing needs the app to be hosted on its
+> https address.
+
 ## Publishing
 
 **Content Studio, Publishing** (`/content/publishing`, executives and staff). Articles, books and

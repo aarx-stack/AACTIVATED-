@@ -13,6 +13,7 @@ export async function getCompanyTeam(role: Role) {
       orderBy: { sortOrder: "asc" },
       include: {
         owner: { select: { name: true } },
+        parent: { select: { name: true } },
         agents: {
           where: { kind: AgentKind.DEPARTMENT },
           orderBy: { name: "asc" },
@@ -37,6 +38,8 @@ export async function getCompanyTeam(role: Role) {
       return {
         id: d.id,
         name: d.name,
+        /** Set for a division, e.g. "Finance" for Credit Builder. */
+        divisionOf: d.parent?.name ?? null,
         description: d.description,
         isConfidential: d.isConfidential,
         canViewDetail,
