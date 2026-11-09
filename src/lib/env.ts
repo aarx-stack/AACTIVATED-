@@ -105,7 +105,12 @@ export function getEnv(source: NodeJS.ProcessEnv = process.env): Env {
       "Invalid environment configuration:\n  - APP_ENV: set APP_ENV (production, staging or development).",
     );
   }
-  const parsed = schema.safeParse(source);
+  // On Render the public address is provided as RENDER_EXTERNAL_URL.
+  const withUrl =
+    !source.APP_URL && source.RENDER_EXTERNAL_URL
+      ? { ...source, APP_URL: source.RENDER_EXTERNAL_URL }
+      : source;
+  const parsed = schema.safeParse(withUrl);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)

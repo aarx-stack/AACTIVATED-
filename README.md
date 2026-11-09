@@ -372,6 +372,13 @@ Before going live: confirm the contact search (`POST /contacts/search`, tag filt
 do-not-disturb fields in `live/gohighlevel.ts` against the HighLevel API reference with a test
 location, and tag your clinic, member and rep contacts in GoHighLevel.
 
+## Put it online
+
+`render.yaml` deploys the real app from this repository on Render in a few clicks (staging: demo
+company, simulated services, behind a site password). Steps: [docs/DEPLOY.md](docs/DEPLOY.md).
+`SITE_PASSWORD` puts a password in front of any copy; `npm run start:hosted` applies migrations,
+loads the demo data once when `SEED_DEMO=true`, and starts the app.
+
 ## Production checklist
 
 The full, ordered guide is [docs/GO_LIVE.md](docs/GO_LIVE.md). For a new production database run

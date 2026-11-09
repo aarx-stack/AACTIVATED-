@@ -281,3 +281,27 @@ describe("EPUB export", () => {
     expect(fileNameFor("Routines & <Habits>!", "epub")).toBe("routines-habits.epub");
   });
 });
+
+describe("site password (staging copies)", () => {
+  it("accepts only the right password, with any user name; health and unsubscribe stay public", async () => {
+    const { hasSitePassword, isPublicPath } = await import("@/server/security/site-password");
+    const basic = (s: string) => `Basic ${Buffer.from(s).toString("base64")}`;
+    expect(hasSitePassword(basic("team:open sesame"), "open sesame")).toBe(true);
+    expect(hasSitePassword(basic("anyone:open sesame"), "open sesame")).toBe(true);
+    expect(hasSitePassword(basic("team:wrong"), "open sesame")).toBe(false);
+    expect(hasSitePassword(basic("no-colon"), "no-colon")).toBe(false);
+    expect(hasSitePassword(null, "open sesame")).toBe(false);
+    expect(hasSitePassword("Bearer x", "open sesame")).toBe(false);
+    expect(isPublicPath("/api/health")).toBe(true);
+    expect(isPublicPath("/unsubscribe")).toBe(true);
+    expect(isPublicPath("/command-center")).toBe(false);
+  });
+
+  it("uses the host's public address when APP_URL is not set", () => {
+    const env = getEnv({
+      DATABASE_URL: "postgresql://x",
+      RENDER_EXTERNAL_URL: "https://aactivated-ai-brain.onrender.com",
+    } as unknown as NodeJS.ProcessEnv);
+    expect(env.APP_URL).toBe("https://aactivated-ai-brain.onrender.com");
+  });
+});
