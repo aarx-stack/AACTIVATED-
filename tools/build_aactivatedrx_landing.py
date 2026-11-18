@@ -2,7 +2,7 @@
 """Build the AACTIVATED Rx landing pages (Landing Page Concepts v2, Nov 17 2026).
 
 Writes one folder per page into ../aactivatedrx/<slug>/index.html so each page
-gets its own sub URL on aactivatedrx.com, e.g. https://aactivatedrx.com/klow-blend/
+gets its own sub URL on aactivatedrx.com, e.g. https://aactivatedrx.com/nad-plus/
 
 Every outbound link points at https://aactivatedrx.com (never pure.aactivatedrx.com).
 Edit the PAGES data below (prices, copy, links) and re-run:
@@ -33,11 +33,11 @@ PRODUCT = {
 PRICE = '<span class="ph">[PRICE]</span>'  # placeholder per the concept doc
 
 LINEUP = [
-    ("glp1", "GLP-1 Weight Loss", "Provider guided weight loss", "glp1-vial.jpg"),
+    ("glp1", "GLP-1 Weight Loss", "Semaglutide or Tirzepatide", "rx-vial.jpg"),
     ("nad", "NAD+", "Cellular energy support", "nad-vials.jpg"),
     ("tb", "TB-500/BPC-157", "Recovery and repair", "tb500-bpc157-vial.jpg"),
-    ("glow", "GLOW+", "Skin, hair and beauty", "glow-vial.jpg"),
-    ("klow", "KLOW", "Signature four peptide blend", "klow-kit.jpg"),
+    ("glow", "Tretinoin + GHK-Cu Serum", "Prescription skin serum", "woman-skin.jpg"),
+    ("klow", "BPC-157 / TB-500 / GHK-Cu / KPV", "Four peptide injection", "man-training.jpg"),
 ]
 
 LEGAL_ANSWER = (
@@ -59,7 +59,7 @@ PAGES = [
         eyebrow="Medical Weight Loss Program",
         h1="Weight loss guided by a licensed provider. Delivered to your door.",
         lede="Compounded Semaglutide and Tirzepatide programs, prescribed after a private online visit and shipped cold, overnight, from a licensed 503A pharmacy.",
-        gallery=[("glp1-vial.jpg", "AACTIVATED Rx GLP-1 vial"), ("woman-app.jpg", "Member checking progress in the app"), ("cold-chain.jpg", "Vial packed in a cold shipping box")],
+        gallery=[("rx-vial.jpg", "AACTIVATED Rx prescription vial"), ("woman-app.jpg", "Member checking progress in the app"), ("cold-chain.jpg", "Vial packed in a cold shipping box")],
         members_img=("couple-fitness.jpg", "Two members smiling after a workout"),
         points=[
             ("Provider led, start to finish", "A licensed provider reviews your history and adjusts your plan with you."),
@@ -78,7 +78,7 @@ PAGES = [
             ("Is this legal?", LEGAL_ANSWER),
         ],
         closer="Your next chapter starts with a 2 minute quiz.",
-        closer_img=("glp1-vial.jpg", "AACTIVATED Rx GLP-1 vial"),
+        closer_img=("rx-vial.jpg", "AACTIVATED Rx prescription vial"),
     ),
     dict(
         key="nad", slug="nad-plus",
@@ -139,62 +139,65 @@ PAGES = [
         closer_img=("tb500-bpc157-vial.jpg", "AACTIVATED Rx TB-500/BPC-157 vial"),
     ),
     dict(
-        key="glow", slug="glow-plus",
-        title="GLOW+ Skin, Hair and Beauty | AACTIVATED Rx",
-        desc="GLOW+ is our provider guided beauty formula, designed to support collagen, skin firmness and healthy hair.",
-        cta=("Get My GLOW+", PRODUCT["glow"]),
-        eyebrow="Skin, Hair and Beauty",
-        h1="Glow from the inside out.",
-        lede="GLOW+ is our provider guided beauty formula, designed to support collagen, skin firmness and healthy hair as part of your routine.",
-        gallery=[("glow-vial.jpg", "AACTIVATED Rx GLOW+ vial"), ("woman-skin.jpg", "Woman with glowing skin"), ("man-skin.jpg", "Man with clear skin")],
-        members_img=("woman-skin.jpg", "Woman with glowing skin"),
+        key="glow", slug="tretinoin-ghk-cu-serum",
+        title="Tretinoin + GHK-Cu Prescription Serum | AACTIVATED Rx",
+        desc="Tretinoin 0.025% + GHK-Cu 0.2% prescription serum, prescribed through telehealth and prepared by a licensed 503A pharmacy.",
+        cta=("Start My Online Visit", PRODUCT["glow"]),
+        eyebrow="Tretinoin 0.025% + GHK-Cu 0.2% Serum",
+        h1="Smoother looking skin, prescribed for you.",
+        lede="Our prescription serum combines tretinoin 0.025%, a retinoid, with GHK-Cu 0.2%, a copper peptide, in one 30 g topical. It is designed to support skin texture, tone and firmness as part of your routine.",
+        gallery=[("woman-skin.jpg", "Woman with smooth, healthy looking skin"), ("man-skin.jpg", "Man with clear skin"), ("telehealth-visit.jpg", "Patient on a video visit with a provider")],
+        members_img=("woman-skin.jpg", "Woman with smooth, healthy looking skin"),
+        cold=False,
         points=[
-            ("Collagen support", "Copper peptides are studied for their role in collagen production and skin repair."),
-            ("Firmness and tone", "Designed to support smoother, firmer looking skin over time."),
-            ("Hair and scalp", "Research suggests a role in supporting healthy hair follicles."),
-            ("For everyone", 'Built for women and men who want to support skin and hair health. <span class="ph">[CONFIRM GLOW+ FORMULA]</span>'),
+            ("Two actives, one serum", "Tretinoin 0.025% and GHK-Cu 0.2% together in a single 30 g prescription topical."),
+            ("Tretinoin", "A prescription retinoid long studied for its effects on skin texture and tone."),
+            ("GHK-Cu", "A copper peptide studied for its role in collagen production and skin repair."),
+            ("For women and men", "For adults who want to support smoother, firmer looking skin. Your provider confirms whether it fits you."),
         ],
         options=[
-            ("One vial", "Single Purchase", "Try GLOW+", PRODUCT["glow"]),
+            ("One 30 g serum", "Single Purchase", "Try it once", PRODUCT["glow"]),
             ("Every 2 months", "Subscribe", "10% off, ships automatically", PRODUCT["glow"]),
         ],
         faq=[
             ("When will I notice a difference?", "Everyone is different. Skin changes take consistent use over weeks, not days."),
-            ("Can men use GLOW+?", "Yes. GLOW+ is built for women and men who want to support skin and hair health. Your provider confirms whether it is right for you."),
-            ("Do I need a prescription?", "GLOW+ is a prescription product, but you do not need one before you start. Your online visit is how a licensed provider decides whether it is right for you."),
+            ("What should I expect with tretinoin?", "Tretinoin can cause dryness, redness, peeling and sun sensitivity, especially in the first weeks, so daily sunscreen matters. It is not for use during pregnancy or while trying to conceive. Your provider reviews your history and explains how to use it."),
+            ("Can men use this serum?", "Yes. It is prescribed for women and men who want to support skin health. Your provider confirms whether it is right for you."),
+            ("Do I need a prescription?", "Tretinoin + GHK-Cu Serum is a prescription product, but you do not need one before you start. Your online visit is how a licensed provider decides whether it is right for you."),
             ("Is this legal?", LEGAL_ANSWER),
         ],
         closer="Your skin keeps score. Give it support.",
-        closer_img=("glow-vial.jpg", "AACTIVATED Rx GLOW+ vial"),
+        closer_img=("man-skin.jpg", "Man with clear skin"),
     ),
     dict(
-        key="klow", slug="klow-blend",
-        title="KLOW Signature Blend | AACTIVATED Rx",
-        desc="KLOW brings recovery and skin support peptides together in one provider guided protocol.",
-        cta=("Start With KLOW", PRODUCT["klow"]),
-        eyebrow="Signature Blend",
-        h1="KLOW. Four peptides. One complete routine.",
-        lede="Our signature blend brings recovery and skin support peptides together in one provider guided protocol, for people who want performance and appearance in a single plan.",
-        gallery=[("klow-kit.jpg", "AACTIVATED Rx KLOW two vial kit"), ("couple-fitness.jpg", "Two members smiling after a workout"), ("man-training.jpg", "Athlete lifting in the gym")],
+        key="klow", slug="bpc-157-tb-500-ghk-cu-kpv",
+        title="BPC-157 / TB-500 / GHK-Cu / KPV Injection | AACTIVATED Rx",
+        desc="BPC-157, TB-500, GHK-Cu and KPV in one provider guided injection protocol for recovery and skin support.",
+        cta=("Start My Online Visit", PRODUCT["klow"]),
+        eyebrow="BPC-157 / TB-500 / GHK-Cu / KPV Injection",
+        h1="Four peptides. One complete routine.",
+        lede="One injection that combines BPC-157, TB-500, GHK-Cu and KPV in a single provider guided protocol, for people who want recovery and skin support in one plan.",
+        gallery=[("rx-vial.jpg", "AACTIVATED Rx prescription vial"), ("couple-fitness.jpg", "Two members smiling after a workout"), ("man-training.jpg", "Athlete lifting in the gym")],
         members_img=("couple-fitness.jpg", "Two members smiling after a workout"),
         points=[
-            ("Recovery and repair", 'Includes BPC-157 and TB-500, studied for tissue repair. <span class="ph">[CONFIRM KLOW FORMULA]</span>'),
-            ("Skin and collagen", "Includes GHK-Cu, studied for collagen support and skin renewal."),
-            ("Calm from within", "Includes KPV, studied for supporting a balanced inflammatory response."),
-            ("One simple plan", "Four peptides in one protocol means fewer products and one routine."),
+            ("Recovery and repair", "BPC-157 (15 mg) and TB-500 (15 mg), studied for tissue repair."),
+            ("Skin and collagen", "GHK-Cu (50 mg), studied for collagen support and skin renewal."),
+            ("Calm from within", "KPV (15 mg), studied for supporting a balanced inflammatory response."),
+            ("One simple plan", "Four peptides in one vial means fewer products and one routine."),
         ],
         options=[
             ("2 vial pack", "Single Purchase", "No commitment", PRODUCT["klow"]),
             ("Best value", "Subscribe", "10% off, auto renews", PRODUCT["klow"]),
         ],
         faq=[
-            ("Why a blend?", "One protocol covers recovery and skin support instead of buying products separately."),
-            ("Who is KLOW for?", "People who want recovery and skin support in a single plan. A licensed provider reviews your goals and history before anything ships."),
+            ("What is in each vial?", "Each vial contains BPC-157 15 mg, TB-500 15 mg, GHK-Cu 50 mg and KPV 15 mg. Your provider confirms dosing during your online visit."),
+            ("Why combine four peptides?", "One protocol covers recovery and skin support instead of buying products separately."),
+            ("Who is this for?", "People who want recovery and skin support in a single plan. A licensed provider reviews your goals and history before anything ships."),
             ("How is it shipped?", SHIP_ANSWER),
             ("Is this legal?", LEGAL_ANSWER),
         ],
-        closer="One blend. Every goal.",
-        closer_img=("klow-kit.jpg", "AACTIVATED Rx KLOW two vial kit"),
+        closer="Four peptides. Every goal.",
+        closer_img=("rx-vial.jpg", "AACTIVATED Rx prescription vial"),
     ),
 ]
 
@@ -300,13 +303,13 @@ def hero(eyebrow, h1, lede, primary, secondary, checks, items):
 """
 
 
-def why():
+def why(cold=True):
     rows = [
         ("Evaluated by a licensed provider", "Yes", "No"),
         ("Prescription written in your name", "Yes", "No"),
         ("Prepared by a state licensed 503A pharmacy", "Yes", "Unknown source"),
         ("Labeled for human use", "Yes", "“Not for human consumption”"),
-        ("Cold shipped overnight", "Yes", "Often not"),
+        ("Cold shipped overnight", "Yes", "Often not") if cold else ("Shipped direct from the pharmacy", "Yes", "Unknown source"),
         ("Ongoing provider support", "Yes", "No"),
     ]
     trs = "".join(
@@ -316,7 +319,8 @@ def why():
     cards = [
         ("telehealth-visit.jpg", "Patient on a video visit with a provider", "A real telehealth visit", "Meet a licensed U.S. provider online from home. No waiting room, no guesswork."),
         ("pharmacy.jpg", "Pharmacist compounding in a clean room", "A licensed 503A pharmacy", "Your prescription is compounded for you by a state licensed pharmacy, not shipped from a warehouse."),
-        ("cold-chain.jpg", "Vial packed in a cold shipping box", "Cold chain to your door", "Shipped cold and overnight so it arrives the way the pharmacy made it."),
+        ("cold-chain.jpg", "Vial packed in a cold shipping box", "Cold chain to your door", "Shipped cold and overnight so it arrives the way the pharmacy made it.") if cold else
+        ("woman-app.jpg", "Member checking her order on her phone", "Delivered to your door", "Shipped from the pharmacy straight to your door, prepared for you."),
     ]
     return f"""<section class="section section--alt" id="why">
   <div class="wrap">
@@ -444,7 +448,7 @@ def reviews():
 """
 
 
-def faq(items, closer, closer_img, cta):
+def faq(items, closer, closer_img, cta, delivered="Delivered cold to your door."):
     d = "".join(
         f'<details{" open" if i == 0 else ""}><summary>{e(q)}</summary><div class="answer">{a}</div></details>'
         for i, (q, a) in enumerate(items)
@@ -460,7 +464,7 @@ def faq(items, closer, closer_img, cta):
     <div class="closer">
       <div class="closer__copy">
         <h2>{e(closer)}</h2>
-        <p>Licensed providers. Real prescriptions. Delivered cold to your door.</p>
+        <p>Licensed providers. Real prescriptions. {delivered}</p>
         <a class="btn btn--white" href="{cta[1]}">{e(cta[0])}</a>
       </div>
       <div class="closer__img">{img(*closer_img)}</div>
@@ -499,18 +503,20 @@ RX_DISCLAIMER = (
 
 
 def product_page(p):
+    cold = p.get("cold", True)
+    rx_steps = RX_STEPS if cold else RX_STEPS[:2] + [("Receive it at home", "If prescribed, it ships to your door from a licensed 503A pharmacy.")]
     return "".join([
         head(p),
         header(p["cta"]),
         hero(p["eyebrow"], p["h1"], p["lede"], p["cta"], ("See Why It Is Legal", "#why"),
-             ["Licensed U.S. providers", "503A compounding pharmacies", "Cold overnight shipping"], p["gallery"]),
-        why(),
+             ["Licensed U.S. providers", "503A compounding pharmacies", "Cold overnight shipping" if cold else "Shipped to your door"], p["gallery"]),
+        why(cold),
         members_choose(p["members_img"], p["points"]),
         options(p["options"]),
-        steps(RX_STEPS),
+        steps(rx_steps),
         lineup(p["key"], "Every product is prescribed through telehealth and prepared by a licensed 503A pharmacy."),
         reviews(),
-        faq(p["faq"], p["closer"], p["closer_img"], p["cta"]),
+        faq(p["faq"], p["closer"], p["closer_img"], p["cta"], "Delivered cold to your door." if cold else "Delivered to your door."),
         footer(RX_DISCLAIMER),
     ])
 
