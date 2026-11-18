@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["claude/3d-scrolling-website-s09aix", "claude/focused-rubin-2ubdtc"]
+    branches: ["claude/3d-scrolling-website-s09aix"]
   workflow_dispatch:
 
 permissions:
